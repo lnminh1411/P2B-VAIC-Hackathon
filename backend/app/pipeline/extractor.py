@@ -20,6 +20,24 @@ def get_embed_model():
         _embed_model = SentenceTransformer(EMBED_MODEL_NAME)
     return _embed_model
 
+class FactEvidence(BaseModel):
+    company_name: str = Field(default="", description="Trích dẫn/vị trí cho Tên doanh nghiệp")
+    tax_code: str = Field(default="", description="Trích dẫn/vị trí cho Mã số thuế")
+    industry: str = Field(default="", description="Trích dẫn/vị trí cho Ngành nghề")
+    location: str = Field(default="", description="Trích dẫn/vị trí cho Trụ sở")
+    employee_count: str = Field(default="", description="Trích dẫn/vị trí cho Nhân sự")
+    rd_spend_ratio: str = Field(default="", description="Trích dẫn/vị trí cho R&D")
+    revenue: str = Field(default="", description="Trích dẫn/vị trí cho Doanh thu")
+    registered_capital: str = Field(default="", description="Trích dẫn/vị trí cho Vốn điều lệ")
+
+class PersonalEvidence(BaseModel):
+    full_name: str = Field(default="", description="Trích dẫn/vị trí cho Họ tên")
+    birth_year: str = Field(default="", description="Trích dẫn/vị trí cho Năm sinh")
+    location: str = Field(default="", description="Trích dẫn/vị trí cho Thành phố")
+    occupation: str = Field(default="", description="Trích dẫn/vị trí cho Nghề nghiệp")
+    degree: str = Field(default="", description="Trích dẫn/vị trí cho Bằng cấp")
+    monthly_income: str = Field(default="", description="Trích dẫn/vị trí cho Thu nhập")
+
 class ExtractedPassport(BaseModel):
     company_name: str = Field(description="Tên chính thức của doanh nghiệp")
     tax_code: str = Field(description="Mã số thuế hoặc mã số doanh nghiệp")
@@ -29,8 +47,8 @@ class ExtractedPassport(BaseModel):
     rd_spend_ratio: float = Field(description="Tỷ lệ chi phí R&D trên tổng doanh thu (giá trị thực từ 0.0 đến 1.0, ví dụ: 0.03)")
     revenue: int = Field(description="Doanh thu hàng năm tính bằng VND")
     registered_capital: int = Field(description="Vốn điều lệ đăng ký tính bằng VND")
-    evidence_quotes: Dict[str, str] = Field(description="Trích dẫn nguyên văn từ tài liệu chứng minh cho từng trường thông tin")
-    page_locations: Dict[str, str] = Field(description="Trang hoặc mục chứa thông tin trích dẫn")
+    evidence_quotes: FactEvidence = Field(description="Trích dẫn nguyên văn từ tài liệu chứng minh cho từng trường thông tin")
+    page_locations: FactEvidence = Field(description="Trang hoặc mục chứa thông tin trích dẫn")
 
 class ExtractedPersonal(BaseModel):
     full_name: str = Field(description="Họ và tên cá nhân")
@@ -39,8 +57,8 @@ class ExtractedPersonal(BaseModel):
     occupation: str = Field(description="Nghề nghiệp hoặc chuyên môn chính (ví dụ: Semiconductor Engineer, AI Researcher)")
     degree: str = Field(description="Bằng cấp cao nhất (ví dụ: Bachelor, Master, PhD)")
     monthly_income: int = Field(description="Thu nhập trung bình hàng tháng tính bằng VND")
-    evidence_quotes: Dict[str, str] = Field(description="Trích dẫn nguyên văn hỗ trợ cho các trường")
-    page_locations: Dict[str, str] = Field(description="Trang hoặc mục chứa thông tin")
+    evidence_quotes: PersonalEvidence = Field(description="Trích dẫn nguyên văn hỗ trợ cho các trường")
+    page_locations: PersonalEvidence = Field(description="Trang hoặc mục chứa thông tin")
 
 def extract_year_from_text(text: str) -> int:
     """Finds the most recent year (e.g. 2024, 2025) mentioned in the document text."""
