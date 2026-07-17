@@ -41,6 +41,35 @@ class HybridRetrievalEngine:
         
         def decompress_cache():
             gz_path = self.cache_path + ".gz"
+            
+            # Merge split parts if full gz file is missing
+            if not os.path.exists(gz_path):
+                part_num = 1
+                parts = []
+                while True:
+                    part_name = f"{gz_path}.part{part_num:03d}"
+                    if not os.path.exists(part_name):
+                        break
+                    parts.append(part_name)
+                    part_num += 1
+                if parts:
+                    print(f"Merging {len(parts)} split cache parts into {gz_path}...")
+                    tmp_gz = gz_path + ".tmp"
+                    try:
+                        with open(tmp_gz, 'wb') as dest:
+                            for p in parts:
+                                with open(p, 'rb') as src:
+                                    dest.write(src.read())
+                        os.replace(tmp_gz, gz_path)
+                        print("Cache parts merged successfully.")
+                    except Exception as e:
+                        print(f"[Retrieval Error] Failed to merge cache parts: {e}")
+                        if os.path.exists(tmp_gz):
+                            try:
+                                os.remove(tmp_gz)
+                            except Exception:
+                                pass
+
             if os.path.exists(gz_path):
                 print(f"Decompressing embeddings cache from {gz_path}...")
                 import gzip
