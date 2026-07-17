@@ -496,7 +496,7 @@ export default function App() {
 
   const findRuleById = (rulesList: any[], ruleId: string): any => {
     for (const r of rulesList) {
-      if (r.criterion_id === ruleId) return r;
+      if (r.criterion_id === ruleId || r.rule_id === ruleId) return r;
       if (r.rules) {
         const found = findRuleById(r.rules, ruleId);
         if (found) return found;
