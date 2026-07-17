@@ -73,9 +73,9 @@
       }
     },
     "fdi_semiconductor_incentive": {
-      "status": "MET",
+      "status": "NOT_MET",
       "criteria": {
-        "fdi_capital_check": "MET",
+        "fdi_capital_check": "NOT_MET",
         "fdi_industry_check": "MET"
       }
     },
@@ -96,9 +96,9 @@
       }
     },
     "high_tech_certification": {
-      "status": "NOT_MET",
+      "status": "MET",
       "criteria": {
-        "hte_rd_ratio": "NOT_MET",
+        "hte_rd_ratio": "MET",
         "hte_employee_limit": "MET"
       }
     },

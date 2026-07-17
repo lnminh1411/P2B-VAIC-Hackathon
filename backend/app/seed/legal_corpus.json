@@ -3,7 +3,7 @@
     "id": "law_sme_support_2017",
     "title": "Luật Hỗ trợ Doanh nghiệp nhỏ và vừa năm 2017 (Luật số 04/2017/QH14)",
     "issuing_body": "Quốc hội Việt Nam",
-    "source_url": "https://vbpl.vn/tw/Pages/vbpq-toanvan.aspx?ItemID=12345",
+    "source_url": "https://vbpl.vn/TW/Pages/vbpq-toanvan.aspx?ItemID=123164",
     "issued_at": "2017-06-12",
     "effective_from": "2018-01-01",
     "effective_to": null,
@@ -17,26 +17,26 @@
     "content_hash": "149e87bfd19913a1ccafcd9d597277788a985565fae7a8caee85d84417bad3bd"
   },
   {
-    "id": "decision_19_2021_qd_ttg",
-    "title": "Quyết định số 19/2021/QĐ-TTg quy định về tiêu chí xác định doanh nghiệp công nghệ cao",
+    "id": "decision_10_2021_qd_ttg",
+    "title": "Quyết định số 10/2021/QĐ-TTg quy định tiêu chí xác định doanh nghiệp công nghệ cao",
     "issuing_body": "Thủ tướng Chính phủ",
-    "source_url": "https://vbpl.vn/tw/Pages/vbpq-toanvan.aspx?ItemID=54321",
-    "issued_at": "2021-05-26",
-    "effective_from": "2021-07-15",
+    "source_url": "https://vbpl.vn/TW/Pages/vbpq-toanvan.aspx?ItemID=147480",
+    "issued_at": "2021-03-16",
+    "effective_from": "2021-04-30",
     "effective_to": null,
     "last_verified_at": "2026-07-17",
     "status": "CURRENT",
     "chunks": [
-      "Điều 5. Tiêu chí xác định doanh nghiệp công nghệ cao: Doanh nghiệp sản xuất sản phẩm công nghệ cao phải đáp ứng các tiêu chí sau: Doanh thu từ sản phẩm công nghệ cao phải đạt tối thiểu 70% tổng doanh thu thuần hàng năm; Tỷ lệ chi cho hoạt động nghiên cứu và phát triển (R&D) của doanh nghiệp tối thiểu đạt 1% đến 2% tùy theo doanh thu.",
-      "Điều 6. Số lượng lao động có trình độ đại học trở lên trực tiếp thực hiện nghiên cứu và phát triển đạt tối thiểu 1% đến 5% tổng số lao động tùy thuộc vào quy mô doanh nghiệp và số lượng nhân sự."
+      "Điều 3. Tiêu chí xác định doanh nghiệp công nghệ cao: Doanh nghiệp công nghiệp phải đáp ứng các tiêu chí sau: Tỷ lệ chi cho hoạt động nghiên cứu và phát triển (R&D) của doanh nghiệp trên tổng doanh thu thuần hàng năm tối thiểu đạt 1% đối với doanh nghiệp có doanh thu từ 100 tỷ đồng trở lên.",
+      "Điều 3. Số lượng lao động có trình độ chuyên môn trực tiếp thực hiện nghiên cứu và phát triển đạt tối thiểu 1% đến 2.5% tổng số lao động tùy thuộc vào quy mô doanh nghiệp."
     ],
-    "content_hash": "cb3bf7b9f32820fce15cba2fa81ddc823292606cb74f0762900353b067894eb8"
+    "content_hash": "8d4580963bba9179b7cc9fb40992850cd68320d4bee78b5443e809b868a457ef"
   },
   {
     "id": "decree_94_2020_nd_cp",
     "title": "Nghị định số 94/2020/NĐ-CP quy định cơ chế, chính sách ưu đãi đối với Trung tâm Đổi mới sáng tạo Quốc gia",
     "issuing_body": "Chính phủ Việt Nam",
-    "source_url": "https://vbpl.vn/tw/Pages/vbpq-toanvan.aspx?ItemID=9988",
+    "source_url": "https://vbpl.vn/TW/Pages/vbpq-toanvan.aspx?ItemID=140632",
     "issued_at": "2020-08-21",
     "effective_from": "2020-10-05",
     "effective_to": null,
@@ -52,7 +52,7 @@
     "id": "decision_1658_qd_ttg",
     "title": "Quyết định số 1658/QĐ-TTg phê duyệt Chiến lược quốc gia về tăng trưởng xanh giai đoạn 2021-2030",
     "issuing_body": "Thủ tướng Chính phủ",
-    "source_url": "https://vbpl.vn/tw/Pages/vbpq-toanvan.aspx?ItemID=7766",
+    "source_url": "https://vbpl.vn/TW/Pages/vbpq-toanvan.aspx?ItemID=150644",
     "issued_at": "2021-10-01",
     "effective_from": "2021-10-01",
     "effective_to": null,
@@ -68,7 +68,7 @@
     "id": "investment_law_2020",
     "title": "Luật Đầu tư năm 2020 (Luật số 61/2020/QH14)",
     "issuing_body": "Quốc hội Việt Nam",
-    "source_url": "https://vbpl.vn/tw/Pages/vbpq-toanvan.aspx?ItemID=1122",
+    "source_url": "https://vbpl.vn/TW/Pages/vbpq-toanvan.aspx?ItemID=142867",
     "issued_at": "2020-06-17",
     "effective_from": "2021-01-01",
     "effective_to": null,
@@ -76,15 +76,15 @@
     "status": "CURRENT",
     "chunks": [
       "Điều 19. Ngành, nghề ưu đãi đầu tư: Công nghệ thông tin, sản xuất sản phẩm phần mềm, linh kiện điện tử, bán dẫn, sản phẩm công nghệ số trọng điểm là ngành nghề đặc biệt ưu đãi đầu tư.",
-      "Điều 20. Ưu đãi đầu tư đặc biệt: Áp dụng thuế suất CIT ưu đãi đặc biệt tối thiểu 5% trong thời hạn tối đa 30 năm đối với các dự án thành lập mới trung tâm nghiên cứu và phát triển có tổng vốn đầu tư từ 100 tỷ đồng trở lên."
+      "Điều 20. Ưu đãi đầu tư đặc biệt: Áp dụng thuế suất CIT ưu đãi đặc biệt tối thiểu 5% trong thời hạn tối đa 30 năm đối với các dự án thành lập mới trung tâm nghiên cứu và phát triển có tổng vốn đầu tư từ 3.000 tỷ đồng trở lên."
     ],
-    "content_hash": "c1a9a3fb582f43f3dd8949809b23d3d1c0639a91e97ea16831795dac19f2a22b"
+    "content_hash": "beaebe01ab4873a54a3382246a8077a2ac0f8ea0cfde48ad5c460d0d1f4b415a"
   },
   {
     "id": "decision_127_qd_ttg",
     "title": "Quyết định số 127/QĐ-TTg về Chiến lược quốc gia về nghiên cứu, phát triển và ứng dụng Trí tuệ nhân tạo đến năm 2030",
     "issuing_body": "Thủ tướng Chính phủ",
-    "source_url": "https://vbpl.vn/tw/Pages/vbpq-toanvan.aspx?ItemID=3344",
+    "source_url": "https://vbpl.vn/TW/Pages/vbpq-toanvan.aspx?ItemID=146054",
     "issued_at": "2021-01-26",
     "effective_from": "2021-01-26",
     "effective_to": null,
