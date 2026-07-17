@@ -3,7 +3,7 @@
     "id": "law_sme_support_2017",
     "title": "Luật Hỗ trợ Doanh nghiệp nhỏ và vừa năm 2017 (Luật số 04/2017/QH14)",
     "issuing_body": "Quốc hội Việt Nam",
-    "source_url": "https://vbpl.vn/TW/Pages/vbpq-toanvan.aspx?ItemID=123164",
+    "source_url": "https://vbpl.vn/pages/portal.aspx?SearchTerm=04/2017/QH14",
     "issued_at": "2017-06-12",
     "effective_from": "2018-01-01",
     "effective_to": null,
@@ -17,10 +17,74 @@
     "content_hash": "149e87bfd19913a1ccafcd9d597277788a985565fae7a8caee85d84417bad3bd"
   },
   {
+    "id": "decree_80_2021_nd_cp",
+    "title": "Nghị định số 80/2021/NĐ-CP hướng dẫn Luật Hỗ trợ Doanh nghiệp nhỏ và vừa",
+    "issuing_body": "Chính phủ Việt Nam",
+    "source_url": "https://vbpl.vn/pages/portal.aspx?SearchTerm=80/2021/ND-CP",
+    "issued_at": "2021-08-26",
+    "effective_from": "2021-10-15",
+    "effective_to": null,
+    "last_verified_at": "2026-07-17",
+    "status": "CURRENT",
+    "chunks": [
+      "Điều 5. Hỗ trợ công nghệ: Hỗ trợ tối đa 50% giá trị hợp đồng tư vấn giải pháp chuyển đổi số cho doanh nghiệp nhưng không quá 50 triệu đồng/năm đối với doanh nghiệp nhỏ.",
+      "Điều 11. Hỗ trợ phát triển nguồn nhân lực: Miễn học phí cho học viên của doanh nghiệp nhỏ và vừa khi tham gia các khóa đào tạo khởi sự kinh doanh và quản trị doanh nghiệp sử dụng ngân sách nhà nước."
+    ],
+    "content_hash": "29136dea6c9ccede8dcf6aeb1aa243085a05971bba4f73dc175277034ad4aebc"
+  },
+  {
+    "id": "decree_39_2018_nd_cp",
+    "title": "Nghị định số 39/2018/NĐ-CP chi tiết Luật Hỗ trợ Doanh nghiệp nhỏ và vừa",
+    "issuing_body": "Chính phủ Việt Nam",
+    "source_url": "https://vbpl.vn/pages/portal.aspx?SearchTerm=39/2018/ND-CP",
+    "issued_at": "2018-03-11",
+    "effective_from": "2018-03-11",
+    "effective_to": null,
+    "last_verified_at": "2026-07-17",
+    "status": "CURRENT",
+    "chunks": [
+      "Điều 12. Hỗ trợ tư vấn pháp lý: Thiết lập mạng lưới tư vấn viên pháp luật để hỗ trợ pháp lý, giải quyết tranh chấp kinh doanh cho doanh nghiệp nhỏ và vừa.",
+      "Điều 14. Hỗ trợ thông tin: Bộ Kế hoạch và Đầu tư xây dựng Cổng thông tin quốc gia hỗ trợ doanh nghiệp nhỏ và vừa để cung cấp miễn phí thông tin về cơ chế, chính sách, kế hoạch, chương trình hỗ trợ."
+    ],
+    "content_hash": "1763489073d42321883e33ba948d39300567b5aa972910c39355b7fe6445c6a9"
+  },
+  {
+    "id": "circular_06_2022_tt_bkhdt",
+    "title": "Thông tư số 06/2022/TT-BKHĐT hướng dẫn một số điều về hỗ trợ doanh nghiệp nhỏ và vừa",
+    "issuing_body": "Bộ Kế hoạch và Đầu tư",
+    "source_url": "https://vbpl.vn/pages/portal.aspx?SearchTerm=06/2022/TT-BKHDT",
+    "issued_at": "2022-05-10",
+    "effective_from": "2022-06-25",
+    "effective_to": null,
+    "last_verified_at": "2026-07-17",
+    "status": "CURRENT",
+    "chunks": [
+      "Điều 4. Quy trình hỗ trợ: Doanh nghiệp chuẩn bị hồ sơ đề xuất nhu cầu hỗ trợ nộp trực tiếp hoặc trực tuyến qua Cổng thông tin hỗ trợ doanh nghiệp nhỏ và vừa.",
+      "Điều 8. Kinh phí hỗ trợ: Cơ quan hỗ trợ SME thực hiện thanh toán chi phí hỗ trợ trực tiếp cho đơn vị cung cấp dịch vụ hoặc hoàn trả cho doanh nghiệp theo hợp đồng đã thực hiện."
+    ],
+    "content_hash": "45fe980d45470b12cf9a42476f299d9f940f1e78f52b5d5172419afe2ec35966"
+  },
+  {
+    "id": "law_high_tech_2008",
+    "title": "Luật Công nghệ cao năm 2008 (Luật số 21/2008/QH12)",
+    "issuing_body": "Quốc hội Việt Nam",
+    "source_url": "https://vbpl.vn/pages/portal.aspx?SearchTerm=21/2008/QH12",
+    "issued_at": "2008-11-13",
+    "effective_from": "2009-07-01",
+    "effective_to": null,
+    "last_verified_at": "2026-07-17",
+    "status": "CURRENT",
+    "chunks": [
+      "Điều 18. Doanh nghiệp công nghệ cao: Là doanh nghiệp sản xuất sản phẩm công nghệ cao, ứng dụng công nghệ cao có hoạt động nghiên cứu phát triển, quy mô doanh thu và nhân lực nghiên cứu đạt chuẩn theo quy định của Thủ tướng Chính phủ.",
+      "Điều 19. Ưu đãi đối với doanh nghiệp công nghệ cao: Được hưởng mức ưu đãi cao nhất theo quy định của pháp luật về thuế thu nhập doanh nghiệp, thuế giá trị gia tăng, thuế xuất nhập khẩu và đất đai."
+    ],
+    "content_hash": "6661a2375eeb85c65b73d984f0283ef3e2f97f614618a6233495f623176ee9ba"
+  },
+  {
     "id": "decision_10_2021_qd_ttg",
     "title": "Quyết định số 10/2021/QĐ-TTg quy định tiêu chí xác định doanh nghiệp công nghệ cao",
     "issuing_body": "Thủ tướng Chính phủ",
-    "source_url": "https://vbpl.vn/TW/Pages/vbpq-toanvan.aspx?ItemID=147480",
+    "source_url": "https://vbpl.vn/pages/portal.aspx?SearchTerm=10/2021/QD-TTg",
     "issued_at": "2021-03-16",
     "effective_from": "2021-04-30",
     "effective_to": null,
@@ -33,10 +97,42 @@
     "content_hash": "8d4580963bba9179b7cc9fb40992850cd68320d4bee78b5443e809b868a457ef"
   },
   {
+    "id": "decision_38_2020_qd_ttg",
+    "title": "Quyết định số 38/2020/QĐ-TTg ban hành danh mục công nghệ cao được ưu tiên đầu tư phát triển",
+    "issuing_body": "Thủ tướng Chính phủ",
+    "source_url": "https://vbpl.vn/pages/portal.aspx?SearchTerm=38/2020/QD-TTg",
+    "issued_at": "2020-12-30",
+    "effective_from": "2021-02-15",
+    "effective_to": null,
+    "last_verified_at": "2026-07-17",
+    "status": "CURRENT",
+    "chunks": [
+      "Điều 1. Danh mục công nghệ cao: Công nghệ trí tuệ nhân tạo; Công nghệ Internet vạn vật; Công nghệ sinh học thế hệ mới; Công nghệ sản xuất linh kiện bán dẫn và vi mạch điện tử.",
+      "Điều 2. Tổ chức thực hiện: Bộ Khoa học và Công nghệ chủ trì phối hợp các bộ ngành định kỳ rà soát, đề xuất sửa đổi danh mục công nghệ cao ưu tiên đầu tư phù hợp xu hướng phát triển."
+    ],
+    "content_hash": "83728ee66c9f0e0637521cefbb63683328b9c185706ee91a1663f1c368fd7237"
+  },
+  {
+    "id": "decree_13_2019_nd_cp",
+    "title": "Nghị định số 13/2019/NĐ-CP về phát triển doanh nghiệp khoa học và công nghệ",
+    "issuing_body": "Chính phủ Việt Nam",
+    "source_url": "https://vbpl.vn/pages/portal.aspx?SearchTerm=13/2019/ND-CP",
+    "issued_at": "2019-02-01",
+    "effective_from": "2019-03-20",
+    "effective_to": null,
+    "last_verified_at": "2026-07-17",
+    "status": "CURRENT",
+    "chunks": [
+      "Điều 12. Miễn, giảm thuế thu nhập doanh nghiệp: Doanh nghiệp khoa học và công nghệ được miễn thuế thu nhập doanh nghiệp trong 4 năm và giảm 50% số thuế phải nộp trong 9 năm tiếp theo kể từ năm đầu tiên có thu nhập chịu thuế.",
+      "Điều 15. Hỗ trợ tín dụng: Các dự án sản xuất thử nghiệm sản phẩm khoa học công nghệ được hỗ trợ vay vốn ưu đãi từ Quỹ Đổi mới công nghệ quốc gia."
+    ],
+    "content_hash": "f5df8a8a5947993c24636cbdc067eb76bc54930fd6e0b05b3bdb690db14d64b2"
+  },
+  {
     "id": "decree_94_2020_nd_cp",
     "title": "Nghị định số 94/2020/NĐ-CP quy định cơ chế, chính sách ưu đãi đối với Trung tâm Đổi mới sáng tạo Quốc gia",
     "issuing_body": "Chính phủ Việt Nam",
-    "source_url": "https://vbpl.vn/TW/Pages/vbpq-toanvan.aspx?ItemID=140632",
+    "source_url": "https://vbpl.vn/pages/portal.aspx?SearchTerm=94/2020/ND-CP",
     "issued_at": "2020-08-21",
     "effective_from": "2020-10-05",
     "effective_to": null,
@@ -49,10 +145,42 @@
     "content_hash": "c2cf7c6da497299217bb197b08cfe1515fa3a22be6365c76d5ad2dbf296a6544"
   },
   {
+    "id": "decree_35_2022_nd_cp",
+    "title": "Nghị định số 35/2022/NĐ-CP về quản lý khu công nghiệp và khu kinh tế",
+    "issuing_body": "Chính phủ Việt Nam",
+    "source_url": "https://vbpl.vn/pages/portal.aspx?SearchTerm=35/2022/ND-CP",
+    "issued_at": "2022-05-28",
+    "effective_from": "2022-07-15",
+    "effective_to": null,
+    "last_verified_at": "2026-07-17",
+    "status": "CURRENT",
+    "chunks": [
+      "Điều 28. Ưu đãi đầu tư khu công nghiệp: Các dự án đầu tư phát triển hạ tầng và dự án công nghệ cao sản xuất tại khu công nghiệp được hưởng ưu đãi thuế CIT và thuế nhập khẩu theo khung pháp lý ưu đãi đặc biệt.",
+      "Điều 33. Thủ tục một cửa: Ban quản lý khu công nghiệp thực hiện thẩm quyền cấp, điều chỉnh giấy chứng nhận đăng ký đầu tư đối với các dự án thứ cấp một cách nhanh chóng."
+    ],
+    "content_hash": "cddf64c581ae61b829acb2857b303418615fe70c3921f664d0905e7c00cfb3e5"
+  },
+  {
+    "id": "decision_1269_qd_ttg",
+    "title": "Quyết định số 1269/QĐ-TTg thành lập Trung tâm Đổi mới sáng tạo Quốc gia",
+    "issuing_body": "Thủ tướng Chính phủ",
+    "source_url": "https://vbpl.vn/pages/portal.aspx?SearchTerm=1269/QD-TTg",
+    "issued_at": "2019-10-02",
+    "effective_from": "2019-10-02",
+    "effective_to": null,
+    "last_verified_at": "2026-07-17",
+    "status": "CURRENT",
+    "chunks": [
+      "Điều 1. Thành lập NIC: Thành lập Trung tâm Đổi mới sáng tạo Quốc gia trực thuộc Bộ Kế hoạch và Đầu tư nhằm thúc đẩy hoạt động đổi mới sáng tạo, chuyển giao công nghệ, hỗ trợ doanh nghiệp khởi nghiệp sáng tạo.",
+      "Điều 2. Nhiệm vụ của Trung tâm: Xây dựng hệ sinh thái đổi mới sáng tạo; Tổ chức đào tạo nguồn nhân lực số; Thu hút vốn đầu tư mạo hiểm quốc tế."
+    ],
+    "content_hash": "fc0c39e9d83e3afc019a20119fb16c7ea55919c87e67c6efd57ecfcf0b7e5932"
+  },
+  {
     "id": "decision_1658_qd_ttg",
     "title": "Quyết định số 1658/QĐ-TTg phê duyệt Chiến lược quốc gia về tăng trưởng xanh giai đoạn 2021-2030",
     "issuing_body": "Thủ tướng Chính phủ",
-    "source_url": "https://vbpl.vn/TW/Pages/vbpq-toanvan.aspx?ItemID=150644",
+    "source_url": "https://vbpl.vn/pages/portal.aspx?SearchTerm=1658/QD-TTg",
     "issued_at": "2021-10-01",
     "effective_from": "2021-10-01",
     "effective_to": null,
@@ -65,10 +193,58 @@
     "content_hash": "78349d9774b533eb0de2e41d279c2f6d7b8c599106515424c27aba4a6f9df6e4"
   },
   {
+    "id": "law_environment_2020",
+    "title": "Luật Bảo vệ môi trường năm 2020 (Luật số 72/2020/QH14)",
+    "issuing_body": "Quốc hội Việt Nam",
+    "source_url": "https://vbpl.vn/pages/portal.aspx?SearchTerm=72/2020/QH14",
+    "issued_at": "2020-11-17",
+    "effective_from": "2022-01-01",
+    "effective_to": null,
+    "last_verified_at": "2026-07-17",
+    "status": "CURRENT",
+    "chunks": [
+      "Điều 138. Phát triển kinh tế tuần hoàn: Nhà nước khuyến khích, ưu đãi cho tổ chức, cá nhân thực hiện hoạt động nghiên cứu khoa học, ứng dụng công nghệ, sản xuất sản phẩm thân thiện môi trường.",
+      "Điều 141. Tín dụng xanh, trái phiếu xanh: Các dự án đầu tư bảo vệ môi trường, tiết kiệm năng lượng được ưu tiên cấp tín dụng xanh với lãi suất ưu đãi."
+    ],
+    "content_hash": "d07dcf715e88b50507a3e249b1984637295d6197b47af43f02d266c1e9729954"
+  },
+  {
+    "id": "decree_08_2022_nd_cp",
+    "title": "Nghị định số 08/2022/NĐ-CP quy định chi tiết một số điều của Luật Bảo vệ môi trường",
+    "issuing_body": "Chính phủ Việt Nam",
+    "source_url": "https://vbpl.vn/pages/portal.aspx?SearchTerm=08/2022/ND-CP",
+    "issued_at": "2022-01-10",
+    "effective_from": "2022-01-10",
+    "effective_to": null,
+    "last_verified_at": "2026-07-17",
+    "status": "CURRENT",
+    "chunks": [
+      "Điều 131. Ưu đãi về đất đai và tài chính: Các dự án xử lý chất thải tập trung, sản xuất năng lượng sạch được miễn, giảm tiền sử dụng đất và hỗ trợ vốn đầu tư hạ tầng.",
+      "Điều 135. Hỗ trợ sản phẩm thân thiện môi trường: Các sản phẩm được gắn nhãn sinh thái Việt Nam được ưu tiên mua sắm công bằng ngân sách nhà nước."
+    ],
+    "content_hash": "5593b85b1fa00b44f77cb86155aa8a191544b6aeb1fb1754a4645d60d6cae45b"
+  },
+  {
+    "id": "decision_500_qd_ttg",
+    "title": "Quyết định số 500/QĐ-TTg phê duyệt Quy hoạch phát triển điện lực quốc gia (Quy hoạch điện VIII)",
+    "issuing_body": "Thủ tướng Chính phủ",
+    "source_url": "https://vbpl.vn/pages/portal.aspx?SearchTerm=500/QD-TTg",
+    "issued_at": "2023-05-15",
+    "effective_from": "2023-05-15",
+    "effective_to": null,
+    "last_verified_at": "2026-07-17",
+    "status": "CURRENT",
+    "chunks": [
+      "Mục III. Định hướng phát triển: Ưu tiên phát triển mạnh mẽ các nguồn năng lượng tái tạo (điện gió, điện mặt trời, điện sinh khối) phục vụ sản xuất và tiêu dùng nội địa.",
+      "Mục IV. Giải pháp thực hiện: Khuyến khích mô hình điện mặt trời mái nhà tự sản tự tiêu phục vụ cho các doanh nghiệp sản xuất công nghiệp và dân dụng."
+    ],
+    "content_hash": "6f75bee95324bb71151e5948c3db3ecb880a1d73da2ddbefbc6e0c6908f88d86"
+  },
+  {
     "id": "investment_law_2020",
     "title": "Luật Đầu tư năm 2020 (Luật số 61/2020/QH14)",
     "issuing_body": "Quốc hội Việt Nam",
-    "source_url": "https://vbpl.vn/TW/Pages/vbpq-toanvan.aspx?ItemID=142867",
+    "source_url": "https://vbpl.vn/pages/portal.aspx?SearchTerm=61/2020/QH14",
     "issued_at": "2020-06-17",
     "effective_from": "2021-01-01",
     "effective_to": null,
@@ -81,10 +257,58 @@
     "content_hash": "beaebe01ab4873a54a3382246a8077a2ac0f8ea0cfde48ad5c460d0d1f4b415a"
   },
   {
+    "id": "decree_31_2021_nd_cp",
+    "title": "Nghị định số 31/2021/NĐ-CP hướng dẫn chi tiết thi hành Luật Đầu tư",
+    "issuing_body": "Chính phủ Việt Nam",
+    "source_url": "https://vbpl.vn/pages/portal.aspx?SearchTerm=31/2021/ND-CP",
+    "issued_at": "2021-03-26",
+    "effective_from": "2021-03-26",
+    "effective_to": null,
+    "last_verified_at": "2026-07-17",
+    "status": "CURRENT",
+    "chunks": [
+      "Điều 22. Danh mục ngành nghề ưu đãi: Quy định chi tiết các lĩnh vực công nghệ cao, linh kiện điện tử, vi mạch bán dẫn và sản phẩm công nghệ hỗ trợ được áp dụng mức ưu đãi đầu tư.",
+      "Điều 30. Quy trình đăng ký ưu đãi: Doanh nghiệp tự xác định điều kiện ưu đãi đầu tư và thực hiện thủ tục tại cơ quan thuế, hải quan không cần xin xác nhận riêng."
+    ],
+    "content_hash": "5a2249ad3e329f1b6ccf2471400617ff096abca96e202e54a908f2542c170f62"
+  },
+  {
+    "id": "decision_1018_qd_ttg",
+    "title": "Quyết định số 1018/QĐ-TTg ban hành Chiến lược phát triển công nghiệp bán dẫn Việt Nam đến năm 2030",
+    "issuing_body": "Thủ tướng Chính phủ",
+    "source_url": "https://vbpl.vn/pages/portal.aspx?SearchTerm=1018/QD-TTg",
+    "issued_at": "2024-09-21",
+    "effective_from": "2024-09-21",
+    "effective_to": null,
+    "last_verified_at": "2026-07-17",
+    "status": "CURRENT",
+    "chunks": [
+      "Mục II. Mục tiêu đến năm 2030: Thu hút các tập đoàn bán dẫn lớn xây dựng nhà máy đóng gói, kiểm thử và sản xuất chip bán dẫn tại Việt Nam; Đào tạo tối thiểu 50.000 kỹ sư bán dẫn.",
+      "Mục III. Giải pháp đột phá: Hỗ trợ tài chính đặc biệt cho dự án R&D thiết kế chip và chế tạo linh kiện bán dẫn từ Quỹ phát triển khoa học công nghệ quốc gia."
+    ],
+    "content_hash": "3eb1381d48e67edb4bd7213d960fd5dbc457931c03442e9776a9bd0b86157a68"
+  },
+  {
+    "id": "decision_29_2021_qd_ttg",
+    "title": "Quyết định số 29/2021/QĐ-TTg quy định về ưu đãi đầu tư đặc biệt",
+    "issuing_body": "Thủ tướng Chính phủ",
+    "source_url": "https://vbpl.vn/pages/portal.aspx?SearchTerm=29/2021/QD-TTg",
+    "issued_at": "2021-10-06",
+    "effective_from": "2021-10-06",
+    "effective_to": null,
+    "last_verified_at": "2026-07-17",
+    "status": "CURRENT",
+    "chunks": [
+      "Điều 5. Mức ưu đãi thuế suất: Thuế suất thuế TNDN ưu đãi 9% trong 30 năm, 7% trong 33 năm hoặc 5% trong 37 năm áp dụng tùy thuộc mức độ đóng góp khoa học công nghệ của dự án đầu tư đặc biệt.",
+      "Điều 6. Miễn giảm tiền thuê đất: Miễn tiền thuê đất, thuê mặt nước lên tới 18-22 năm đối với dự án nghiên cứu và sản xuất công nghệ cao quy mô lớn."
+    ],
+    "content_hash": "3210640cb60b3d5fd7478be97fbac6252023692b233223beb4f4d447722c554e"
+  },
+  {
     "id": "decision_127_qd_ttg",
     "title": "Quyết định số 127/QĐ-TTg về Chiến lược quốc gia về nghiên cứu, phát triển và ứng dụng Trí tuệ nhân tạo đến năm 2030",
     "issuing_body": "Thủ tướng Chính phủ",
-    "source_url": "https://vbpl.vn/TW/Pages/vbpq-toanvan.aspx?ItemID=146054",
+    "source_url": "https://vbpl.vn/pages/portal.aspx?SearchTerm=127/QD-TTg",
     "issued_at": "2021-01-26",
     "effective_from": "2021-01-26",
     "effective_to": null,
@@ -95,5 +319,53 @@
       "Mục III.2. Phát triển nguồn nhân lực AI: Hỗ trợ kết nối chuyên gia AI quốc tế, đào tạo chuyên sâu và chuyển giao công nghệ cho doanh nghiệp khởi nghiệp trong nước."
     ],
     "content_hash": "e81ffd317058221fb97e23a896d2aa5ddf53ba4b62c6e25c3d87d8dff80d7db0"
+  },
+  {
+    "id": "decision_749_qd_ttg",
+    "title": "Quyết định số 749/QĐ-TTg phê duyệt Chương trình Chuyển đổi số quốc gia đến năm 2025",
+    "issuing_body": "Thủ tướng Chính phủ",
+    "source_url": "https://vbpl.vn/pages/portal.aspx?SearchTerm=749/QD-TTg",
+    "issued_at": "2020-06-03",
+    "effective_from": "2020-06-03",
+    "effective_to": null,
+    "last_verified_at": "2026-07-17",
+    "status": "CURRENT",
+    "chunks": [
+      "Mục II. Mục tiêu cơ bản: Phát triển chính phủ số, kinh tế số và xã hội số, phổ cập danh tính điện tử và thúc đẩy thanh toán không dùng tiền mặt.",
+      "Mục III. Nhiệm vụ giải pháp: Đẩy mạnh phát triển hạ tầng băng rộng cáp quang, mạng di động 5G, phát triển các nền tảng điện toán đám mây Make in Vietnam."
+    ],
+    "content_hash": "c234fb1e7b5d2cea3b982807c1cb8e0608b1cba7fe66c6181e708382f9a0a89e"
+  },
+  {
+    "id": "decree_13_2023_nd_cp",
+    "title": "Nghị định số 13/2023/NĐ-CP về bảo vệ dữ liệu cá nhân",
+    "issuing_body": "Chính phủ Việt Nam",
+    "source_url": "https://vbpl.vn/pages/portal.aspx?SearchTerm=13/2023/ND-CP",
+    "issued_at": "2023-04-17",
+    "effective_from": "2023-07-01",
+    "effective_to": null,
+    "last_verified_at": "2026-07-17",
+    "status": "CURRENT",
+    "chunks": [
+      "Điều 9. Quyền của chủ thể dữ liệu: Chủ thể dữ liệu có quyền đồng ý, rút lại sự đồng ý, yêu cầu xóa dữ liệu và được thông báo về các hoạt động xử lý dữ liệu cá nhân.",
+      "Điều 24. Đánh giá tác động xử lý dữ liệu cá nhân: Doanh nghiệp xử lý dữ liệu cá nhân phải lập và lưu giữ Hồ sơ đánh giá tác động xử lý dữ liệu cá nhân gửi về Bộ Công an."
+    ],
+    "content_hash": "1c10c6faef1d9515ca4995e47dd9b477eab113b260cc41699346bdd26afdaad0"
+  },
+  {
+    "id": "decision_2289_qd_ttg",
+    "title": "Quyết định số 2289/QĐ-TTg ban hành Chiến lược quốc gia về Cách mạng công nghiệp lần thứ tư đến năm 2030",
+    "issuing_body": "Thủ tướng Chính phủ",
+    "source_url": "https://vbpl.vn/pages/portal.aspx?SearchTerm=2289/QD-TTg",
+    "issued_at": "2020-12-31",
+    "effective_from": "2020-12-31",
+    "effective_to": null,
+    "last_verified_at": "2026-07-17",
+    "status": "CURRENT",
+    "chunks": [
+      "Mục III. Định hướng chiến lược: Hoàn thiện thể chế thúc đẩy đổi mới sáng tạo, phát triển hạ tầng số kết nối vạn vật, đầu tư mạnh mẽ vào các công nghệ tương lai như AI, Big Data, Blockchain.",
+      "Mục IV. Tổ chức thực hiện: Giao Bộ Thông tin và Truyền thông chủ trì xây dựng kế hoạch hành động về hạ tầng mạng, an toàn thông tin phục vụ CMCN 4.0."
+    ],
+    "content_hash": "4049bb159c2fc2ee3216c20d58c1506a2fa611e322bcdf1073a0ee0f082e4334"
   }
 ]

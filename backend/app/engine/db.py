@@ -168,6 +168,21 @@ def init_db():
                     (opp["id"], json.dumps(opp, ensure_ascii=False))
                 )
             print(f"Seeded {len(opps)} policy opportunities.")
+
+    # Seed Legal Documents if empty
+    cursor.execute("SELECT COUNT(*) FROM legal_documents")
+    if cursor.fetchone()[0] == 0:
+        seed_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "seed")
+        corpus_file = os.path.join(seed_dir, "legal_corpus.json")
+        if os.path.exists(corpus_file):
+            with open(corpus_file, "r", encoding="utf-8") as f:
+                corpus = json.load(f)
+            for doc in corpus:
+                cursor.execute(
+                    "INSERT INTO legal_documents (id, title, chunks_json, updated_at) VALUES (?, ?, ?, ?)",
+                    (doc["id"], doc["title"], json.dumps(doc["chunks"], ensure_ascii=False), datetime.utcnow().isoformat())
+                )
+            print(f"Seeded {len(corpus)} legal documents.")
             
     # Seed default crawler config if empty
     cursor.execute("SELECT COUNT(*) FROM crawler_configs")
