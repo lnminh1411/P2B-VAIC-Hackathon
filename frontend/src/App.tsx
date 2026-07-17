@@ -674,7 +674,7 @@ export default function App() {
   // ------------------ LOGIN / REGISTER RENDER ------------------
   if (!token) {
     return (
-      <div className="min-h-screen bg-[#0b0f19] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/20 via-slate-950 to-slate-950 pointer-events-none" />
         <div className="w-full max-w-md bg-slate-900/60 border border-slate-800/80 rounded-2xl p-8 backdrop-blur-xl shadow-2xl relative z-10">
           <div className="flex items-center gap-3 justify-center mb-6">
@@ -760,10 +760,10 @@ export default function App() {
 
   // ------------------ MAIN DASHBOARD RENDER ------------------
   return (
-    <div className="min-h-screen bg-[#070913] text-white flex flex-col font-sans relative overflow-x-hidden">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans relative overflow-x-hidden">
       <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-indigo-500/5 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-violet-500/5 rounded-full blur-[120px] pointer-events-none" />
-
+ 
       {/* HEADER NAVBAR */}
       <header className="sticky top-0 z-40 bg-slate-950/70 backdrop-blur-xl border-b border-slate-900 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -918,7 +918,7 @@ export default function App() {
                       {editingField === key ? (
                         <div className="mt-2 flex items-center gap-2" onClick={e => e.stopPropagation()}>
                           <input 
-                            className="flex-1 bg-slate-950 border border-slate-800 rounded px-2.5 py-1 text-xs text-white focus:outline-none"
+                            className="flex-1 bg-slate-950 border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-100 focus:outline-none"
                             value={editValue}
                             onChange={(e) => setEditValue(e.target.value)}
                           />
@@ -927,7 +927,7 @@ export default function App() {
                         </div>
                       ) : (
                         <div className="mt-1.5 flex justify-between items-center">
-                          <span className="text-sm font-semibold text-white">{formatValue(key, field)}</span>
+                          <span className="text-sm font-semibold text-slate-100">{formatValue(key, field)}</span>
                           <button 
                             onClick={(e) => { e.stopPropagation(); handleEditField(key, field.value); }} 
                             className="text-slate-500 hover:text-white p-1"
@@ -976,7 +976,7 @@ export default function App() {
                   <label className="block text-xs font-medium text-slate-400 mb-1">Họ và tên</label>
                   <input 
                     type="text"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none"
                     value={personalPassport.full_name || ''}
                     onChange={(e) => setPersonalPassport({ ...personalPassport, full_name: e.target.value })}
                   />
@@ -987,7 +987,7 @@ export default function App() {
                     <label className="block text-xs font-medium text-slate-400 mb-1">Năm sinh</label>
                     <input 
                       type="number"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none"
                       value={personalPassport.birth_year || 0}
                       onChange={(e) => setPersonalPassport({ ...personalPassport, birth_year: Number(e.target.value) })}
                     />
@@ -996,7 +996,7 @@ export default function App() {
                     <label className="block text-xs font-medium text-slate-400 mb-1">Thành phố</label>
                     <input 
                       type="text"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none"
                       value={personalPassport.location || ''}
                       onChange={(e) => setPersonalPassport({ ...personalPassport, location: e.target.value })}
                     />
@@ -1007,7 +1007,7 @@ export default function App() {
                   <label className="block text-xs font-medium text-slate-400 mb-1">Nghề nghiệp / Chuyên môn</label>
                   <input 
                     type="text"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none"
                     value={personalPassport.occupation || ''}
                     onChange={(e) => setPersonalPassport({ ...personalPassport, occupation: e.target.value })}
                     placeholder="Semiconductor Engineer"
@@ -1019,7 +1019,7 @@ export default function App() {
                     <label className="block text-xs font-medium text-slate-400 mb-1">Bằng cấp</label>
                     <input 
                       type="text"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none"
                       value={personalPassport.degree || ''}
                       onChange={(e) => setPersonalPassport({ ...personalPassport, degree: e.target.value })}
                       placeholder="Master"
@@ -1029,7 +1029,7 @@ export default function App() {
                     <label className="block text-xs font-medium text-slate-400 mb-1">Thu nhập tháng (VND)</label>
                     <input 
                       type="number"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none"
                       value={personalPassport.monthly_income || 0}
                       onChange={(e) => setPersonalPassport({ ...personalPassport, monthly_income: Number(e.target.value) })}
                     />
@@ -1076,7 +1076,7 @@ export default function App() {
             <div className="flex-1 bg-slate-950 border border-slate-800/80 rounded-lg px-3 py-2 flex items-center gap-2">
               <Search className="w-4 h-4 text-slate-500" />
               <input 
-                className="bg-transparent flex-1 text-xs text-white focus:outline-none"
+                className="bg-transparent flex-1 text-xs text-slate-100 focus:outline-none"
                 placeholder="Tìm kiếm chính sách (ví dụ: ưu đãi thuế bán dẫn, tài trợ khoa học công nghệ...)"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -1283,7 +1283,7 @@ export default function App() {
                             <div>
                               <label className="block text-xs font-medium text-slate-400 mb-1">Góp ý của người duyệt (Reviewer Comments)</label>
                               <textarea 
-                                className="w-full h-16 bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none"
+                                className="w-full h-16 bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-100 focus:outline-none"
                                 value={reviewerComments}
                                 onChange={(e) => setReviewerComments(e.target.value)}
                                 placeholder="Ghi chú thẩm định hồ sơ..."
@@ -1454,7 +1454,7 @@ export default function App() {
                   <input 
                     type="password"
                     required
-                    className="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none"
+                    className="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none"
                     value={oldPassword}
                     onChange={(e) => setOldPassword(e.target.value)}
                   />
@@ -1464,7 +1464,7 @@ export default function App() {
                   <input 
                     type="password"
                     required
-                    className="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none"
+                    className="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                   />

@@ -4,9 +4,11 @@
 @theme {
   --color-slate-950: rgb(var(--bg-main-rgb));
   --color-slate-900: rgb(var(--bg-card-rgb));
+  --color-slate-850: rgb(var(--bg-input-rgb));
   --color-slate-800: rgb(var(--border-color-rgb));
   --color-slate-700: rgb(var(--border-focus-rgb));
-  --color-white: rgb(var(--text-primary-rgb));
+  --color-slate-100: rgb(var(--text-primary-rgb));
+  --color-slate-200: rgb(var(--text-primary-rgb));
   --color-slate-300: rgb(var(--text-secondary-rgb));
   --color-slate-400: rgb(var(--text-secondary-rgb));
   --color-slate-500: rgb(var(--text-muted-rgb));
