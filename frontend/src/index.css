@@ -1,20 +1,40 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
+@theme {
+  --color-slate-950: rgb(var(--bg-main-rgb));
+  --color-slate-900: rgb(var(--bg-card-rgb));
+  --color-slate-800: rgb(var(--border-color-rgb));
+  --color-slate-700: rgb(var(--border-focus-rgb));
+  --color-white: rgb(var(--text-primary-rgb));
+  --color-slate-300: rgb(var(--text-secondary-rgb));
+  --color-slate-400: rgb(var(--text-secondary-rgb));
+  --color-slate-500: rgb(var(--text-muted-rgb));
+}
+
 :root {
   --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   --font-heading: 'Outfit', system-ui, -apple-system, sans-serif;
   
-  /* Color Palette - Premium Dark Mode */
-  --bg-main: #0b0f19;
-  --bg-card: rgba(17, 24, 39, 0.7);
-  --bg-input: #1f2937;
-  --border-color: rgba(255, 255, 255, 0.08);
-  --border-focus: rgba(99, 102, 241, 0.4);
+  /* Color Palette - Premium Light Mode (Default) */
+  --bg-main-rgb: 248 250 252;      /* #f8fafc */
+  --bg-card-rgb: 255 255 255;      /* #ffffff */
+  --bg-input-rgb: 255 255 255;
+  --border-color-rgb: 226 232 240; /* #e2e8f0 */
+  --border-focus-rgb: 199 210 254; /* #c7d2fe */
+  --text-primary-rgb: 15 23 42;    /* #0f172a */
+  --text-secondary-rgb: 71 85 105; /* #475569 */
+  --text-muted-rgb: 148 163 184;   /* #94a3b8 */
   
-  --text-primary: #f3f4f6;
-  --text-secondary: #9ca3af;
-  --text-muted: #6b7280;
+  --bg-main: rgb(var(--bg-main-rgb));
+  --bg-card: rgba(var(--bg-card-rgb), 0.75);
+  --bg-input: rgb(var(--bg-input-rgb));
+  --border-color: rgba(var(--border-color-rgb), 0.7);
+  --border-focus: rgb(var(--border-focus-rgb));
+  
+  --text-primary: rgb(var(--text-primary-rgb));
+  --text-secondary: rgb(var(--text-secondary-rgb));
+  --text-muted: rgb(var(--text-muted-rgb));
   
   /* Accents */
   --color-primary: #6366f1; /* Indigo */
@@ -31,8 +51,32 @@
   --radius-md: 14px;
   --radius-lg: 20px;
   --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  --shadow-premium: 0 10px 30px -10px rgba(0, 0, 0, 0.7);
+  --shadow-premium: 0 10px 30px -10px rgba(0, 0, 0, 0.05);
   --glass-blur: blur(12px);
+}
+
+.dark {
+  /* Color Palette - Premium Dark Mode */
+  --bg-main-rgb: 11 15 25;         /* #0b0f19 */
+  --bg-card-rgb: 17 24 39;         /* #111827 */
+  --bg-input-rgb: 31 41 55;        /* #1f2937 */
+  --border-color-rgb: 51 65 85;    /* #334155 */
+  --border-focus-rgb: 99 102 241;  /* #6366f1 */
+  --text-primary-rgb: 243 244 246; /* #f3f4f6 */
+  --text-secondary-rgb: 156 163 175; /* #9ca3af */
+  --text-muted-rgb: 107 114 128;   /* #6b7280 */
+  
+  --bg-main: rgb(var(--bg-main-rgb));
+  --bg-card: rgba(var(--bg-card-rgb), 0.7);
+  --bg-input: rgb(var(--bg-input-rgb));
+  --border-color: rgba(var(--border-color-rgb), 0.4);
+  --border-focus: rgb(var(--border-focus-rgb));
+  
+  --text-primary: rgb(var(--text-primary-rgb));
+  --text-secondary: rgb(var(--text-secondary-rgb));
+  --text-muted: rgb(var(--text-muted-rgb));
+  
+  --shadow-premium: 0 10px 30px -10px rgba(0, 0, 0, 0.7);
 }
 
 body {

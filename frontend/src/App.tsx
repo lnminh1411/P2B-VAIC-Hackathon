@@ -22,9 +22,58 @@ import {
   AlertTriangle
 } from 'lucide-react';
 
+import vi from './locales/vi.json';
+import en from './locales/en.json';
+
+const translations: Record<string, any> = { vi, en };
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api/v1';
 
 export default function App() {
+  // Localization & Theme states
+  const [locale, setLocale] = useState(() => localStorage.getItem('p2b_locale') || 'vi');
+  const [theme, setTheme] = useState(() => localStorage.getItem('p2b_theme') || 'light');
+
+  const t = (path: string) => {
+    const keys = path.split('.');
+    let current = translations[locale] || translations['vi'];
+    for (const key of keys) {
+      if (current && typeof current === 'object' && key in current) {
+        current = current[key];
+      } else {
+        return path;
+      }
+    }
+    return typeof current === 'string' ? current : path;
+  };
+
+  const handleThemeChange = (newTheme: string) => {
+    setTheme(newTheme);
+    localStorage.setItem('p2b_theme', newTheme);
+    if (newTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+      document.body.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.body.classList.remove('dark');
+    }
+  };
+
+  const handleLanguageChange = (newLocale: string) => {
+    setLocale(newLocale);
+    localStorage.setItem('p2b_locale', newLocale);
+  };
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('p2b_theme') || 'light';
+    if (savedTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+      document.body.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.body.classList.remove('dark');
+    }
+  }, []);
+
   // Auth state
   const [token, setToken] = useState<string | null>(localStorage.getItem('p2b_token'));
   const [user, setUser] = useState<any>(null);
@@ -636,12 +685,12 @@ export default function App() {
           </div>
 
           <h2 className="text-xl font-semibold text-center text-white mb-6">
-            {isRegistering ? 'Đăng ký tài khoản' : 'Đăng nhập vào hệ thống'}
+            {isRegistering ? t('auth.signupHeader') : t('auth.loginHeader')}
           </h2>
-
+ 
           <form onSubmit={handleAuth} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Email</label>
+              <label className="block text-xs font-medium text-slate-400 mb-1.5">{t('auth.email')}</label>
               <input 
                 type="email" 
                 required
@@ -653,7 +702,7 @@ export default function App() {
             </div>
             
             <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Mật khẩu</label>
+              <label className="block text-xs font-medium text-slate-400 mb-1.5">{t('auth.password')}</label>
               <input 
                 type="password" 
                 required
@@ -663,45 +712,45 @@ export default function App() {
                 placeholder="••••••••"
               />
             </div>
-
+ 
             {isRegistering && (
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">Vai trò thành viên</label>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">{t('settings.userType')}</label>
                 <select 
                   className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500/50 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none transition-all"
                   value={registerType}
                   onChange={(e) => setRegisterType(e.target.value)}
                 >
-                  <option value="COMPANY_MANAGER">Quản lý Doanh nghiệp (Company Manager)</option>
-                  <option value="INDIVIDUAL">Cá nhân (Individual expert)</option>
+                  <option value="COMPANY_MANAGER">{t('settings.companyMode')}</option>
+                  <option value="INDIVIDUAL">{t('settings.individualMode')}</option>
                 </select>
               </div>
             )}
-
+ 
             {authError && (
               <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400 text-center">
                 {authError}
               </div>
             )}
-
+ 
             <button 
               type="submit" 
               className="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm transition-all shadow-lg shadow-indigo-600/15"
             >
-              {isRegistering ? 'Đăng Ký' : 'Đăng Nhập'}
+              {isRegistering ? t('auth.signupBtn') : t('auth.loginBtn')}
             </button>
           </form>
-
+ 
           <div className="mt-6 text-center text-xs text-slate-400">
             {isRegistering ? (
-              <span>Đã có tài khoản? <button onClick={() => { setIsRegistering(false); setAuthError(null); }} className="text-indigo-400 hover:underline">Đăng nhập</button></span>
+              <span>{t('auth.hasAccount')} <button onClick={() => { setIsRegistering(false); setAuthError(null); }} className="text-indigo-400 hover:underline">{t('auth.toggleLogin')}</button></span>
             ) : (
-              <span>Chưa có tài khoản? <button onClick={() => { setIsRegistering(true); setAuthError(null); }} className="text-indigo-400 hover:underline">Đăng ký ngay</button></span>
+              <span>{t('auth.noAccount')} <button onClick={() => { setIsRegistering(true); setAuthError(null); }} className="text-indigo-400 hover:underline">{t('auth.toggleSignup')}</button></span>
             )}
           </div>
           
           <div className="mt-8 pt-6 border-t border-slate-800/80 text-[10px] text-slate-500 text-center space-y-1">
-            <p>Demo accounts (Mật khẩu: Password123):</p>
+            <p>{t('auth.demoTitle')}</p>
             <p className="font-mono">aitech@p2b.vn | semivina@p2b.vn | individual@p2b.vn</p>
           </div>
         </div>
@@ -716,14 +765,14 @@ export default function App() {
       <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-violet-500/5 rounded-full blur-[120px] pointer-events-none" />
 
       {/* HEADER NAVBAR */}
-      <header className="sticky top-0 z-40 bg-[#070913]/70 backdrop-blur-xl border-b border-slate-900 px-6 py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-40 bg-slate-950/70 backdrop-blur-xl border-b border-slate-900 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
             <ShieldCheck className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-lg font-bold tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">P2B Platform</h1>
-            <p className="text-[10px] text-slate-400">AI-native Policy Matching MVP</p>
+            <h1 className="text-lg font-bold tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">{t('nav.title')}</h1>
+            <p className="text-[10px] text-slate-400">{t('nav.subtitle')}</p>
           </div>
         </div>
 
@@ -731,19 +780,19 @@ export default function App() {
           <button 
             onClick={() => setShowSyncModal(true)} 
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-800/80 bg-slate-900/30 hover:bg-slate-900/70 text-xs font-medium text-slate-300 transition-all"
-            aria-label="Cập nhật văn bản"
+            aria-label={t('nav.syncAlert')}
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            <span>Đồng Bộ Pháp Lý</span>
+            <span>{t('nav.syncAlert')}</span>
           </button>
           
           <button 
             onClick={fetchAuditLogs} 
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-800/80 bg-slate-900/30 hover:bg-slate-900/70 text-xs font-medium text-slate-300 transition-all"
-            aria-label="Lịch sử nhật ký"
+            aria-label={t('nav.logs')}
           >
             <History className="w-3.5 h-3.5" />
-            <span>Lịch Sử Nhật Ký</span>
+            <span>{t('nav.logs')}</span>
           </button>
 
           {/* User profile dropdown button */}
@@ -751,7 +800,7 @@ export default function App() {
             <button 
               onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
               className="w-9 h-9 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center hover:bg-indigo-600/40 transition-all overflow-hidden"
-              aria-label="Tài khoản người dùng"
+              aria-label={t('nav.userProfile')}
             >
               {user?.avatar_path ? (
                 <img src={`http://localhost:8000${user.avatar_path}`} alt="Avatar" className="w-full h-full object-cover" />
@@ -763,10 +812,10 @@ export default function App() {
             {isProfileDropdownOpen && (
               <div className="absolute right-0 mt-2.5 w-64 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                 <div className="px-4 py-2.5 border-b border-slate-800/60">
-                  <p className="text-xs text-slate-400 font-medium">Tài khoản</p>
+                  <p className="text-xs text-slate-400 font-medium">{t('nav.userProfile')}</p>
                   <p className="text-sm font-semibold truncate text-white">{user?.email}</p>
                   <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded bg-indigo-600/20 border border-indigo-500/25 text-indigo-300 font-mono">
-                    {user?.user_type === 'COMPANY_MANAGER' ? '🏢 Doanh nghiệp' : '👤 Cá nhân'}
+                    {user?.user_type === 'COMPANY_MANAGER' ? '🏢 ' + t('settings.companyMode') : '👤 ' + t('settings.individualMode')}
                   </span>
                 </div>
                 
@@ -775,7 +824,7 @@ export default function App() {
                   className="w-full text-left px-4 py-2 hover:bg-slate-800 text-xs flex items-center gap-2.5 transition-all text-slate-300"
                 >
                   <UserCheck className="w-4 h-4 text-indigo-400" />
-                  Chuyển sang chế độ {user?.user_type === 'COMPANY_MANAGER' ? 'Cá nhân' : 'Doanh nghiệp'}
+                  Chuyển sang {user?.user_type === 'COMPANY_MANAGER' ? t('settings.individualMode') : t('settings.companyMode')}
                 </button>
 
                 <button 
@@ -783,7 +832,7 @@ export default function App() {
                   className="w-full text-left px-4 py-2 hover:bg-slate-800 text-xs flex items-center gap-2.5 transition-all text-slate-300"
                 >
                   <Settings className="w-4 h-4 text-slate-400" />
-                  Cài đặt tài khoản
+                  {t('nav.settings')}
                 </button>
 
                 <button 
@@ -791,7 +840,7 @@ export default function App() {
                   className="w-full text-left px-4 py-2 hover:bg-slate-800 text-xs flex items-center gap-2.5 text-red-400 transition-all border-t border-slate-800/60"
                 >
                   <LogOut className="w-4 h-4" />
-                  Đăng xuất
+                  {t('nav.logout')}
                 </button>
               </div>
             )}
@@ -806,7 +855,7 @@ export default function App() {
         <section className="lg:col-span-4 bg-slate-900/30 border border-slate-800/50 rounded-xl p-5 backdrop-blur-md space-y-5">
           <div className="flex justify-between items-center pb-3 border-b border-slate-800/50">
             <h2 className="text-sm font-semibold tracking-tight text-slate-300 uppercase">
-              {user?.user_type === 'COMPANY_MANAGER' ? 'Hồ Sơ Doanh Nghiệp (Passport)' : 'Thông Tin Cá Nhân'}
+              {user?.user_type === 'COMPANY_MANAGER' ? t('passport.companyTitle') : t('passport.personalTitle')}
             </h2>
             <button 
               onClick={() => setShowUploadModal(true)} 
@@ -1307,14 +1356,14 @@ export default function App() {
       {showSettingsModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true">
           <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl relative">
-            <button onClick={() => setShowSettingsModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white" aria-label="Đóng">
+            <button onClick={() => setShowSettingsModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white" aria-label={t('settings.closeBtn')}>
               <X className="w-4 h-4" />
             </button>
             <h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-5 flex items-center gap-2">
-              <Settings className="w-4 h-4 text-indigo-400" /> Cài đặt tài khoản
+              <Settings className="w-4 h-4 text-indigo-400" /> {t('settings.title')}
             </h3>
 
-            <div className="space-y-6">
+            <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-1">
               {/* Profile Image upload section */}
               <div className="space-y-2">
                 <label className="block text-xs font-medium text-slate-400">Hình đại diện (Avatar)</label>
@@ -1330,17 +1379,78 @@ export default function App() {
                     onClick={() => avatarInputRef.current?.click()}
                     className="px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-950 text-xs font-semibold hover:bg-slate-900 transition-all"
                   >
-                    Thay đổi hình ảnh
+                    {t('passport.uploadBtn')}
                   </button>
                   <input ref={avatarInputRef} type="file" className="hidden" accept="image/*" onChange={handleAvatarUpload} />
                 </div>
               </div>
 
+              {/* User Mode selection */}
+              <div className="space-y-2 pt-4 border-t border-slate-850">
+                <label className="block text-xs font-medium text-slate-400">{t('settings.userType')}</label>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => {
+                      if (user?.user_type !== 'COMPANY_MANAGER') handleToggleMode();
+                    }}
+                    className={`flex-1 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${user?.user_type === 'COMPANY_MANAGER' ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-900'}`}
+                  >
+                    {t('settings.companyMode')}
+                  </button>
+                  <button 
+                    onClick={() => {
+                      if (user?.user_type !== 'INDIVIDUAL') handleToggleMode();
+                    }}
+                    className={`flex-1 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${user?.user_type === 'INDIVIDUAL' ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-900'}`}
+                  >
+                    {t('settings.individualMode')}
+                  </button>
+                </div>
+              </div>
+
+              {/* Theme selection */}
+              <div className="space-y-2 pt-4 border-t border-slate-850">
+                <label className="block text-xs font-medium text-slate-400">{t('settings.theme')}</label>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => handleThemeChange('light')}
+                    className={`flex-1 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${theme === 'light' ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-900'}`}
+                  >
+                    {t('settings.lightMode')}
+                  </button>
+                  <button 
+                    onClick={() => handleThemeChange('dark')}
+                    className={`flex-1 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${theme === 'dark' ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-900'}`}
+                  >
+                    {t('settings.darkMode')}
+                  </button>
+                </div>
+              </div>
+
+              {/* Language selection */}
+              <div className="space-y-2 pt-4 border-t border-slate-850">
+                <label className="block text-xs font-medium text-slate-400">{t('settings.language')}</label>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => handleLanguageChange('vi')}
+                    className={`flex-1 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${locale === 'vi' ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-900'}`}
+                  >
+                    {t('settings.vi')}
+                  </button>
+                  <button 
+                    onClick={() => handleLanguageChange('en')}
+                    className={`flex-1 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${locale === 'en' ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-900'}`}
+                  >
+                    {t('settings.en')}
+                  </button>
+                </div>
+              </div>
+
               {/* Password update form */}
               <form onSubmit={handleChangePassword} className="space-y-3.5 pt-4 border-t border-slate-850">
-                <p className="text-xs font-semibold text-slate-300">Đổi mật khẩu</p>
+                <p className="text-xs font-semibold text-slate-300">{t('settings.changePassword')}</p>
                 <div>
-                  <label className="block text-[10px] font-medium text-slate-400 mb-1">Mật khẩu hiện tại</label>
+                  <label className="block text-[10px] font-medium text-slate-400 mb-1">{t('settings.oldPassword')}</label>
                   <input 
                     type="password"
                     required
@@ -1350,7 +1460,7 @@ export default function App() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-medium text-slate-400 mb-1">Mật khẩu mới</label>
+                  <label className="block text-[10px] font-medium text-slate-400 mb-1">{t('settings.newPassword')}</label>
                   <input 
                     type="password"
                     required
@@ -1363,7 +1473,7 @@ export default function App() {
                 {pwdMessage && <p className="text-xs text-emerald-400 font-mono text-center">{pwdMessage}</p>}
                 {pwdError && <p className="text-xs text-rose-400 font-mono text-center">{pwdError}</p>}
 
-                <button type="submit" className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded text-xs text-white font-medium">Lưu mật khẩu</button>
+                <button type="submit" className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded text-xs text-white font-medium">{t('settings.updateBtn')}</button>
               </form>
 
               {/* Account Deletion */}
