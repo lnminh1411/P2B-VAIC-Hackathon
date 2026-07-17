@@ -12,8 +12,8 @@
     "hash": "4b54e10b899dc8cfd049f3e496f21d12"
   },
   "E:/VAIC Hackathon/backend/app/engine/db.py": {
-    "mtime": 1784322357874.412,
-    "hash": "4267962c711f28b034f654c709284edb"
+    "mtime": 1784324441269.7026,
+    "hash": "c73aaccc2190b4559623e0a2397d551e"
   },
   "E:/VAIC Hackathon/backend/app/engine/retrieval.py": {
     "mtime": 1784322357874.9048,
@@ -24,8 +24,8 @@
     "hash": "8d366521c858168190801905adacda19"
   },
   "E:/VAIC Hackathon/backend/app/main.py": {
-    "mtime": 1784322357875.9048,
-    "hash": "b8e2fc441777d5107fecad7c1526ce82"
+    "mtime": 1784324441270.2026,
+    "hash": "c2e35f94925b8a40a1d44a9856c7a82d"
   },
   "E:/VAIC Hackathon/backend/app/schemas/__init__.py": {
     "mtime": 1784286180405.2375,
@@ -60,8 +60,8 @@
     "hash": "0b998983ee6278e219984a6881561d4f"
   },
   "E:/VAIC Hackathon/frontend/src/App.tsx": {
-    "mtime": 1784323443990.8274,
-    "hash": "151e68bef4be9f33bdf969f5026dc590"
+    "mtime": 1784324441271.2075,
+    "hash": "b5cbfd56f4dac6ebd0d5d85a20eb8535"
   },
   "E:/VAIC Hackathon/frontend/src/main.tsx": {
     "mtime": 1784286180426.9531,
@@ -144,8 +144,8 @@
     "hash": "e854315cc2f4361a1da9561b3b1b336c"
   },
   "E:/VAIC Hackathon/.graphify/GRAPH_REPORT.md": {
-    "mtime": 1784323237995.489,
-    "hash": "058255305d3b4a0c28c00bae8b53d717"
+    "mtime": 1784323481808.3032,
+    "hash": "149c856d029d7c7e7f62db7201567746"
   },
   "E:/VAIC Hackathon/README.md": {
     "mtime": 1784286180396.1838,
@@ -156,11 +156,15 @@
     "hash": "f1044a74c250d6f5841f2671e9965ea5"
   },
   "E:/VAIC Hackathon/backend/app/pipeline/search_crawler.py": {
-    "mtime": 1784323200833.7488,
-    "hash": "f5d47b9b0414d6cd55cced8195f19018"
+    "mtime": 1784324441270.7075,
+    "hash": "2b68d933c0a728d85d2008179095cc57"
   },
   "E:/VAIC Hackathon/backend/tests/test_active_search.py": {
     "mtime": 1784322357882.4272,
     "hash": "d9278e8b9184740caf4f051024d61ec0"
+  },
+  "E:/VAIC Hackathon/backend/app/pipeline/crawl_five_years.py": {
+    "mtime": 1784324441270.2026,
+    "hash": "d089e3fc15c2a0e39da6c4783512b84e"
   }
 }
