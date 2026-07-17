@@ -1,75 +1,75 @@
 {
   "E:/VAIC Hackathon/backend/app/__init__.py": {
-    "mtime": 1784276239343.8916,
-    "hash": "03b5ec782c7a3b35337cde1e8471d2ec"
+    "mtime": 1784286180396.685,
+    "hash": "22f52a62d8232c23f06dad1b4c706e67"
   },
   "E:/VAIC Hackathon/backend/app/cli_golden_path.py": {
-    "mtime": 1784276776869.8794,
-    "hash": "f91e2dfc862764130ab49a5a27ee5b43"
+    "mtime": 1784286180400.7317,
+    "hash": "b109c44b3291537bc4c4e517d6db7482"
   },
   "E:/VAIC Hackathon/backend/app/engine/__init__.py": {
-    "mtime": 1784276247382.062,
-    "hash": "f62de661a709d0441b9a104abc44d08e"
+    "mtime": 1784286180401.2373,
+    "hash": "4b54e10b899dc8cfd049f3e496f21d12"
   },
   "E:/VAIC Hackathon/backend/app/engine/db.py": {
-    "mtime": 1784276870800.639,
-    "hash": "b6102da3b7208868c97a6c2b4ca78b89"
+    "mtime": 1784307586909.4937,
+    "hash": "a57086f26f5bbe1a4cfaba347e4c036b"
   },
   "E:/VAIC Hackathon/backend/app/engine/retrieval.py": {
-    "mtime": 1784276735609.13,
-    "hash": "23ad602e41a5239b9c7cd6daed6261fa"
+    "mtime": 1784307620904.767,
+    "hash": "17c67a877c0129f80a9deead68ff22b3"
   },
   "E:/VAIC Hackathon/backend/app/engine/rule_evaluator.py": {
-    "mtime": 1784276236074.9875,
-    "hash": "2cad19316f49616d3c267d98aef9c4c3"
+    "mtime": 1784286180403.7373,
+    "hash": "8d366521c858168190801905adacda19"
   },
   "E:/VAIC Hackathon/backend/app/main.py": {
-    "mtime": 1784276889038.142,
-    "hash": "c5ba91f45669699b123a191a04bed57b"
+    "mtime": 1784307635788.7246,
+    "hash": "28d11a5146c09d256ca9846d0a9dace5"
   },
   "E:/VAIC Hackathon/backend/app/schemas/__init__.py": {
-    "mtime": 1784276242443.4053,
-    "hash": "142f49e3dc31b8ffec8c2a5cdccd315b"
+    "mtime": 1784286180405.2375,
+    "hash": "2d01a79e28008817cce03221ee53e7e1"
   },
   "E:/VAIC Hackathon/backend/app/schemas/passport.py": {
-    "mtime": 1784275979541.0305,
-    "hash": "0df81313eba127f2a2991817ca8fa3d3"
+    "mtime": 1784286180411.7795,
+    "hash": "06dcd315574bcd8fca315fbee8d2f5f9"
   },
   "E:/VAIC Hackathon/backend/app/schemas/policy.py": {
-    "mtime": 1784275983393.5159,
-    "hash": "4f5218797c4ef67a5ab41d06be3abd39"
+    "mtime": 1784286180412.2798,
+    "hash": "987ce7c64ada838ad6ebaeb84593623d"
   },
   "E:/VAIC Hackathon/backend/app/seed/__init__.py": {
-    "mtime": 1784276250496.1133,
-    "hash": "5b76e56affed80ccc64de6f204e3b128"
+    "mtime": 1784286180412.2798,
+    "hash": "9d51dc8788c1f8415a4f105d7d41853c"
   },
   "E:/VAIC Hackathon/backend/app/seed/corpus_generator.py": {
-    "mtime": 1784276816804.5925,
-    "hash": "528119d5e42a6cfd4ecb90f07ec2ebf5"
+    "mtime": 1784293669783.0264,
+    "hash": "6dfce530576a3c2ae95266e0cdc71c18"
   },
   "E:/VAIC Hackathon/backend/app/seed/generate_cache.py": {
-    "mtime": 1784276687718.276,
-    "hash": "fc50d60dfe5d4f3f3be0b2979288d436"
+    "mtime": 1784286180418.6072,
+    "hash": "f35749d60984a3f16b0f765c3b929d53"
   },
   "E:/VAIC Hackathon/backend/app/seed/template_generator.py": {
-    "mtime": 1784276710828.9275,
-    "hash": "790458b7e8bdbd52262b9a897e68a463"
+    "mtime": 1784286180421.13,
+    "hash": "da971a660007a481f945c193b0a131cf"
   },
   "E:/VAIC Hackathon/backend/tests/test_golden_path.py": {
-    "mtime": 1784276825325.9949,
-    "hash": "b561ceb91bd16bb259df70b701009ecd"
+    "mtime": 1784286180421.6348,
+    "hash": "0b998983ee6278e219984a6881561d4f"
   },
   "E:/VAIC Hackathon/frontend/src/App.tsx": {
-    "mtime": 1784278117261.9097,
-    "hash": "3c9b48cef42ae99029366f1f51ecc185"
+    "mtime": 1784302133666.8997,
+    "hash": "1797500dacc7e8dca881ef36a23fd289"
   },
   "E:/VAIC Hackathon/frontend/src/main.tsx": {
-    "mtime": 1784276931201.59,
-    "hash": "787e5a07efeb2bf6209d5937195f2f68"
+    "mtime": 1784286180426.9531,
+    "hash": "df3369963799e47ef5a77cdca932abf0"
   },
   "E:/VAIC Hackathon/frontend/vite.config.ts": {
-    "mtime": 1784277666442.9978,
-    "hash": "d281d66c4390899f561fa3db9b8e9eac"
+    "mtime": 1784286180427.953,
+    "hash": "2438e22076957bfbb3dc33f52d41a169"
   },
   "E:/VAIC Hackathon/CONTEXT.md": {
     "mtime": 1784272280606.1948,
@@ -96,35 +96,71 @@
     "hash": "c03bc9b4e6841f3201e1017e4db8dbb6"
   },
   "E:/VAIC Hackathon/docs/adr/0003-tailwind-css-v4.md": {
-    "mtime": 1784277344033.732,
-    "hash": "e25005b197a1a1c26c789278f3cbe9c5"
+    "mtime": 1784286180422.0742,
+    "hash": "2f563f7686cfe2c6d1a743fd8dcb356e"
   },
   "E:/VAIC Hackathon/frontend/README.md": {
-    "mtime": 1784276931021.065,
-    "hash": "10495bfcc6c568eca4dab6dd5df795d3"
+    "mtime": 1784286180422.6365,
+    "hash": "3a8e2f41658852c43fdce93a22bc2f90"
   },
   "E:/VAIC Hackathon/frontend/index.html": {
-    "mtime": 1784276931311.1023,
-    "hash": "33bd262affcefea92f1509cda449a19c"
+    "mtime": 1784286180422.6365,
+    "hash": "44737f46046f1a5d99f8417c2c9dac32"
   },
   "E:/VAIC Hackathon/implementation_plan.md": {
-    "mtime": 1784277619428.4255,
-    "hash": "84bf3f96b9dce423f4aacb1d42d5553c"
+    "mtime": 1784286180428.4526,
+    "hash": "a6a1c6119d9078728a5c6ae24b2c33cd"
   },
   "E:/VAIC Hackathon/workflows/test.md": {
-    "mtime": 1784280654075.4402,
-    "hash": "6e772d248a049bc7ee08ca81bc0871fa"
+    "mtime": 1784306704906.715,
+    "hash": "c20bf9a616a70c9651a8ee9dc884c6b7"
   },
   "E:/VAIC Hackathon/frontend/src/assets/hero.png": {
-    "mtime": 1784276931038.565,
+    "mtime": 1784286180425.453,
     "hash": "aead493361b27e7510691c5d7072dfc1"
   },
   "E:/VAIC Hackathon/frontend/src/assets/react.svg": {
-    "mtime": 1784276931149.5808,
+    "mtime": 1784286180425.9524,
     "hash": "f0402b67b6ce880f65666bb49e841696"
   },
   "E:/VAIC Hackathon/frontend/src/assets/vite.svg": {
-    "mtime": 1784276931169.5894,
-    "hash": "9960a24288958394ac50e57ff638b036"
+    "mtime": 1784286180426.4531,
+    "hash": "6d5180a782d64c8cf51ba01c2a2184d8"
+  },
+  "E:/VAIC Hackathon/backend/app/engine/auth.py": {
+    "mtime": 1784293813415.202,
+    "hash": "db6bdae1eba69fd04f139a3b426fea86"
+  },
+  "E:/VAIC Hackathon/backend/app/pipeline/extractor.py": {
+    "mtime": 1784306195144.2495,
+    "hash": "23b6e33ff60b1b8222f1e2aabbde7392"
+  },
+  "E:/VAIC Hackathon/backend/app/pipeline/markdown_converter.py": {
+    "mtime": 1784293815703.0134,
+    "hash": "cfed10d7e4d7b0117c9c8d6beeb7d7d5"
+  },
+  "E:/VAIC Hackathon/backend/tests/test_integration.py": {
+    "mtime": 1784294007449.2358,
+    "hash": "c44142beb7712589a9219ab5801d4d9b"
+  },
+  "E:/VAIC Hackathon/.graphify/GRAPH_REPORT.md": {
+    "mtime": 1784294035615.9822,
+    "hash": "c95d67b755878c88e2d3e09f494fd9b8"
+  },
+  "E:/VAIC Hackathon/README.md": {
+    "mtime": 1784286180396.1838,
+    "hash": "8987ecbf2a49058cc8b1908240844ba3"
+  },
+  "E:/VAIC Hackathon/requirements.txt": {
+    "mtime": 1784293228559.8062,
+    "hash": "f1044a74c250d6f5841f2671e9965ea5"
+  },
+  "E:/VAIC Hackathon/backend/app/pipeline/search_crawler.py": {
+    "mtime": 1784307604329.5276,
+    "hash": "70f08cffe8906fe616c8acb5e988f5f0"
+  },
+  "E:/VAIC Hackathon/backend/tests/test_active_search.py": {
+    "mtime": 1784307677434.6785,
+    "hash": "417012ec45a4c6e3547975359c54b511"
   }
 }
