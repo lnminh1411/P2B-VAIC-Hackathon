@@ -24,9 +24,9 @@
   --bg-input-rgb: 255 255 255;
   --border-color-rgb: 226 232 240; /* #e2e8f0 */
   --border-focus-rgb: 199 210 254; /* #c7d2fe */
-  --text-primary-rgb: 15 23 42;    /* #0f172a */
-  --text-secondary-rgb: 71 85 105; /* #475569 */
-  --text-muted-rgb: 148 163 184;   /* #94a3b8 */
+  --text-primary-rgb: 2 6 23;      /* #020617 - very dark slate */
+  --text-secondary-rgb: 51 65 85;  /* #334155 - slate-700 */
+  --text-muted-rgb: 100 116 139;   /* #64748b - slate-500 */
   
   --bg-main: rgb(var(--bg-main-rgb));
   --bg-card: rgba(var(--bg-card-rgb), 0.75);

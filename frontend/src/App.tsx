@@ -771,7 +771,7 @@ export default function App() {
             <ShieldCheck className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-lg font-bold tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">{t('nav.title')}</h1>
+            <h1 className="text-lg font-bold tracking-tight text-slate-100">{t('nav.title')}</h1>
             <p className="text-[10px] text-slate-400">{t('nav.subtitle')}</p>
           </div>
         </div>
@@ -1112,7 +1112,7 @@ export default function App() {
                           <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
                         </span>
                       )}
-                      <h4 className="text-xs font-bold text-white pr-4">{p.title}</h4>
+                      <h4 className="text-xs font-bold text-slate-100 pr-4">{p.title}</h4>
                       <p className="text-[10px] text-slate-400 mt-1 line-clamp-2">{p.benefits}</p>
                       
                       <div className="mt-2.5 flex items-center justify-between">
@@ -1137,7 +1137,7 @@ export default function App() {
                 <div className="bg-slate-900/20 border border-slate-800/60 rounded-xl p-5 space-y-5">
                   <div className="flex justify-between items-start pb-3 border-b border-slate-800/50">
                     <div>
-                      <h3 className="text-sm font-bold text-white">{selectedPolicy.title}</h3>
+                      <h3 className="text-sm font-bold text-slate-100">{selectedPolicy.title}</h3>
                       <p className="text-[10px] text-slate-500 mt-0.5">Văn bản nguồn: <span className="font-mono">{selectedPolicy.source_legal_documents.join(", ")}</span></p>
                     </div>
                     
@@ -1182,7 +1182,7 @@ export default function App() {
                           }`}
                         >
                           <div className="flex justify-between items-start gap-2">
-                            <span className="text-xs text-white font-medium">{rule.description}</span>
+                            <span className="text-xs text-slate-100 font-medium">{rule.description}</span>
                             <div className="flex items-center gap-1.5 flex-shrink-0">
                               {rule.status === 'MET' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
                               {rule.status === 'NOT_MET' && <XCircle className="w-3.5 h-3.5 text-rose-400" />}
@@ -1200,7 +1200,7 @@ export default function App() {
                               {rule.observed_value !== undefined && (
                                 <div>
                                   <span className="text-slate-400 font-medium">Giá trị thực tế:</span>{' '}
-                                  <span className="text-white font-mono">{String(rule.observed_value)}</span>
+                                  <span className="text-slate-100 font-mono">{String(rule.observed_value)}</span>
                                 </div>
                               )}
                               {rule.citation && (
@@ -1245,7 +1245,7 @@ export default function App() {
                       </div>
 
                       <div className="text-[11px] space-y-1.5 text-slate-300">
-                        <p><span className="text-slate-500">Nguồn trích xuất:</span> <span className="font-semibold text-white">{companyPassport[selectedField]?.source_type}</span></p>
+                        <p><span className="text-slate-500">Nguồn trích xuất:</span> <span className="font-semibold text-slate-100">{companyPassport[selectedField]?.source_type}</span></p>
                         <p><span className="text-slate-500">File tài liệu:</span> <span className="font-mono text-indigo-400">{companyPassport[selectedField]?.source_uri || 'Không có'}</span></p>
                         <p><span className="text-slate-500">Vị trí:</span> <span>{companyPassport[selectedField]?.source_location || 'Không có'}</span></p>
                         {companyPassport[selectedField]?.evidence_quote && (
