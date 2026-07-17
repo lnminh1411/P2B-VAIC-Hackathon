@@ -681,10 +681,10 @@ export default function App() {
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/25">
               <ShieldCheck className="w-6 h-6 text-white" />
             </div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent tracking-tight">P2B Platform</span>
+            <span className="text-2xl font-bold text-slate-100 tracking-tight">P2B Platform</span>
           </div>
 
-          <h2 className="text-xl font-semibold text-center text-white mb-6">
+          <h2 className="text-xl font-semibold text-center text-slate-100 mb-6">
             {isRegistering ? t('auth.signupHeader') : t('auth.loginHeader')}
           </h2>
  
@@ -694,7 +694,7 @@ export default function App() {
               <input 
                 type="email" 
                 required
-                className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500/50 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500/20 transition-all"
+                className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500/50 rounded-lg px-4 py-2.5 text-slate-100 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500/20 transition-all"
                 value={authEmail}
                 onChange={(e) => setAuthEmail(e.target.value)}
                 placeholder="chuyengia@p2b.vn"
@@ -706,7 +706,7 @@ export default function App() {
               <input 
                 type="password" 
                 required
-                className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500/50 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500/20 transition-all"
+                className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500/50 rounded-lg px-4 py-2.5 text-slate-100 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500/20 transition-all"
                 value={authPassword}
                 onChange={(e) => setAuthPassword(e.target.value)}
                 placeholder="••••••••"
@@ -717,7 +717,7 @@ export default function App() {
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1.5">{t('settings.userType')}</label>
                 <select 
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500/50 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none transition-all"
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500/50 rounded-lg px-3 py-2.5 text-slate-100 text-sm focus:outline-none transition-all"
                   value={registerType}
                   onChange={(e) => setRegisterType(e.target.value)}
                 >
