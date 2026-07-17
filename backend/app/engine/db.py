@@ -7,6 +7,20 @@ from typing import List, Any, Optional
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "p2b_database.sqlite")
 
 def get_db_connection():
+    if not os.path.exists(DB_PATH):
+        gz_path = DB_PATH + ".gz"
+        if os.path.exists(gz_path):
+            print(f"Decompressing database from {gz_path}...")
+            import gzip
+            import shutil
+            try:
+                with gzip.open(gz_path, 'rb') as f_in:
+                    with open(DB_PATH, 'wb') as f_out:
+                        shutil.copyfileobj(f_in, f_out)
+                print("Database decompressed successfully.")
+            except Exception as e:
+                print(f"[Database Error] Failed to decompress database: {e}")
+                
     conn = sqlite3.connect(DB_PATH, timeout=5.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL;")

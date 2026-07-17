@@ -63,8 +63,8 @@ def main():
     print("Sorting by issue date...")
     filtered_rows.sort(key=lambda x: x.get("issue_date") or "", reverse=True)
     
-    # Take top 1,000 documents
-    target_docs = filtered_rows[:1000]
+    # Take top 5,000 documents
+    target_docs = filtered_rows[:5000]
     print(f"Selected top {len(target_docs)} newest documents for indexing.")
     
     # 3. Connect to Database
@@ -124,8 +124,8 @@ def main():
         for c in chunks:
             all_chunks_text.append(c.strip())
             
-        if (idx + 1) % 100 == 0:
-            print(f"  Processed {idx + 1}/1000 documents...")
+        if (idx + 1) % 500 == 0:
+            print(f"  Processed {idx + 1}/5000 documents...")
             
     conn.commit()
     conn.close()

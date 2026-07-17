@@ -38,6 +38,20 @@ class HybridRetrievalEngine:
 
         # Load cached embeddings if available (fallback)
         self.embeddings_cache = {}
+        if not os.path.exists(self.cache_path):
+            gz_path = self.cache_path + ".gz"
+            if os.path.exists(gz_path):
+                print(f"Decompressing embeddings cache from {gz_path}...")
+                import gzip
+                import shutil
+                try:
+                    with gzip.open(gz_path, 'rb') as f_in:
+                        with open(self.cache_path, 'wb') as f_out:
+                            shutil.copyfileobj(f_in, f_out)
+                    print("Cache decompressed successfully.")
+                except Exception as e:
+                    print(f"[Retrieval Error] Failed to decompress cache: {e}")
+
         if os.path.exists(self.cache_path):
             with open(self.cache_path, "r", encoding="utf-8") as f:
                 self.embeddings_cache = json.load(f)
@@ -341,6 +355,20 @@ class HybridRetrievalEngine:
         # 5. Fusion ranking: final_score = 0.4*bm25 + 0.4*vector + 0.2*metadata
         fused_results = []
         for i, opp in enumerate(self.opportunities):
+            is_relevant = True
+            if query.strip():
+                opp_text = f"{opp.title} {opp.benefits} {opp.target_companies}".lower()
+                opp_emb = self.get_embedding(opp_text, is_query=False)
+                direct_sim = cosine_similarity(query_emb, opp_emb)
+                is_substring = query.lower() in opp_text
+                
+                # Filter out opportunities without semantic match or direct substring matches
+                if direct_sim < 0.805 and not is_substring:
+                    is_relevant = False
+                    
+            if not is_relevant:
+                continue
+
             final_score = (
                 0.4 * bm25_scores[i] +
                 0.4 * vector_scores[i] +
