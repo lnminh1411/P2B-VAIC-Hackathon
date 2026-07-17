@@ -32,20 +32,37 @@ app = FastAPI(
 def on_startup():
     init_db()
 
-# CORS configuration - strict origin whitelist
-ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "https://frontend-henna-nu-49.vercel.app"
-]
+from fastapi import Request, Response
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-)
+def is_allowed_origin(origin: str) -> bool:
+    if not origin:
+        return False
+    if origin.startswith("http://localhost:") or origin.startswith("http://127.0.0.1:"):
+        return True
+    if origin.endswith(".vercel.app"):
+        return True
+    return False
+
+@app.middleware("http")
+async def dynamic_cors_middleware(request: Request, call_next):
+    if request.method == "OPTIONS":
+        origin = request.headers.get("Origin")
+        if is_allowed_origin(origin):
+            response = Response()
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "*"
+            return response
+            
+    response = await call_next(request)
+    origin = request.headers.get("Origin")
+    if is_allowed_origin(origin):
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+    return response
 
 # Directory Setup
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -90,13 +107,24 @@ class PassportUpdateRequest(BaseModel):
     passport_data: dict
 
 # Dependency: Get Current User from Session Token
-def get_current_user(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
-    if not authorization or not authorization.startswith("Bearer "):
+def get_current_user(
+    authorization: Optional[str] = Header(None),
+    token_query: Optional[str] = Query(None, alias="authorization")
+) -> Dict[str, Any]:
+    token = None
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ")[1]
+    elif token_query:
+        if token_query.startswith("Bearer "):
+            token = token_query.split(" ")[1]
+        else:
+            token = token_query
+            
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing or invalid Authorization header"
+            detail="Missing or invalid Authorization header or query parameter"
         )
-    token = authorization.split(" ")[1]
     
     conn = get_db_connection()
     cursor = conn.cursor()
