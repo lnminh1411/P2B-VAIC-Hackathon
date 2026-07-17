@@ -147,6 +147,10 @@ export default function App() {
   }, [selectedCompanyId, searchQuery, user?.user_type, token]);
 
   useEffect(() => {
+    setDraftId(null);
+    setDraftStatus(null);
+    setDraftError(null);
+    setReviewerComments('');
     if (selectedPolicyId && token) {
       fetchEligibility();
     }
