@@ -128,6 +128,16 @@ def init_db():
         timestamp TEXT NOT NULL
     )
     """)
+
+    # 10. Legal Documents Table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS legal_documents (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        chunks_json TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    )
+    """)
     
     # Seed Company Passports if empty
     cursor.execute("SELECT COUNT(*) FROM company_passports")

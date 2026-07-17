@@ -28,9 +28,35 @@ app = FastAPI(
     version="1.0.0"
 )
 
+def run_daily_cache_sync():
+    import time
+    print("[Cron Job] Starting 20-year decree cache sync...")
+    keywords = ["bán dẫn", "trí tuệ nhân tạo", "năng lượng xanh", "thuế thu nhập doanh nghiệp"]
+    from app.pipeline.search_crawler import search_and_cache_decrees
+    for kw in keywords:
+        try:
+            search_and_cache_decrees(kw)
+        except Exception as e:
+            print(f"[Cron Job Warning] Cache sync failed for keyword '{kw}': {e}")
+    print("[Cron Job] 20-year decree cache sync complete.")
+
+def daily_cron_worker():
+    import time
+    # Wait 5 seconds after startup before running the first sync
+    time.sleep(5)
+    while True:
+        try:
+            run_daily_cache_sync()
+        except Exception as e:
+            print(f"[Cron Job Error] {e}")
+        # Sleep for 24 hours
+        time.sleep(24 * 3600)
+
 @app.on_event("startup")
 def on_startup():
     init_db()
+    import threading
+    threading.Thread(target=daily_cron_worker, daemon=True).start()
 
 from fastapi import Request, Response
 
@@ -519,6 +545,13 @@ def update_personal_passport(passport_data: Dict[str, Any], user: Dict[str, Any]
 
 @app.get("/api/v1/policies")
 def list_policies(query: Optional[str] = "", user: Dict[str, Any] = Depends(get_current_user)):
+    if query:
+        try:
+            from app.pipeline.search_crawler import search_and_cache_decrees
+            search_and_cache_decrees(query)
+        except Exception as e:
+            print(f"[Search Warning] Active crawler failed or fallback used: {e}")
+            
     conn = get_db_connection()
     cursor = conn.cursor()
     

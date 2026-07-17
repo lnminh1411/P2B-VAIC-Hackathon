@@ -23,15 +23,6 @@ class HybridRetrievalEngine:
         self.legal_corpus_path = os.path.join(seed_dir, "legal_corpus.json")
         self.cache_path = os.path.join(seed_dir, "cached_embeddings.json")
         
-        # Load opportunities
-        with open(self.opportunities_path, "r", encoding="utf-8") as f:
-            self.opps_data = json.load(f)
-            self.opportunities = [PolicyOpportunity(**opp) for opp in self.opps_data]
-            
-        # Load legal documents (decrees)
-        with open(self.legal_corpus_path, "r", encoding="utf-8") as f:
-            self.legal_docs = json.load(f)
-            
         # Check if we should use Gemini API for embeddings
         self.use_gemini = False
         self.gemini_client = None
@@ -61,21 +52,86 @@ class HybridRetrievalEngine:
                 print(f"[Warning] Failed to load local SentenceTransformer: {e}. Falling back to cached embeddings only.")
                 self.model = None
 
-        # Build chunks corpus from decrees
+        # Load opportunities and documents dynamically
+        self.load_opportunities_and_documents()
+
+    def load_opportunities_and_documents(self):
+        """
+        Loads all opportunities and legal documents from static seed files and SQLite tables.
+        Re-builds decree chunks and BM25 index.
+        """
+        # 1. Load static opportunities
+        opportunities = {}
+        try:
+            if os.path.exists(self.opportunities_path):
+                with open(self.opportunities_path, "r", encoding="utf-8") as f:
+                    opps_data = json.load(f)
+                    opportunities = {opp["id"]: PolicyOpportunity(**opp) for opp in opps_data}
+        except Exception as e:
+            print(f"[Retrieval Warning] Failed to load static opportunities: {e}")
+            
+        # 2. Load from SQLite policy_opportunities table
+        try:
+            from app.engine.db import get_db_connection
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, data_json FROM policy_opportunities")
+            for row in cursor.fetchall():
+                try:
+                    opportunities[row["id"]] = PolicyOpportunity(**json.loads(row["data_json"]))
+                except Exception:
+                    pass
+            conn.close()
+        except Exception as e:
+            print(f"[Retrieval Warning] Failed to load opportunities from SQLite: {e}")
+            
+        self.opportunities = list(opportunities.values())
+        
+        # 3. Load static legal documents (decrees)
+        docs_dict = {}
+        try:
+            if os.path.exists(self.legal_corpus_path):
+                with open(self.legal_corpus_path, "r", encoding="utf-8") as f:
+                    legal_docs = json.load(f)
+                    docs_dict = {doc["id"]: doc for doc in legal_docs}
+        except Exception as e:
+            print(f"[Retrieval Warning] Failed to load static legal corpus: {e}")
+            
+        # 4. Load from SQLite legal_documents table
+        try:
+            from app.engine.db import get_db_connection
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, title, chunks_json FROM legal_documents")
+            for row in cursor.fetchall():
+                try:
+                    doc_id = row["id"]
+                    docs_dict[doc_id] = {
+                        "id": doc_id,
+                        "title": row["title"],
+                        "chunks": json.loads(row["chunks_json"])
+                    }
+                except Exception:
+                    pass
+            conn.close()
+        except Exception as e:
+            print(f"[Retrieval Warning] Failed to load legal documents from SQLite: {e}")
+            
+        # 5. Build chunks corpus
         self.chunks = []
-        for doc in self.legal_docs:
-            for chunk in doc["chunks"]:
+        for doc_id, doc in docs_dict.items():
+            for chunk in doc.get("chunks", []):
                 self.chunks.append({
-                    "doc_id": doc["id"],
+                    "doc_id": doc_id,
                     "text": chunk
                 })
-
-        # Pre-warm embeddings cache for decree chunks
-        self.pre_warm_cache()
-            
-        # Initialize BM25 lexical index over chunks (real-time query over decrees)
+                
+        # 6. Initialize BM25 lexical index
         self.bm25_corpus = [c["text"].lower().split() for c in self.chunks]
-        self.bm25 = BM25Okapi(self.bm25_corpus)
+        if self.bm25_corpus:
+            self.bm25 = BM25Okapi(self.bm25_corpus)
+        else:
+            self.bm25 = None
 
     def pre_warm_cache(self):
         """
@@ -185,6 +241,7 @@ class HybridRetrievalEngine:
         """
         Retrieves ranked PolicyOpportunities using BM25 and Vector Search over decree chunks.
         """
+        self.load_opportunities_and_documents()
         query_tokens = query.lower().split()
         
         # 1. Compute BM25 scores over decree chunks
