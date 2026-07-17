@@ -38,23 +38,48 @@ class HybridRetrievalEngine:
 
         # Load cached embeddings if available (fallback)
         self.embeddings_cache = {}
-        if not os.path.exists(self.cache_path):
+        
+        def decompress_cache():
             gz_path = self.cache_path + ".gz"
             if os.path.exists(gz_path):
                 print(f"Decompressing embeddings cache from {gz_path}...")
                 import gzip
                 import shutil
+                tmp_path = self.cache_path + ".tmp"
                 try:
                     with gzip.open(gz_path, 'rb') as f_in:
-                        with open(self.cache_path, 'wb') as f_out:
+                        with open(tmp_path, 'wb') as f_out:
                             shutil.copyfileobj(f_in, f_out)
+                    os.replace(tmp_path, self.cache_path)
                     print("Cache decompressed successfully.")
                 except Exception as e:
                     print(f"[Retrieval Error] Failed to decompress cache: {e}")
+                    if os.path.exists(tmp_path):
+                        try:
+                            os.remove(tmp_path)
+                        except Exception:
+                            pass
+
+        if not os.path.exists(self.cache_path):
+            decompress_cache()
 
         if os.path.exists(self.cache_path):
-            with open(self.cache_path, "r", encoding="utf-8") as f:
-                self.embeddings_cache = json.load(f)
+            try:
+                with open(self.cache_path, "r", encoding="utf-8") as f:
+                    self.embeddings_cache = json.load(f)
+            except Exception as e:
+                print(f"[Retrieval Warning] Cache file corrupted ({e}). Retrying decompression...")
+                try:
+                    os.remove(self.cache_path)
+                except Exception:
+                    pass
+                decompress_cache()
+                if os.path.exists(self.cache_path):
+                    try:
+                        with open(self.cache_path, "r", encoding="utf-8") as f:
+                            self.embeddings_cache = json.load(f)
+                    except Exception as e2:
+                        print(f"[Retrieval Error] Redecompression failed: {e2}")
                 
         self.model = None
         if not self.use_gemini:

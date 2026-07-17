@@ -7,19 +7,38 @@ from typing import List, Any, Optional
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "p2b_database.sqlite")
 
 def get_db_connection():
+    if os.path.exists(DB_PATH):
+        try:
+            conn = sqlite3.connect(DB_PATH, timeout=1.0)
+            conn.cursor().execute("SELECT 1")
+            conn.close()
+        except sqlite3.Error:
+            print("Local database is corrupted. Deleting and redecompressing...")
+            try:
+                os.remove(DB_PATH)
+            except Exception:
+                pass
+
     if not os.path.exists(DB_PATH):
         gz_path = DB_PATH + ".gz"
         if os.path.exists(gz_path):
             print(f"Decompressing database from {gz_path}...")
             import gzip
             import shutil
+            tmp_path = DB_PATH + ".tmp"
             try:
                 with gzip.open(gz_path, 'rb') as f_in:
-                    with open(DB_PATH, 'wb') as f_out:
+                    with open(tmp_path, 'wb') as f_out:
                         shutil.copyfileobj(f_in, f_out)
+                os.replace(tmp_path, DB_PATH)
                 print("Database decompressed successfully.")
             except Exception as e:
                 print(f"[Database Error] Failed to decompress database: {e}")
+                if os.path.exists(tmp_path):
+                    try:
+                        os.remove(tmp_path)
+                    except Exception:
+                        pass
                 
     conn = sqlite3.connect(DB_PATH, timeout=5.0)
     conn.row_factory = sqlite3.Row
