@@ -79,16 +79,20 @@ const formatDocIdForSearch = (docId: string): string => {
 };
 
 const getRobustGovLink = (url: string, docId: string): string => {
+  if (url && url.includes("/van-ban/chi-tiet/")) {
+    return url;
+  }
+
   if (!url) {
     const searchVal = formatDocIdForSearch(docId);
-    return `https://vbpl.vn/pages/portal.aspx?SearchTerm=${encodeURIComponent(searchVal)}`;
+    return `https://vbpl.vn/TW/Pages/vbpq-timkiem.aspx?Keyword=${encodeURIComponent(searchVal)}`;
   }
   
   if (url.includes("vbpl.vn")) {
     const itemMatch = url.match(/ItemID=(\d+)/);
     if (itemMatch) {
       const searchVal = formatDocIdForSearch(docId);
-      return `https://vbpl.vn/pages/portal.aspx?SearchTerm=${encodeURIComponent(searchVal)}`;
+      return `https://vbpl.vn/TW/Pages/vbpq-timkiem.aspx?Keyword=${encodeURIComponent(searchVal)}`;
     }
   }
   return url;
