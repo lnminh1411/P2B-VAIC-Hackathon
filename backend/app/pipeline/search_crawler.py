@@ -111,7 +111,7 @@ def get_fallback_mock_decree(query: str) -> dict:
         "doc_id": doc_id
     }
 
-def construct_policy_rules(extracted: ExtractedPolicyOpportunity, doc_id: str) -> RuleGroup:
+def construct_policy_rules(extracted: ExtractedPolicyOpportunity, doc_id: str, url: str = "") -> RuleGroup:
     """
     Programmatically builds a matching RuleGroup mapping extracted criteria fields to P2B passport properties.
     """
@@ -129,7 +129,7 @@ def construct_policy_rules(extracted: ExtractedPolicyOpportunity, doc_id: str) -
             operator=RuleOperator.EQ,
             expected_value="Semiconductor",
             required=True,
-            citation=Citation(document_id=doc_id, article="Điều 5", quote="hoạt động trong lĩnh vực bán dẫn", source_url="")
+            citation=Citation(document_id=doc_id, article="Điều 5", quote="hoạt động trong lĩnh vực bán dẫn", source_url=url)
         ))
     elif "trí tuệ" in target_str or "ai" in target_str or "intelligence" in target_str or "ai" in title_str:
         rules.append(Rule(
@@ -139,7 +139,7 @@ def construct_policy_rules(extracted: ExtractedPolicyOpportunity, doc_id: str) -
             operator=RuleOperator.EQ,
             expected_value="Artificial Intelligence",
             required=True,
-            citation=Citation(document_id=doc_id, article="Điều 3", quote="hoạt động trong lĩnh vực Artificial Intelligence", source_url="")
+            citation=Citation(document_id=doc_id, article="Điều 3", quote="hoạt động trong lĩnh vực Artificial Intelligence", source_url=url)
         ))
     elif "xanh" in target_str or "green" in target_str or "giảm phát thải" in target_str:
         rules.append(Rule(
@@ -149,7 +149,7 @@ def construct_policy_rules(extracted: ExtractedPolicyOpportunity, doc_id: str) -
             operator=RuleOperator.EQ,
             expected_value="Green Energy",
             required=True,
-            citation=Citation(document_id=doc_id, article="Điều 8", quote="hoạt động trong ngành Green Energy", source_url="")
+            citation=Citation(document_id=doc_id, article="Điều 8", quote="hoạt động trong ngành Green Energy", source_url=url)
         ))
         
     # 2. R&D Ratio Rule
@@ -166,7 +166,7 @@ def construct_policy_rules(extracted: ExtractedPolicyOpportunity, doc_id: str) -
         operator=RuleOperator.GTE,
         expected_value=val,
         required=True,
-        citation=Citation(document_id=doc_id, article="Điều khoản quy định tỷ lệ", quote=f"tỷ lệ chi phí R&D tối thiểu đạt {val*100}%", source_url="")
+        citation=Citation(document_id=doc_id, article="Điều khoản quy định tỷ lệ", quote=f"tỷ lệ chi phí R&D tối thiểu đạt {val*100}%", source_url=url)
     ))
     
     # 3. Capital Rule
@@ -178,7 +178,7 @@ def construct_policy_rules(extracted: ExtractedPolicyOpportunity, doc_id: str) -
             operator=RuleOperator.GTE,
             expected_value=3000000000000,
             required=True,
-            citation=Citation(document_id=doc_id, article="Điều kiện vốn", quote="vốn đăng ký tối thiểu 3,000 tỷ VND", source_url="")
+            citation=Citation(document_id=doc_id, article="Điều kiện vốn", quote="vốn đăng ký tối thiểu 3,000 tỷ VND", source_url=url)
         ))
         
     # 4. Location check
@@ -190,7 +190,7 @@ def construct_policy_rules(extracted: ExtractedPolicyOpportunity, doc_id: str) -
             operator=RuleOperator.EQ,
             expected_value="NIC Hoa Lac",
             required=True,
-            citation=Citation(document_id=doc_id, article="Địa điểm", quote="trụ sở đặt tại NIC Hòa Lạc", source_url="")
+            citation=Citation(document_id=doc_id, article="Địa điểm", quote="trụ sở đặt tại NIC Hòa Lạc", source_url=url)
         ))
         
     # If no rules matched, add a default fallback rule
@@ -202,7 +202,7 @@ def construct_policy_rules(extracted: ExtractedPolicyOpportunity, doc_id: str) -
             operator=RuleOperator.GTE,
             expected_value=0.02,
             required=True,
-            citation=Citation(document_id=doc_id, article="Điều 2", quote="tỷ lệ chi R&D đạt trên 2.0%", source_url="")
+            citation=Citation(document_id=doc_id, article="Điều 2", quote="tỷ lệ chi R&D đạt trên 2.0%", source_url=url)
         ))
         
     return RuleGroup(
@@ -273,7 +273,7 @@ def search_and_cache_decrees(query: str):
             
         # 2. Build complete PolicyOpportunity
         opp_id = f"opp_{doc_id}"
-        rules = construct_policy_rules(extracted, doc_id)
+        rules = construct_policy_rules(extracted, doc_id, url)
         
         opp = PolicyOpportunity(
             id=opp_id,

@@ -28,6 +28,72 @@ import en from './locales/en.json';
 const translations: Record<string, any> = { vi, en };
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api/v1';
 
+const formatDocIdForSearch = (docId: string): string => {
+  if (!docId) return "văn bản pháp luật";
+  
+  const mapping: { [key: string]: string } = {
+    "law_sme_support_2017": "04/2017/QH14",
+    "decree_80_2021_nd_cp": "80/2021/ND-CP",
+    "decree_39_2018_nd_cp": "39/2018/ND-CP",
+    "circular_06_2022_tt_bkhdt": "06/2022/TT-BKHDT",
+    "law_high_tech_2008": "21/2008/QH12",
+    "decision_10_2021_qd_ttg": "10/2021/QD-TTg",
+    "decision_38_2020_qd_ttg": "38/2020/QD-TTg",
+    "decree_13_2019_nd_cp": "13/2019/ND-CP",
+    "decree_94_2020_nd_cp": "94/2020/ND-CP",
+    "decree_35_2022_nd_cp": "35/2022/ND-CP",
+    "decision_1269_qd_ttg": "1269/QD-TTg",
+    "decision_1658_qd_ttg": "1658/QD-TTg",
+    "law_environment_2020": "72/2020/QH14",
+    "decree_08_2022_nd_cp": "08/2022/ND-CP",
+    "decision_500_qd_ttg": "500/QD-TTg",
+    "investment_law_2020": "61/2020/QH14",
+    "decree_31_2021_nd_cp": "31/2021/ND-CP",
+    "decision_1018_qd_ttg": "1018/QD-TTg",
+    "decision_29_2021_qd_ttg": "29/2021/QD-TTg",
+    "decision_127_qd_ttg": "127/QD-TTg",
+    "decision_749_qd_ttg": "749/QD-TTg",
+    "decree_13_2023_nd_cp": "13/2023/ND-CP",
+    "decision_2289_qd_ttg": "2289/QD-TTg"
+  };
+
+  if (mapping[docId]) {
+    return mapping[docId];
+  }
+
+  // Parse crawled dynamic ID format
+  let cleanId = docId.replace("opp_crawled_", "").replace("crawled_", "");
+  const parts = cleanId.split("_");
+  if (parts.length >= 4) {
+    const type = parts[0].toUpperCase();
+    const num = parts[1];
+    const year = parts[2];
+    const suffix = parts.slice(3).join("-").toUpperCase();
+    
+    if (type === "ND" || type === "QD" || type === "TT") {
+      return `${num}/${year}/${suffix}`;
+    }
+  }
+
+  return cleanId.replace(/_/g, " ");
+};
+
+const getRobustGovLink = (url: string, docId: string): string => {
+  if (!url) {
+    const searchVal = formatDocIdForSearch(docId);
+    return `https://vbpl.vn/pages/portal.aspx?SearchTerm=${encodeURIComponent(searchVal)}`;
+  }
+  
+  if (url.includes("vbpl.vn")) {
+    const itemMatch = url.match(/ItemID=(\d+)/);
+    if (itemMatch) {
+      const searchVal = formatDocIdForSearch(docId);
+      return `https://vbpl.vn/pages/portal.aspx?SearchTerm=${encodeURIComponent(searchVal)}`;
+    }
+  }
+  return url;
+};
+
 export default function App() {
   // Localization & Theme states
   const [locale, setLocale] = useState(() => localStorage.getItem('p2b_locale') || 'vi');
@@ -1138,7 +1204,22 @@ export default function App() {
                   <div className="flex justify-between items-start pb-3 border-b border-slate-800/50">
                     <div>
                       <h3 className="text-sm font-bold text-slate-100">{selectedPolicy.title}</h3>
-                      <p className="text-[10px] text-slate-500 mt-0.5">Văn bản nguồn: <span className="font-mono">{selectedPolicy.source_legal_documents.join(", ")}</span></p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">
+                        Văn bản nguồn:{' '}
+                        {selectedPolicy.source_legal_documents.map((docId: string, idx: number) => (
+                          <span key={docId}>
+                            {idx > 0 && ", "}
+                            <a 
+                              href={getRobustGovLink("", docId)} 
+                              target="_blank" 
+                              rel="noreferrer" 
+                              className="font-mono text-indigo-400 hover:underline"
+                            >
+                              {formatDocIdForSearch(docId)}
+                            </a>
+                          </span>
+                        ))}
+                      </p>
                     </div>
                     
                     <div className="flex items-center gap-1.5">
@@ -1209,8 +1290,8 @@ export default function App() {
                                     <FileText className="w-3 h-3 text-indigo-400" /> Trích dẫn pháp lý ({rule.citation.article}):
                                   </p>
                                   <p className="italic text-slate-300">"{rule.citation.quote}"</p>
-                                  {rule.citation.source_url && (
-                                    <a href={rule.citation.source_url} target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline flex items-center gap-0.5 mt-1">
+                                  {(rule.citation.source_url || rule.citation.document_id) && (
+                                    <a href={getRobustGovLink(rule.citation.source_url, rule.citation.document_id)} target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline flex items-center gap-0.5 mt-1">
                                       <span>Xem cổng văn bản chính phủ</span> <ExternalLink className="w-2.5 h-2.5" />
                                     </a>
                                   )}
