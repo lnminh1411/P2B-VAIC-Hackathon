@@ -23,7 +23,16 @@ import {
   AlertTriangle
 } from 'lucide-react';
 
-const API_BASE = 'http://localhost:8000/api/v1';
+const isLocal = 
+  window.location.hostname === 'localhost' || 
+  window.location.hostname === '127.0.0.1' || 
+  /^192\.168\./.test(window.location.hostname) ||
+  /^10\./.test(window.location.hostname) ||
+  /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(window.location.hostname);
+
+const API_BASE = isLocal 
+  ? `http://${window.location.hostname}:8000/api/v1`
+  : 'https://p2b-backend-production.up.railway.app/api/v1';
 
 export default function App() {
   // Navigation & General state

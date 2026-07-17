@@ -62,7 +62,11 @@ python backend/app/seed/generate_cache.py
 
 ### 3. Chạy Server Backend
 ```bash
+# Chạy local:
 uvicorn app.main:app --host 127.0.0.1 --port 8000
+
+# Chạy để demo qua điện thoại/mạng nội bộ:
+uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 ### 4. Chuẩn bị Frontend
@@ -70,9 +74,15 @@ Di chuyển vào thư mục frontend và khởi động Vite dev server:
 ```bash
 cd frontend
 npm install
+
+# Chạy local:
 npm run dev -- --host 127.0.0.1 --port 5173
+
+# Chạy để demo qua điện thoại/mạng nội bộ:
+npm run dev -- --host 0.0.0.0 --port 5173
 ```
-Mở trình duyệt truy cập: `http://127.0.0.1:5173`
+Mở trình duyệt truy cập: `http://localhost:5173` hoặc `http://<ip_may_tinh>:5173` trên điện thoại.
+
 
 ---
 
@@ -84,3 +94,30 @@ $env:PYTHONPATH="backend"
 python -m unittest backend/tests/test_golden_path.py
 ```
 > Bộ test kiểm tra 3 doanh nghiệp seed với 6 chính sách khác nhau để đảm bảo logic khớp 100% với kịch bản demo.
+
+---
+
+## 🌐 Triển khai Đám mây & Tối ưu hóa Quy mô (Vercel & Railway/Render)
+
+Hệ thống được thiết kế để triển khai đám mây dễ dàng và đáp ứng quy mô demo **1000+ người dùng đồng thời**:
+
+### 1. Frontend (React) -> Vercel
+Frontend được triển khai trên **Vercel** để tận dụng CDN toàn cầu và tự động mở rộng không giới hạn:
+1. Di chuyển vào thư mục frontend: `cd frontend`
+2. Khởi tạo cấu hình và liên kết dự án: `vercel link`
+3. Triển khai bản Production: `vercel --prod`
+*(Cấu hình định tuyến Single Page Application đã được thiết lập sẵn trong `vercel.json`)*
+
+### 2. Backend (FastAPI & SQLite) -> Railway / Render
+Backend chạy dạng Docker Container hoặc Python service trên các nền tảng như **Railway** hoặc **Render**:
+
+*   **Tối ưu hóa bộ nhớ & Quy mô (1000+ Users):**
+    Mô hình local `SentenceTransformer` yêu cầu ~1.1GB dung lượng và tốn nhiều tài nguyên CPU/RAM. Để demo mượt mà trên các gói tài nguyên nhỏ (Hobby tier), hãy cấu hình biến môi trường:
+    ```env
+    GEMINI_API_KEY=your_gemini_api_key_here
+    ```
+    Khi phát hiện `GEMINI_API_KEY`, backend sẽ tự động chuyển sang sử dụng **Google Gemini API (text-embedding-004)** để xử lý vector. Điều này giúp giảm lượng RAM tiêu hao xuống dưới **100MB**, tăng tốc độ phản hồi đáng kể và loại bỏ nguy cơ quá tải CPU.
+
+*   **Tối ưu hóa cơ sở dữ liệu SQLite Concurrency:**
+    SQLite đã được nâng cấp lên chế độ **WAL (Write-Ahead Logging)** và cấu hình thời gian chờ bận (busy timeout) là 5.0 giây. Sự thay đổi này giúp các tiến trình đọc/ghi diễn ra đồng thời mà không gặp lỗi khóa cơ sở dữ liệu (`database is locked`) khi hàng ngàn người truy cập cùng một lúc.
+

@@ -20,6 +20,7 @@ class HybridRetrievalEngine:
     def __init__(self, seed_dir: str):
         self.seed_dir = seed_dir
         self.opportunities_path = os.path.join(seed_dir, "policy_opportunities.json")
+        self.legal_corpus_path = os.path.join(seed_dir, "legal_corpus.json")
         self.cache_path = os.path.join(seed_dir, "cached_embeddings.json")
         
         # Load opportunities
@@ -27,32 +28,78 @@ class HybridRetrievalEngine:
             self.opps_data = json.load(f)
             self.opportunities = [PolicyOpportunity(**opp) for opp in self.opps_data]
             
+        # Load legal documents (decrees)
+        with open(self.legal_corpus_path, "r", encoding="utf-8") as f:
+            self.legal_docs = json.load(f)
+            
+        # Check if we should use Gemini API for embeddings
+        self.use_gemini = False
+        self.gemini_client = None
+        if os.environ.get("GEMINI_API_KEY"):
+            try:
+                from google import genai
+                self.gemini_client = genai.Client()
+                self.use_gemini = True
+                self.cache_path = os.path.join(seed_dir, "cached_embeddings_gemini.json")
+                print("Using Google Gemini API (text-embedding-004) for embeddings.")
+            except ImportError:
+                print("[Warning] google-genai library not found. Falling back to local SentenceTransformer.")
+
         # Load cached embeddings if available (fallback)
         self.embeddings_cache = {}
         if os.path.exists(self.cache_path):
             with open(self.cache_path, "r", encoding="utf-8") as f:
                 self.embeddings_cache = json.load(f)
                 
-        # Initialize local SentenceTransformer for multilingual-e5-base (now cached locally)
-        print("Loading local SentenceTransformer (intfloat/multilingual-e5-base)...")
-        try:
-            self.model = SentenceTransformer('intfloat/multilingual-e5-base')
-        except Exception as e:
-            print(f"[Warning] Failed to load local SentenceTransformer: {e}. Falling back to cached embeddings only.")
-            self.model = None
+        self.model = None
+        if not self.use_gemini:
+            # Initialize local SentenceTransformer for multilingual-e5-base (now cached locally)
+            print("Loading local SentenceTransformer (intfloat/multilingual-e5-base)...")
+            try:
+                self.model = SentenceTransformer('intfloat/multilingual-e5-base')
+            except Exception as e:
+                print(f"[Warning] Failed to load local SentenceTransformer: {e}. Falling back to cached embeddings only.")
+                self.model = None
+
+        # Build chunks corpus from decrees
+        self.chunks = []
+        for doc in self.legal_docs:
+            for chunk in doc["chunks"]:
+                self.chunks.append({
+                    "doc_id": doc["id"],
+                    "text": chunk
+                })
+
+        # Pre-warm embeddings cache for decree chunks
+        self.pre_warm_cache()
             
-        # Initialize BM25 lexical index over opportunities (title + benefits + target_companies)
-        self.corpus = []
-        for opp in self.opportunities:
-            text = f"{opp.title} {opp.benefits} {opp.target_companies} {opp.geography}"
-            # Tokenize by simple splitting (vietnamese words can be split by space for basic BM25)
-            self.corpus.append(text.lower().split())
-            
-        self.bm25 = BM25Okapi(self.corpus)
+        # Initialize BM25 lexical index over chunks (real-time query over decrees)
+        self.bm25_corpus = [c["text"].lower().split() for c in self.chunks]
+        self.bm25 = BM25Okapi(self.bm25_corpus)
+
+    def pre_warm_cache(self):
+        """
+        Pre-embeds all decree chunks using active model on startup if they aren't already cached.
+        """
+        print("Pre-warming embeddings cache for decrees...")
+        updated = False
+        for chunk in self.chunks:
+            chunk_text = chunk["text"]
+            prefixed_text = "passage: " + chunk_text
+            if prefixed_text not in self.embeddings_cache:
+                print(f"Embedding decree chunk: {chunk_text[:40]}...")
+                try:
+                    self.get_embedding(chunk_text, is_query=False)
+                    updated = True
+                except Exception as e:
+                    print(f"[Retrieval Error] Failed to pre-embed chunk: {e}")
+        if updated:
+            self.save_cache_to_disk()
+            print("Embeddings cache updated and saved.")
 
     def get_embedding(self, text: str, is_query: bool = False) -> List[float]:
         """
-        Gets text embedding using local SentenceTransformer. 
+        Gets text embedding. Uses Gemini API if active, otherwise local SentenceTransformer.
         Prepends 'query: ' or 'passage: ' as required by multilingual-e5 models.
         """
         cleaned_text = text.strip()
@@ -63,13 +110,30 @@ class HybridRetrievalEngine:
         if prefixed_text in self.embeddings_cache:
             return self.embeddings_cache[prefixed_text]
             
+        if self.use_gemini and self.gemini_client:
+            try:
+                # Use Gemini text-embedding-004
+                response = self.gemini_client.models.embed_content(
+                    model="text-embedding-004",
+                    contents=prefixed_text,
+                )
+                embedding = response.embeddings[0].values
+                self.embeddings_cache[prefixed_text] = embedding
+                # Save dynamically to disk
+                self.save_cache_to_disk()
+                return embedding
+            except Exception as e:
+                print(f"[Retrieval Warning] Gemini embedding failed: {e}. Falling back to zero vector.")
+                return [0.0] * 768
+
         if self.model:
             try:
                 # E5 models are trained to output normalized embeddings
                 emb = self.model.encode(prefixed_text, normalize_embeddings=True)
                 embedding = emb.tolist()
-                # Cache it in memory
+                # Cache it in memory and save to disk
                 self.embeddings_cache[prefixed_text] = embedding
+                self.save_cache_to_disk()
                 return embedding
             except Exception as e:
                 print(f"[Retrieval Warning] Local embedding failed: {e}.")
@@ -119,39 +183,60 @@ class HybridRetrievalEngine:
 
     def retrieve(self, passport: CompanyPassport, query: str, top_n: int = 3) -> List[dict[str, Any]]:
         """
-        Retrieves ranked PolicyOpportunities using BM25, Vector Search, and Metadata Filtering.
+        Retrieves ranked PolicyOpportunities using BM25 and Vector Search over decree chunks.
         """
         query_tokens = query.lower().split()
         
-        # 1. Compute BM25 scores
-        bm25_scores = self.bm25.get_scores(query_tokens)
-        max_bm25 = max(bm25_scores) if len(bm25_scores) > 0 and max(bm25_scores) > 0 else 1.0
-        normalized_bm25 = [score / max_bm25 for score in bm25_scores]
+        # 1. Compute BM25 scores over decree chunks
+        chunk_bm25_scores = self.bm25.get_scores(query_tokens)
+        max_bm25 = max(chunk_bm25_scores) if len(chunk_bm25_scores) > 0 and max(chunk_bm25_scores) > 0 else 1.0
+        normalized_chunk_bm25 = [score / max_bm25 for score in chunk_bm25_scores]
         
-        # 2. Compute Vector scores
+        # 2. Compute Vector scores over decree chunks
         query_emb = self.get_embedding(query, is_query=True)
+        chunk_vector_scores = []
+        for chunk in self.chunks:
+            chunk_emb = self.get_embedding(chunk["text"], is_query=False)
+            sim = cosine_similarity(query_emb, chunk_emb)
+            chunk_vector_scores.append(sim)
+            
+        # 3. Aggregate chunk scores for each PolicyOpportunity
+        bm25_scores = []
         vector_scores = []
         for opp in self.opportunities:
-            opp_text = f"{opp.title} {opp.benefits} {opp.target_companies}"
-            opp_emb = self.get_embedding(opp_text, is_query=False)
-            sim = cosine_similarity(query_emb, opp_emb)
-            vector_scores.append(sim)
+            linked_docs = opp.source_legal_documents
+            # Find chunks belonging to this opportunity's source documents
+            matched_indices = [
+                idx for idx, chunk in enumerate(self.chunks)
+                if chunk["doc_id"] in linked_docs
+            ]
             
-        # 3. Compute Metadata match scores
+            if matched_indices:
+                # Take the max score among all matched chunks
+                opp_bm25 = max([normalized_chunk_bm25[idx] for idx in matched_indices])
+                opp_vector = max([chunk_vector_scores[idx] for idx in matched_indices])
+            else:
+                opp_bm25 = 0.0
+                opp_vector = 0.0
+                
+            bm25_scores.append(opp_bm25)
+            vector_scores.append(opp_vector)
+            
+        # 4. Compute Metadata match scores
         metadata_scores = [self.evaluate_metadata_match(passport, opp) for opp in self.opportunities]
         
-        # 4. Fusion ranking: final_score = 0.4*bm25 + 0.4*vector + 0.2*metadata
+        # 5. Fusion ranking: final_score = 0.4*bm25 + 0.4*vector + 0.2*metadata
         fused_results = []
         for i, opp in enumerate(self.opportunities):
             final_score = (
-                0.4 * normalized_bm25[i] +
+                0.4 * bm25_scores[i] +
                 0.4 * vector_scores[i] +
                 0.2 * metadata_scores[i]
             )
             fused_results.append({
                 "opportunity": opp,
                 "score": round(final_score, 4),
-                "bm25_score": round(normalized_bm25[i], 4),
+                "bm25_score": round(bm25_scores[i], 4),
                 "vector_score": round(vector_scores[i], 4),
                 "metadata_score": round(metadata_scores[i], 4)
             })

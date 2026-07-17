@@ -1,6 +1,6 @@
 # P2B Frontend Visual and Build Verification Workflow
 
-This document outlines the step-by-step workflow to verify the P2B platform's frontend build compilation and visual features using automated tools and a browser visual testing agent.
+This document outlines the step-by-step workflow to verify the P2B platform's frontend build compilation, real-time decree query RAG engine, and visual features across different company personas.
 
 ---
 
@@ -11,18 +11,25 @@ Before starting verification, ensure the Python virtual environment and Node.js 
 ### Start Backend Server (port 8000)
 Run the FastAPI application from the `backend` directory. Uvicorn will load the local multilingual E5 embedding model and start the REST API.
 ```powershell
-# From the workspace root
+# From the workspace root (local-only)
 cd backend
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+
+# Or to run for phone/network demo access:
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 *Wait for `INFO: Application startup complete.` to ensure the SentenceTransformer model has loaded.*
 
 ### Start Frontend Dev Server (port 5173)
-Run the Vite development server with Tailwind CSS v4 configured.
+Run the Vite development server.
 ```powershell
-# From the workspace root
+# From the workspace root (local-only)
 cd frontend
-npm run dev
+npm run dev -- --host 127.0.0.1
+
+# Or to run for phone/network demo access:
+cd frontend
+npm run dev -- --host 0.0.0.0
 ```
 
 ---
@@ -34,69 +41,67 @@ To guarantee no TypeScript compilation issues or missing imports:
 cd frontend
 npm run build
 ```
-Verify the build output completes successfully with no warnings or errors. Expected output chunk sizes:
-- `dist/index.html` ~ 0.45 kB
-- `dist/assets/index-*.css` ~ 37.3 kB
-- `dist/assets/index-*.js` ~ 249 kB
+Verify the build output completes successfully with no warnings or errors.
 
 ---
 
-## 3. Visual Verification Trajectory
+## 3. Visual Verification Scenarios (Multi-Persona)
 
-The browser subagent visual verification follows this visual checking path:
+The platform supports multiple corporate personas. Select them via the company dropdown in the top header.
 
-### Step 3.1: Dashboard Verification
-- **Target URL**: `http://localhost:5173/`
-- **Action**: Verify the responsive side-by-side grid is populated with seeded Company Passport facts (left column) and Ranked Policy Opportunities (right column) fetched from the backend.
-- **Artifact**: `home_page.png`
+### Scenario A: AI Innovation Persona (AItech Vietnam LLC)
+Verify the AI extraction and conflict resolution path:
+1. **Dropdown Selection:** Choose **AItech Vietnam LLC** in the top header.
+2. **Real-time Decree Query:** In the search bar, type `chương trình nghiên cứu trí tuệ nhân tạo` and click **Search**.
+   - **Expected Outcome:** The RAG engine queries the legal decree chunks. **Chương Trình Khoa Học Công Nghệ Quốc Gia Về Trí Tuệ Nhân Tạo** (citiing Decision 127/QĐ-TTg) re-ranks to the top.
+3. **Upload File / AI Vision extraction:**
+   - Click **Upload File** in the Company Passport card.
+   - Enter `https://aitechvn.com/report.pdf` and click **Bắt đầu Trích xuất AI**.
+   - Verify simulated OCR scanning stepper finishes.
+   - **Expected Outcome:** `Registered Capital` passport field status is flagged as `CONFLICTED` (Red badge).
+4. **Conflict Resolution:** Click **Đối Chiếu** on that row. Select **Sử dụng Nguồn B** in the side-by-side modal.
+   - **Expected Outcome:** The status changes to `USER_CONFIRMED` (Grey badge) and the value updates to `12,000,000,000 VND`.
+5. **Interactive Required Documents Checklist:**
+   - In the checklist panel (bottom right), click **Bỏ qua** (Waive) on a missing document.
+   - **Expected Outcome:** The document title strikes through and its badge changes to `WAIVED (MIỄN NỘP)`.
+6. **Policy Change Alert:**
+   - Click the pulsing yellow **Có Thay Đổi** badge on the top card.
+   - **Expected Outcome:** A side-by-side legal clause diff comparison modal opens showing R&D threshold changes from 2.0% to 1.5%.
+7. **Document Draft Creation:**
+   - Click **Tạo Hồ Sơ Nháp (Draft)**. Status changes to `PENDING_REVIEW` in purple.
+   - Click **Phê Duyệt & Xuất Đơn (Approve)**. Status changes to `GENERATED` in green with a `Tải Đơn (.docx)` download button.
 
-### Step 3.2: Eligibility Sliding Drawer
-- **Action**: Click a rule under the eligibility list (e.g. *"Hoạt động trong ngành Trí tuệ nhân tạo (Artificial Intelligence)"*).
-- **Expected Outcome**: A side-drawer slides in from the right. It displays:
-  - Evaluation status badge (`MET`, `NOT_MET`, or `MISSING_INFO`).
-  - Company Evidence quote, source location, and URI.
-  - Policy Clause description, expected operator condition, law quote citation, and original document URL link.
-- **Artifact**: `sliding_drawer.png`
+---
 
-### Step 3.3: Document Upload Stepper Simulation
-- **Action**: Click **Upload File** in the Company Passport card. Enter a mock document target link (e.g., `https://aitechvn.com/report.pdf`) and click **Bắt đầu Trích xuất AI**.
-- **Expected Outcome**:
-  - Step 1: Upload progress bar completes.
-  - Step 2: Simulated OCR laser scanning runs (a glowing horizontal laser line moves vertically on the mock document card).
-  - Step 3: Extracted facts pop up one-by-one with matching confidence scores.
-- **Artifacts**: `document_upload_modal.png` (upload state), `conflict_state.png` (completion state highlighting conflict logs)
+### Scenario B: Global Semiconductor FDI Persona (FDI SemiVina Corp)
+Verify FDI rules and positive eligibility outcomes:
+1. **Dropdown Selection:** Choose **FDI SemiVina Corp** in the top header.
+2. **Real-time Decree Query:** Search for `bán dẫn fdi` or `ưu đãi r&d`.
+   - **Expected Outcome:** **Chính Sách Hỗ Trợ Đặc Biệt Dự Án FDI Bán Dẫn và R&D** (citing Investment Law 2020) ranks top.
+3. **Eligibility Check:**
+   - **Expected Outcome:** The overall eligibility status resolves to **MET** (Green indicator).
+   - Click **Hoạt động trong lĩnh vực bán dẫn...** or **Đầu tư R&D đặc biệt**.
+   - Verify the sliding drawer displays high confidence evidence quotes from the company's pitch deck.
 
-### Step 3.4: Conflict Resolution UI
-- **Action**: When scanning completes, the `Registered Capital` passport field status is flagged as `CONFLICTED`. Click **Đối Chiếu** on that row.
-- **Expected Outcome**: A modal appears showing Source A (old database value) and Source B (AI Vision extracted value) side-by-side. Click **Sử dụng Nguồn B** or enter a custom override value.
-- **Expected Backend Integration**: The passport state updates to `USER_CONFIRMED` via API PUT request, and the eligibility check runs automatically.
-- **Artifact**: `conflict_modal_visible.png`
+---
 
-### Step 3.5: Interactive Required Documents Checklist
-- **Action**: Scroll to **Required Documents Checklist**. Select a missing document and click **Bỏ qua** (Waive).
-- **Expected Outcome**: The checklist item status updates to `WAIVED`, strikes through the text, and disables the toggle checkbox.
-- **Artifact**: `interactive_checklist_and_drawer.png`
-
-### Step 3.6: Policy Change Alerts
-- **Action**: Locate the top opportunity card highlighting a yellow pulsing **Có Thay Đổi** badge. Click on the badge.
-- **Expected Outcome**: A diff modal appears displaying a side-by-side red-green comparison comparing the old legislative clause vs the new updated legislative clause (e.g., R&D requirement changed from 2.0% to 1.5%).
-- **Artifact**: `policy_diff_modal.png`
+### Scenario C: Green CleanTech Persona (SolarGreen Tech JSC)
+Verify SME tax reductions and green incentives:
+1. **Dropdown Selection:** Choose **SolarGreen Tech JSC** in the top header.
+2. **Real-time Decree Query:** Search for `năng lượng xanh` or `quỹ tăng trưởng xanh`.
+   - **Expected Outcome:** **Quỹ Tài Trợ Phát Triển Công Nghệ Xanh và Năng Lượng Tái Tạo** (citing Decision 1658/QĐ-TTg) ranks top.
+3. **Eligibility Check:**
+   - **Expected Outcome:** The overall eligibility is **MET**.
+   - Click the rules to view green technology and asset-size citations.
 
 ---
 
 ## 4. Visual Verification Artifacts
 
-All screenshots and screen recording files are saved in:
-`C:\Users\lnminh1411\.gemini\antigravity\brain\e0f22a0d-4008-440e-921d-01d6ea4f704c\`
-
-### Captured Screenshots
-1. Dashboard home layout: `home_page.png`
-2. Eligibility drawer details: `sliding_drawer.png`
-3. OCR extraction start: `document_upload_modal.png`
-4. Stepper conflict log: `conflict_state.png`
-5. Side-by-side conflict resolution: `conflict_modal_visible.png`
-6. Tri-state documents checklist: `interactive_checklist_and_drawer.png`
-7. Legal diff modal: `policy_diff_modal.png`
-
-### Full Web Session Video Recording
-- Screen capture recording: `recording.webm`
+All screenshots and screen recording files are saved in the artifact directory.
+- `home_page.png` (Dashboard overview)
+- `sliding_drawer.png` (Decree citations drawer)
+- `conflict_modal_visible.png` (Side-by-side conflict modal)
+- `policy_diff_modal.png` (Decree change diff modal)
+- `interactive_checklist_and_drawer.png` (Waived documents)
+- `recording.webm` (Full walkthrough video)
