@@ -105,3 +105,47 @@ All screenshots and screen recording files are saved in the artifact directory.
 - `policy_diff_modal.png` (Decree change diff modal)
 - `interactive_checklist_and_drawer.png` (Waived documents)
 - `recording.webm` (Full walkthrough video)
+
+---
+
+## 5. Potential Failure & Automated Browser Test Cases
+
+The following test scenarios can be automated using `/browser` (Playwright / Puppeteer automation) to guard against regressions:
+
+### 5.1. Authentication & Session Lifecycles
+* **TC-001: Invalid Credentials Handling**
+  - **Action**: Enter non-existent email or wrong password. Click log in.
+  - **Expected Failure**: Verify error toast/message "Invalid email or password" is shown and user remains on log in screen.
+* **TC-002: Session Expiration & Auto-Redirect**
+  - **Action**: Delete token from LocalStorage or simulate invalid session token, then click any interactive button.
+  - **Expected Failure**: Page automatically redirects back to the Login screen with an alert.
+* **TC-003: Double Signup Prevention**
+  - **Action**: Sign up with an email that already exists in the database.
+  - **Expected Failure**: System returns a validation error and blocks the registration.
+
+### 5.2. File Ingestion & Parse Failure Recovery
+* **TC-004: Unsupported File Format Ingestion**
+  - **Action**: Try uploading an unsupported binary format (e.g. `.exe`, `.bin`).
+  - **Expected Failure**: UI displays a clean conversion failure notification, file upload inputs are reset, and backend remains intact.
+* **TC-005: Broken / Missing API Key Extraction**
+  - **Action**: Simulate a missing GEMINI_API_KEY environment variable on backend.
+  - **Expected Failure**: Uploading files reports an HTTP 500 error warning "GEMINI_API_KEY environment variable is missing" instead of crashing.
+* **TC-006: Temporary Upload Security Audit**
+  - **Action**: Verify that files uploaded to temp storage are completely removed from server filesystem upon completion or error (tested programmatically via system process check).
+
+### 5.3. Gated Approval & State Security
+* **TC-007: Gated Review Bypass Prevention**
+  - **Action**: Select a policy that resolves to `NOT_MET` (e.g., Green Innovation Grant for FDI SemiVina Corp). Programmatically trigger a draft approval post request.
+  - **Expected Failure**: Backend rejects with HTTP 400, and UI blocks/hides the "Approve" button.
+* **TC-008: Missing/Conflicted Fields Block**
+  - **Action**: Try to approve a draft while a core passport field is marked as `CONFLICTED` or `MISSING`.
+  - **Expected Failure**: Review area displays warnings block listing the conflicting elements, and blocks approval.
+
+### 5.4. Tenant Isolation & Mode Toggles
+* **TC-009: Cross-Tenant Data Access Leak**
+  - **Action**: Login as Tenant A (`aitech@p2b.vn`). Try to navigate to Tenant B's draft URL or send an API request to Tenant B's endpoints.
+  - **Expected Failure**: Server returns HTTP 403 Forbidden.
+* **TC-010: Dynamic Persona Transition Sync**
+  - **Action**: Open user settings, change user type from **Company Manager** to **Individual**, and click Save.
+  - **Expected Outcome**: The dashboard instantly cleans its state and renders the Personal Passport update forms, and the processed documents history loads Individual records.
+
