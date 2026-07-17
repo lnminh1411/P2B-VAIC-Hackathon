@@ -783,10 +783,22 @@ def update_draft_status(id: str, req: DraftStatusUpdateRequest, user: Dict[str, 
         # Block if any checked fields have conflicts or missing statuses
         conflicted_fields = []
         missing_fields = []
-        for r_check in details:
+        
+        def extract_rules_from_details(g_details: dict) -> list:
+            flat = []
+            if "rules" in g_details:
+                for r in g_details["rules"]:
+                    if "rules" in r:
+                        flat.extend(extract_rules_from_details(r))
+                    else:
+                        flat.append(r)
+            return flat
+
+        flat_rules = extract_rules_from_details(details)
+        for r_check in flat_rules:
             # Match passport fields used
-            field_name = r_check["field"]
-            if hasattr(passport, field_name):
+            field_name = r_check.get("field")
+            if field_name and hasattr(passport, field_name):
                 f_provenance = getattr(passport, field_name)
                 if f_provenance.status == "CONFLICTED":
                     conflicted_fields.append(field_name)
