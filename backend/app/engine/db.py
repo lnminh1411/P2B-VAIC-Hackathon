@@ -96,9 +96,16 @@ def init_db():
         occupation TEXT,
         degree TEXT,
         monthly_income INTEGER,
+        uploaded_files_json TEXT,
         updated_at TEXT NOT NULL
     )
     """)
+    
+    # SQLite migration: alter table to add column if it doesn't exist
+    try:
+        cursor.execute("ALTER TABLE personal_passports ADD COLUMN uploaded_files_json TEXT")
+    except sqlite3.OperationalError:
+        pass
 
     # 8. Sessions Table
     cursor.execute("""

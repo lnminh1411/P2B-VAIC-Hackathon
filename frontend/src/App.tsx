@@ -891,6 +891,27 @@ export default function App() {
                     </div>
                   );
                 })}
+                
+                {companyPassport.metadata?.uploaded_files && companyPassport.metadata.uploaded_files.length > 0 && (
+                  <div className="mt-4 pt-3 border-t border-slate-800/85">
+                    <h3 className="text-xs font-semibold text-slate-400 mb-2 flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5 text-indigo-400" />
+                      Lịch sử tài liệu đã xử lý
+                    </h3>
+                    <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
+                      {companyPassport.metadata.uploaded_files.map((file: any, index: number) => (
+                        <div key={index} className="flex justify-between items-center bg-slate-950/45 border border-slate-900 px-2.5 py-1.5 rounded-md text-[11px]">
+                          <span className="text-slate-300 truncate max-w-[150px]" title={file.filename}>
+                            {file.filename}
+                          </span>
+                          <span className="text-slate-500 font-mono text-[9px]">
+                            {new Date(file.uploaded_at).toLocaleString('vi-VN', {hour: '2-digit', minute:'2-digit', day: '2-digit', month: '2-digit'})}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="py-12 text-center text-xs text-slate-500 flex flex-col items-center gap-2">
@@ -900,78 +921,101 @@ export default function App() {
             )
           ) : (
             // Individual passport form
-            <form onSubmit={handleSavePersonalPassport} className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Họ và tên</label>
-                <input 
-                  type="text"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
-                  value={personalPassport.full_name || ''}
-                  onChange={(e) => setPersonalPassport({ ...personalPassport, full_name: e.target.value })}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
+            <>
+              <form onSubmit={handleSavePersonalPassport} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Năm sinh</label>
-                  <input 
-                    type="number"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
-                    value={personalPassport.birth_year || 0}
-                    onChange={(e) => setPersonalPassport({ ...personalPassport, birth_year: Number(e.target.value) })}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Thành phố</label>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Họ và tên</label>
                   <input 
                     type="text"
                     className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
-                    value={personalPassport.location || ''}
-                    onChange={(e) => setPersonalPassport({ ...personalPassport, location: e.target.value })}
+                    value={personalPassport.full_name || ''}
+                    onChange={(e) => setPersonalPassport({ ...personalPassport, full_name: e.target.value })}
                   />
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Nghề nghiệp / Chuyên môn</label>
-                <input 
-                  type="text"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
-                  value={personalPassport.occupation || ''}
-                  onChange={(e) => setPersonalPassport({ ...personalPassport, occupation: e.target.value })}
-                  placeholder="Semiconductor Engineer"
-                />
-              </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">Năm sinh</label>
+                    <input 
+                      type="number"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
+                      value={personalPassport.birth_year || 0}
+                      onChange={(e) => setPersonalPassport({ ...personalPassport, birth_year: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">Thành phố</label>
+                    <input 
+                      type="text"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
+                      value={personalPassport.location || ''}
+                      onChange={(e) => setPersonalPassport({ ...personalPassport, location: e.target.value })}
+                    />
+                  </div>
+                </div>
 
-              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Bằng cấp</label>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Nghề nghiệp / Chuyên môn</label>
                   <input 
                     type="text"
                     className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
-                    value={personalPassport.degree || ''}
-                    onChange={(e) => setPersonalPassport({ ...personalPassport, degree: e.target.value })}
-                    placeholder="Master"
+                    value={personalPassport.occupation || ''}
+                    onChange={(e) => setPersonalPassport({ ...personalPassport, occupation: e.target.value })}
+                    placeholder="Semiconductor Engineer"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Thu nhập tháng (VND)</label>
-                  <input 
-                    type="number"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
-                    value={personalPassport.monthly_income || 0}
-                    onChange={(e) => setPersonalPassport({ ...personalPassport, monthly_income: Number(e.target.value) })}
-                  />
-                </div>
-              </div>
 
-              <button 
-                type="submit" 
-                className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-xs font-medium text-white transition-all"
-              >
-                Cập Nhật Hồ Sơ Cá Nhân
-              </button>
-            </form>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">Bằng cấp</label>
+                    <input 
+                      type="text"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
+                      value={personalPassport.degree || ''}
+                      onChange={(e) => setPersonalPassport({ ...personalPassport, degree: e.target.value })}
+                      placeholder="Master"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">Thu nhập tháng (VND)</label>
+                    <input 
+                      type="number"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
+                      value={personalPassport.monthly_income || 0}
+                      onChange={(e) => setPersonalPassport({ ...personalPassport, monthly_income: Number(e.target.value) })}
+                    />
+                  </div>
+                </div>
+
+                <button 
+                  type="submit" 
+                  className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-xs font-medium text-white transition-all"
+                >
+                  Cập Nhật Hồ Sơ Cá Nhân
+                </button>
+              </form>
+              
+              {personalPassport.uploaded_files && personalPassport.uploaded_files.length > 0 && (
+                <div className="mt-4 pt-3 border-t border-slate-800/80 text-left">
+                  <h3 className="text-xs font-semibold text-slate-400 mb-2 flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-indigo-400" />
+                    Lịch sử tài liệu đã xử lý
+                  </h3>
+                  <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
+                    {personalPassport.uploaded_files.map((file: any, index: number) => (
+                      <div key={index} className="flex justify-between items-center bg-slate-950/40 border border-slate-900 px-2.5 py-1.5 rounded-md text-[11px]">
+                        <span className="text-slate-300 truncate max-w-[150px]" title={file.filename}>
+                          {file.filename}
+                        </span>
+                        <span className="text-slate-500 font-mono text-[9px]">
+                          {new Date(file.uploaded_at).toLocaleString('vi-VN', {hour: '2-digit', minute:'2-digit', day: '2-digit', month: '2-digit'})}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </section>
 

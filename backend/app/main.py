@@ -280,7 +280,7 @@ def get_me(user: Dict[str, Any] = Depends(get_current_user)):
         if row:
             passport_data = json.loads(row["data_json"])
     else:
-        cursor.execute("SELECT id, full_name, birth_year, location, occupation, degree, monthly_income FROM personal_passports WHERE id = ?", (user["personal_passport_id"],))
+        cursor.execute("SELECT id, full_name, birth_year, location, occupation, degree, monthly_income, uploaded_files_json FROM personal_passports WHERE id = ?", (user["personal_passport_id"],))
         row = cursor.fetchone()
         if row:
             passport_data = {
@@ -289,7 +289,8 @@ def get_me(user: Dict[str, Any] = Depends(get_current_user)):
                 "location": row["location"],
                 "occupation": row["occupation"],
                 "degree": row["degree"],
-                "monthly_income": row["monthly_income"]
+                "monthly_income": row["monthly_income"],
+                "uploaded_files": json.loads(row["uploaded_files_json"]) if row["uploaded_files_json"] else []
             }
             
     conn.close()
@@ -365,7 +366,7 @@ def update_user_mode(req: UserModeUpdateRequest, user: Dict[str, Any] = Depends(
             "rd_spend_ratio": {"value": 0.0, "source_type": "MANUAL_INPUT", "source_uri": "", "source_location": "", "evidence_quote": "", "observed_at": timestamp, "confidence": "LOW", "status": "MISSING", "conflicts": []},
             "revenue": {"value": 0, "source_type": "MANUAL_INPUT", "source_uri": "", "source_location": "", "evidence_quote": "", "observed_at": timestamp, "confidence": "LOW", "status": "MISSING", "conflicts": []},
             "registered_capital": {"value": 0, "source_type": "MANUAL_INPUT", "source_uri": "", "source_location": "", "evidence_quote": "", "observed_at": timestamp, "confidence": "LOW", "status": "MISSING", "conflicts": []},
-            "metadata": {}
+            "metadata": {"uploaded_files": []}
         }
         cursor.execute("INSERT INTO company_passports (id, data_json, updated_at) VALUES (?, ?, ?)", (company_id, json.dumps(empty_passport), timestamp))
         cursor.execute("UPDATE users SET company_id = ? WHERE id = ?", (company_id, user["id"]))
@@ -373,8 +374,8 @@ def update_user_mode(req: UserModeUpdateRequest, user: Dict[str, Any] = Depends(
     elif req.user_type == "INDIVIDUAL" and not personal_passport_id:
         personal_passport_id = f"personal_{uuid.uuid4().hex[:8]}"
         cursor.execute(
-            "INSERT INTO personal_passports (id, full_name, birth_year, location, occupation, degree, monthly_income, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (personal_passport_id, "", 0, "", "", "", 0, timestamp)
+            "INSERT INTO personal_passports (id, full_name, birth_year, location, occupation, degree, monthly_income, uploaded_files_json, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (personal_passport_id, "", 0, "", "", "", 0, "[]", timestamp)
         )
         cursor.execute("UPDATE users SET personal_passport_id = ? WHERE id = ?", (personal_passport_id, user["id"]))
         
@@ -954,6 +955,20 @@ def extract_document(file: UploadFile = File(...), user: Dict[str, Any] = Depend
         
         if user["user_type"] == "COMPANY_MANAGER":
             passport_id = user["company_id"]
+            
+            # Fetch existing metadata to preserve uploaded_files history
+            cursor.execute("SELECT data_json FROM company_passports WHERE id = ?", (passport_id,))
+            existing_row = cursor.fetchone()
+            existing_uploaded_files = []
+            if existing_row:
+                try:
+                    existing_data = json.loads(existing_row["data_json"])
+                    existing_uploaded_files = existing_data.get("metadata", {}).get("uploaded_files", [])
+                except Exception:
+                    pass
+            
+            existing_uploaded_files.append({"filename": file.filename, "uploaded_at": timestamp})
+            
             # Compile fields with provenance
             company_passport = {}
             for field in ["company_name", "tax_code", "industry", "location", "employee_count", "rd_spend_ratio", "revenue", "registered_capital"]:
@@ -972,7 +987,7 @@ def extract_document(file: UploadFile = File(...), user: Dict[str, Any] = Depend
                     "status": "EXTRACTED" if quote else "MISSING",
                     "conflicts": []
                 }
-            company_passport["metadata"] = {}
+            company_passport["metadata"] = {"uploaded_files": existing_uploaded_files}
             
             cursor.execute("UPDATE company_passports SET data_json = ?, updated_at = ? WHERE id = ?", (json.dumps(company_passport, ensure_ascii=False), timestamp, passport_id))
             
@@ -984,10 +999,23 @@ def extract_document(file: UploadFile = File(...), user: Dict[str, Any] = Depend
         else:
             # Individual
             passport_id = user["personal_passport_id"]
+            
+            # Fetch existing uploaded_files
+            cursor.execute("SELECT uploaded_files_json FROM personal_passports WHERE id = ?", (passport_id,))
+            existing_row = cursor.fetchone()
+            existing_uploaded_files = []
+            if existing_row and existing_row["uploaded_files_json"]:
+                try:
+                    existing_uploaded_files = json.loads(existing_row["uploaded_files_json"])
+                except Exception:
+                    pass
+            
+            existing_uploaded_files.append({"filename": file.filename, "uploaded_at": timestamp})
+            
             cursor.execute(
                 """
                 UPDATE personal_passports 
-                SET full_name = ?, birth_year = ?, location = ?, occupation = ?, degree = ?, monthly_income = ?, updated_at = ?
+                SET full_name = ?, birth_year = ?, location = ?, occupation = ?, degree = ?, monthly_income = ?, uploaded_files_json = ?, updated_at = ?
                 WHERE id = ?
                 """,
                 (
@@ -997,11 +1025,13 @@ def extract_document(file: UploadFile = File(...), user: Dict[str, Any] = Depend
                     extracted_data.get("occupation", ""),
                     extracted_data.get("degree", ""),
                     int(extracted_data.get("monthly_income", 0)),
+                    json.dumps(existing_uploaded_files, ensure_ascii=False),
                     timestamp,
                     passport_id
                 )
             )
             result_passport = extracted_data
+            result_passport["uploaded_files"] = existing_uploaded_files
             
         conn.commit()
         conn.close()
@@ -1108,7 +1138,21 @@ def extract_multiple_documents(files: List[UploadFile] = File(...), user: Dict[s
                     "status": "EXTRACTED" if quote else "MISSING",
                     "conflicts": []
                 }
-            company_passport["metadata"] = {}
+            # Fetch existing metadata to preserve uploaded_files history
+            cursor.execute("SELECT data_json FROM company_passports WHERE id = ?", (passport_id,))
+            existing_row = cursor.fetchone()
+            existing_uploaded_files = []
+            if existing_row:
+                try:
+                    existing_data = json.loads(existing_row["data_json"])
+                    existing_uploaded_files = existing_data.get("metadata", {}).get("uploaded_files", [])
+                except Exception:
+                    pass
+            
+            for td in temp_docs:
+                existing_uploaded_files.append({"filename": td["name"], "uploaded_at": timestamp})
+                
+            company_passport["metadata"] = {"uploaded_files": existing_uploaded_files}
             
             cursor.execute("UPDATE company_passports SET data_json = ?, updated_at = ? WHERE id = ?", (json.dumps(company_passport, ensure_ascii=False), timestamp, passport_id))
             cursor.execute("INSERT INTO audit_logs (event_type, target_id, field_name, old_value, new_value, timestamp) VALUES (?, ?, ?, ?, ?, ?)",
@@ -1122,10 +1166,24 @@ def extract_multiple_documents(files: List[UploadFile] = File(...), user: Dict[s
             personal_extracted = call_gemini_extraction(best_resume_doc["path"], best_resume_doc["mime_type"], "INDIVIDUAL")
             
             passport_id = user["personal_passport_id"]
+            
+            # Fetch existing uploaded_files
+            cursor.execute("SELECT uploaded_files_json FROM personal_passports WHERE id = ?", (passport_id,))
+            existing_row = cursor.fetchone()
+            existing_uploaded_files = []
+            if existing_row and existing_row["uploaded_files_json"]:
+                try:
+                    existing_uploaded_files = json.loads(existing_row["uploaded_files_json"])
+                except Exception:
+                    pass
+            
+            for td in temp_docs:
+                existing_uploaded_files.append({"filename": td["name"], "uploaded_at": timestamp})
+                
             cursor.execute(
                 """
                 UPDATE personal_passports 
-                SET full_name = ?, birth_year = ?, location = ?, occupation = ?, degree = ?, monthly_income = ?, updated_at = ?
+                SET full_name = ?, birth_year = ?, location = ?, occupation = ?, degree = ?, monthly_income = ?, uploaded_files_json = ?, updated_at = ?
                 WHERE id = ?
                 """,
                 (
@@ -1135,11 +1193,13 @@ def extract_multiple_documents(files: List[UploadFile] = File(...), user: Dict[s
                     personal_extracted.get("occupation", ""),
                     personal_extracted.get("degree", ""),
                     int(personal_extracted.get("monthly_income", 0)),
+                    json.dumps(existing_uploaded_files, ensure_ascii=False),
                     timestamp,
                     passport_id
                 )
             )
             result_passport = personal_extracted
+            result_passport["uploaded_files"] = existing_uploaded_files
             
         conn.commit()
         conn.close()
