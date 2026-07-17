@@ -104,12 +104,12 @@ export default function App() {
     }
   }, [selectedCompanyId, searchQuery]);
 
-  // Load eligibility when policy selection changes
+  // Load eligibility when policy selection or company changes
   useEffect(() => {
-    if (selectedPolicyId) {
+    if (selectedPolicyId && selectedCompanyId) {
       fetchEligibility();
     }
-  }, [selectedPolicyId]);
+  }, [selectedPolicyId, selectedCompanyId]);
 
   // Sync Checklist with selected policy & passport facts
   useEffect(() => {
