@@ -71,6 +71,56 @@ def init_db():
         enabled INTEGER NOT NULL DEFAULT 1
     )
     """)
+
+    # 6. Users Table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        email TEXT UNIQUE NOT NULL,
+        hashed_password TEXT NOT NULL,
+        user_type TEXT NOT NULL, -- COMPANY_MANAGER or INDIVIDUAL
+        company_id TEXT, -- links to company_passports.id
+        personal_passport_id TEXT, -- links to personal_passports.id
+        avatar_path TEXT,
+        created_at TEXT NOT NULL
+    )
+    """)
+
+    # 7. Personal Passports Table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS personal_passports (
+        id TEXT PRIMARY KEY,
+        full_name TEXT NOT NULL,
+        birth_year INTEGER,
+        location TEXT,
+        occupation TEXT,
+        degree TEXT,
+        monthly_income INTEGER,
+        updated_at TEXT NOT NULL
+    )
+    """)
+
+    # 8. Sessions Table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS sessions (
+        token TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+    """)
+
+    # 9. Policy Alerts Table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS policy_alerts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        document_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        change_description TEXT NOT NULL,
+        timestamp TEXT NOT NULL
+    )
+    """)
     
     # Seed Company Passports if empty
     cursor.execute("SELECT COUNT(*) FROM company_passports")
@@ -111,6 +161,41 @@ def init_db():
         )
         print("Seeded default crawler config.")
         
+    # Seed default users if empty
+    cursor.execute("SELECT COUNT(*) FROM users")
+    if cursor.fetchone()[0] == 0:
+        from app.engine.auth import hash_password
+        import uuid
+        
+        default_users = [
+            ("AItech_Vietnam_LLC", "aitech@p2b.vn", "Password123", "COMPANY_MANAGER"),
+            ("FDI_SemiVina_Corp", "semivina@p2b.vn", "Password123", "COMPANY_MANAGER"),
+            ("SolarGreen_Tech_JSC", "solargreen@p2b.vn", "Password123", "COMPANY_MANAGER")
+        ]
+        for cid, email, pwd, utype in default_users:
+            uid = str(uuid.uuid4())
+            hashed = hash_password(pwd)
+            cursor.execute(
+                "INSERT INTO users (id, email, hashed_password, user_type, company_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (uid, email, hashed, utype, cid, datetime.utcnow().isoformat())
+            )
+            
+        # Seed an individual user
+        individual_uid = str(uuid.uuid4())
+        individual_pid = str(uuid.uuid4())
+        hashed_ind = hash_password("Password123")
+        # Insert personal passport first
+        cursor.execute(
+            "INSERT INTO personal_passports (id, full_name, birth_year, location, occupation, degree, monthly_income, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (individual_pid, "Nguyễn Văn Chuyên Gia", 1992, "Đà Nẵng", "Semiconductor Engineer", "Master", 45000000, datetime.utcnow().isoformat())
+        )
+        # Insert user
+        cursor.execute(
+            "INSERT INTO users (id, email, hashed_password, user_type, personal_passport_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (individual_uid, "individual@p2b.vn", hashed_ind, "INDIVIDUAL", individual_pid, datetime.utcnow().isoformat())
+        )
+        print("Seeded default users and personal passport.")
+
     conn.commit()
     conn.close()
     print("Database initialization complete.")
