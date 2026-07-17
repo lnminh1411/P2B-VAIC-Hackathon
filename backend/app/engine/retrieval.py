@@ -132,26 +132,58 @@ class HybridRetrievalEngine:
             self.bm25 = BM25Okapi(self.bm25_corpus)
         else:
             self.bm25 = None
+            
+        # 7. Pre-warm vector cache
+        self.pre_warm_cache()
 
     def pre_warm_cache(self):
         """
-        Pre-embeds all decree chunks using active model on startup if they aren't already cached.
+        Pre-embeds all decree chunks using active model in batch if they aren't already cached.
         """
-        print("Pre-warming embeddings cache for decrees...")
-        updated = False
+        missing_chunks = []
+        missing_prefixed = []
+        
         for chunk in self.chunks:
-            chunk_text = chunk["text"]
+            chunk_text = chunk["text"].strip()
             prefixed_text = "passage: " + chunk_text
             if prefixed_text not in self.embeddings_cache:
-                print(f"Embedding decree chunk: {chunk_text[:40]}...")
-                try:
-                    self.get_embedding(chunk_text, is_query=False)
-                    updated = True
-                except Exception as e:
-                    print(f"[Retrieval Error] Failed to pre-embed chunk: {e}")
-        if updated:
+                missing_chunks.append(chunk_text)
+                missing_prefixed.append(prefixed_text)
+                
+        if not missing_prefixed:
+            return
+            
+        print(f"Pre-warming embeddings cache: embedding {len(missing_prefixed)} new chunks in batch...")
+        
+        embeddings = []
+        
+        if self.use_gemini and self.gemini_client:
+            try:
+                batch_size = 100
+                for i in range(0, len(missing_prefixed), batch_size):
+                    batch = missing_prefixed[i:i+batch_size]
+                    response = self.gemini_client.models.embed_content(
+                        model="text-embedding-004",
+                        contents=batch,
+                    )
+                    embeddings.extend([emb.values for emb in response.embeddings])
+            except Exception as e:
+                print(f"[Retrieval Error] Gemini batch embedding failed: {e}")
+                
+        elif self.model:
+            try:
+                embs = self.model.encode(missing_prefixed, batch_size=32, normalize_embeddings=True, show_progress_bar=False)
+                embeddings = embs.tolist()
+            except Exception as e:
+                print(f"[Retrieval Error] Local batch embedding failed: {e}")
+                
+        if embeddings and len(embeddings) == len(missing_prefixed):
+            for prefixed_text, emb in zip(missing_prefixed, embeddings):
+                self.embeddings_cache[prefixed_text] = emb
             self.save_cache_to_disk()
-            print("Embeddings cache updated and saved.")
+            print(f"Embeddings cache successfully pre-warmed and saved to disk. Total cached: {len(self.embeddings_cache)}")
+        else:
+            print("[Retrieval Warning] Batch embedding did not complete successfully or returned mismatched size.")
 
     def get_embedding(self, text: str, is_query: bool = False) -> List[float]:
         """
