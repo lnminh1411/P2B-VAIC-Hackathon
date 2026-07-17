@@ -135,9 +135,15 @@ def init_db():
         id TEXT PRIMARY KEY,
         title TEXT NOT NULL,
         chunks_json TEXT NOT NULL,
+        xml_content TEXT,
         updated_at TEXT NOT NULL
     )
     """)
+    
+    try:
+        cursor.execute("ALTER TABLE legal_documents ADD COLUMN xml_content TEXT")
+    except sqlite3.OperationalError:
+        pass
     
     # Seed Company Passports if empty
     cursor.execute("SELECT COUNT(*) FROM company_passports")
@@ -177,12 +183,30 @@ def init_db():
         if os.path.exists(corpus_file):
             with open(corpus_file, "r", encoding="utf-8") as f:
                 corpus = json.load(f)
+            from bs4 import BeautifulSoup
+            import xml.etree.ElementTree as ET
             for doc in corpus:
+                # Reconstruct text content to generate basic XML structure
+                root_el = ET.Element("document")
+                root_el.set("id", doc["id"])
+                root_el.set("number", doc["id"].upper().replace("_", "/"))
+                root_el.set("type", "Văn bản pháp luật")
+                root_el.set("status", "Còn hiệu lực")
+                
+                title_el = ET.SubElement(root_el, "title")
+                title_el.text = doc["title"]
+                
+                content_text = "\n\n".join([c.get("content", "") if isinstance(c, dict) else str(c) for c in doc["chunks"]])
+                content_el = ET.SubElement(root_el, "content")
+                content_el.text = content_text
+                
+                xml_str = BeautifulSoup(ET.tostring(root_el, encoding="utf-8"), "xml").prettify()
+                
                 cursor.execute(
-                    "INSERT INTO legal_documents (id, title, chunks_json, updated_at) VALUES (?, ?, ?, ?)",
-                    (doc["id"], doc["title"], json.dumps(doc["chunks"], ensure_ascii=False), datetime.utcnow().isoformat())
+                    "INSERT INTO legal_documents (id, title, chunks_json, xml_content, updated_at) VALUES (?, ?, ?, ?, ?)",
+                    (doc["id"], doc["title"], json.dumps(doc["chunks"], ensure_ascii=False), xml_str, datetime.utcnow().isoformat())
                 )
-            print(f"Seeded {len(corpus)} legal documents.")
+            print(f"Seeded {len(corpus)} legal documents with XML content.")
             
     # Seed default crawler config if empty
     cursor.execute("SELECT COUNT(*) FROM crawler_configs")

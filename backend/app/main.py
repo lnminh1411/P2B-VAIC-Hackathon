@@ -4,7 +4,7 @@ import json
 import shutil
 import hashlib
 from datetime import datetime, timedelta
-from fastapi import FastAPI, HTTPException, status, Query, Header, Depends, UploadFile, File
+from fastapi import FastAPI, HTTPException, status, Query, Header, Depends, UploadFile, File, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -619,6 +619,23 @@ def get_policy(id: str, user: Dict[str, Any] = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Policy Opportunity not found")
         
     return json.loads(row["data_json"])
+
+@app.get("/api/v1/documents/{id}/xml")
+def get_document_xml(id: str, user: Dict[str, Any] = Depends(get_current_user)):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT xml_content FROM legal_documents WHERE id = ?", (id,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    if not row:
+        raise HTTPException(status_code=404, detail="Document not found")
+        
+    xml_str = row["xml_content"]
+    if not xml_str:
+        raise HTTPException(status_code=404, detail="XML content not cached for this document")
+        
+    return Response(content=xml_str, media_type="application/xml")
 
 # ================= ELIGIBILITY ENGINE ENDPOINTS =================
 

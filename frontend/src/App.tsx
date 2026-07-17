@@ -163,6 +163,57 @@ export default function App() {
 
   // Selected Company Tenant (For Company Manager mode)
   const companies = ['AItech_Vietnam_LLC', 'FDI_SemiVina_Corp', 'SolarGreen_Tech_JSC'];
+
+  // Local XML Document Viewer Modal State
+  const [activeXmlDocId, setActiveXmlDocId] = useState<string | null>(null);
+  const [xmlDocData, setXmlDocData] = useState<any>(null);
+  const [xmlLoading, setXmlLoading] = useState(false);
+  const [xmlError, setXmlError] = useState<string | null>(null);
+
+  const fetchXmlDocument = async (docId: string) => {
+    setActiveXmlDocId(docId);
+    setXmlLoading(true);
+    setXmlError(null);
+    setXmlDocData(null);
+    try {
+      const res = await fetch(`${API_BASE}/documents/${docId}/xml`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!res.ok) {
+        throw new Error('Failed to retrieve cached XML document');
+      }
+      const xmlText = await res.text();
+      
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+      const docEl = xmlDoc.getElementsByTagName("document")[0];
+      const titleEl = xmlDoc.getElementsByTagName("title")[0];
+      const contentEl = xmlDoc.getElementsByTagName("content")[0];
+      
+      if (!docEl) {
+        throw new Error('XML parsing failed: missing document root');
+      }
+      
+      setXmlDocData({
+        id: docEl.getAttribute("id") || docId,
+        number: docEl.getAttribute("number") || "N/A",
+        type: docEl.getAttribute("type") || "N/A",
+        agency: docEl.getAttribute("agency") || "N/A",
+        issueDate: docEl.getAttribute("issue_date") || "N/A",
+        effectiveDate: docEl.getAttribute("effective_date") || "N/A",
+        status: docEl.getAttribute("status") || "N/A",
+        title: titleEl ? titleEl.textContent : "N/A",
+        content: contentEl ? contentEl.textContent : ""
+      });
+    } catch (err: any) {
+      console.error(err);
+      setXmlError(err.message || 'Error loading XML document');
+    } finally {
+      setXmlLoading(false);
+    }
+  };
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('AItech_Vietnam_LLC');
   const [companyPassport, setCompanyPassport] = useState<any>(null);
 
@@ -1213,14 +1264,12 @@ export default function App() {
                         {selectedPolicy.source_legal_documents.map((docId: string, idx: number) => (
                           <span key={docId}>
                             {idx > 0 && ", "}
-                            <a 
-                              href={getRobustGovLink("", docId)} 
-                              target="_blank" 
-                              rel="noreferrer" 
-                              className="font-mono text-indigo-400 hover:underline"
+                            <button 
+                              onClick={() => fetchXmlDocument(docId)} 
+                              className="font-mono text-indigo-400 hover:underline transition-all"
                             >
                               {formatDocIdForSearch(docId)}
-                            </a>
+                            </button>
                           </span>
                         ))}
                       </p>
@@ -1294,10 +1343,25 @@ export default function App() {
                                     <FileText className="w-3 h-3 text-indigo-400" /> Trích dẫn pháp lý ({rule.citation.article}):
                                   </p>
                                   <p className="italic text-slate-300">"{rule.citation.quote}"</p>
-                                  {(rule.citation.source_url || rule.citation.document_id) && (
-                                    <a href={getRobustGovLink(rule.citation.source_url, rule.citation.document_id)} target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline flex items-center gap-0.5 mt-1">
-                                      <span>Xem cổng văn bản chính phủ</span> <ExternalLink className="w-2.5 h-2.5" />
-                                    </a>
+                                  {rule.citation && (
+                                    <div className="flex flex-wrap gap-3 mt-1">
+                                      <button 
+                                        onClick={() => fetchXmlDocument(rule.citation.document_id)} 
+                                        className="text-indigo-400 hover:underline flex items-center gap-0.5 font-medium transition-all"
+                                      >
+                                        <span>Xem văn bản nguồn (XML)</span> <Database className="w-2.5 h-2.5" />
+                                      </button>
+                                      {(rule.citation.source_url || rule.citation.document_id) && (
+                                        <a 
+                                          href={getRobustGovLink(rule.citation.source_url, rule.citation.document_id)} 
+                                          target="_blank" 
+                                          rel="noreferrer" 
+                                          className="text-slate-400 hover:text-slate-300 hover:underline flex items-center gap-0.5"
+                                        >
+                                          <span>Cổng chính phủ</span> <ExternalLink className="w-2.5 h-2.5" />
+                                        </a>
+                                      )}
+                                    </div>
                                   )}
                                 </div>
                               )}
@@ -1751,6 +1815,93 @@ export default function App() {
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* XML DOCUMENT VIEWER MODAL */}
+      {activeXmlDocId && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden relative flex flex-col max-h-[85vh]">
+            <button 
+              onClick={() => setActiveXmlDocId(null)} 
+              className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors"
+              aria-label="Đóng"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <div className="p-6 border-b border-slate-800/80 bg-slate-950/30 text-left">
+              <span className="text-[10px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/15 px-2 py-0.5 rounded font-bold uppercase tracking-wider font-mono">
+                {xmlDocData ? xmlDocData.type : 'VĂN BẢN PHÁP LUẬT'}
+              </span>
+              <h3 className="text-base font-bold text-white mt-2 leading-snug">
+                {xmlLoading ? 'Đang tải dữ liệu XML...' : xmlDocData ? xmlDocData.title : 'Đang xử lý...'}
+              </h3>
+              
+              {xmlDocData && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 text-[10px] text-slate-400">
+                  <div className="bg-slate-950/40 p-2 rounded border border-slate-850">
+                    <span className="block text-slate-500 font-semibold mb-0.5">Số hiệu văn bản</span>
+                    <span className="font-mono text-slate-300 font-bold">{xmlDocData.number}</span>
+                  </div>
+                  <div className="bg-slate-950/40 p-2 rounded border border-slate-850">
+                    <span className="block text-slate-500 font-semibold mb-0.5">Cơ quan ban hành</span>
+                    <span className="text-slate-300 font-medium">{xmlDocData.agency}</span>
+                  </div>
+                  <div className="bg-slate-950/40 p-2 rounded border border-slate-850">
+                    <span className="block text-slate-500 font-semibold mb-0.5">Ngày ban hành</span>
+                    <span className="font-mono text-slate-300">{xmlDocData.issueDate ? xmlDocData.issueDate.split('T')[0] : 'N/A'}</span>
+                  </div>
+                  <div className="bg-slate-950/40 p-2 rounded border border-slate-850">
+                    <span className="block text-slate-500 font-semibold mb-0.5">Hiệu lực</span>
+                    <span className={`font-semibold ${xmlDocData.status.includes('Còn hiệu lực') ? 'text-emerald-400' : 'text-slate-400'}`}>{xmlDocData.status}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1 bg-slate-950/20 text-left">
+              {xmlLoading && (
+                <div className="py-16 text-center text-xs text-slate-500 space-y-2 flex flex-col items-center justify-center">
+                  <RefreshCw className="w-8 h-8 animate-spin text-indigo-500" />
+                  <span className="font-mono">Đang phân tích cấu trúc cây XML từ máy chủ...</span>
+                </div>
+              )}
+              
+              {xmlError && (
+                <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl text-center text-xs text-rose-400">
+                  <p>{xmlError}</p>
+                  <button 
+                    onClick={() => fetchXmlDocument(activeXmlDocId)} 
+                    className="mt-2.5 px-3 py-1 bg-rose-600 hover:bg-rose-500 rounded text-white font-medium transition-all"
+                  >
+                    Thử lại
+                  </button>
+                </div>
+              )}
+
+              {xmlDocData && (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center text-slate-500 text-[10px]">
+                    <span>CẤU TRÚC VĂN BẢN ĐÃ CACHED</span>
+                    <span className="font-mono font-semibold text-slate-600">ID: {xmlDocData.id}</span>
+                  </div>
+                  <div className="bg-slate-950 border border-slate-850 rounded-xl p-5 text-slate-300 text-xs font-sans leading-relaxed whitespace-pre-wrap max-h-[48vh] overflow-y-auto selection:bg-indigo-500/30">
+                    {xmlDocData.content}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-slate-800/80 bg-slate-900 flex justify-end gap-3 text-xs">
+              <button 
+                onClick={() => setActiveXmlDocId(null)} 
+                className="px-4 py-2 border border-slate-800 bg-slate-950 rounded-lg font-bold text-slate-300 hover:bg-slate-900 transition-all"
+              >
+                Đóng
+              </button>
             </div>
           </div>
         </div>

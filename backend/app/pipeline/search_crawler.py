@@ -290,12 +290,31 @@ def search_and_cache_decrees(query: str):
         # 3. Cache Policy Opportunity to Database
         cursor.execute("INSERT OR REPLACE INTO policy_opportunities (id, data_json) VALUES (?, ?)", (opp_id, json.dumps(opp.model_dump(), ensure_ascii=False)))
         
-        # 4. Cache Decree chunks to Database
-        chunks = [content[i:i+1500] for i in range(0, len(content), 1200)]
-        cursor.execute("INSERT OR REPLACE INTO legal_documents (id, title, chunks_json, updated_at) VALUES (?, ?, ?, ?)",
-                       (doc_id, title, json.dumps(chunks, ensure_ascii=False), datetime.utcnow().isoformat()))
+        # 4. Build XML content
+        import xml.etree.ElementTree as ET
         
-        print(f"[Crawler Cache] Saved: {title} -> {opp_id}")
+        root_el = ET.Element("document")
+        root_el.set("id", doc_id)
+        num_match = re.search(r'(Nghị định|Quyết định|Thông tư)\s+([0-9\/\w\-]+)', title, re.IGNORECASE)
+        num_str = num_match.group(2) if num_match else doc_id.upper().replace("_", "/")
+        root_el.set("number", num_str)
+        root_el.set("type", "Nghị định" if "nghị định" in title.lower() else "Quyết định" if "quyết định" in title.lower() else "Thông tư")
+        root_el.set("status", "Còn hiệu lực")
+        
+        title_el = ET.SubElement(root_el, "title")
+        title_el.text = title
+        
+        content_el = ET.SubElement(root_el, "content")
+        content_el.text = content
+        
+        xml_str = BeautifulSoup(ET.tostring(root_el, encoding="utf-8"), "xml").prettify()
+        
+        # 5. Cache Decree chunks to Database
+        chunks = [content[i:i+1500] for i in range(0, len(content), 1200)]
+        cursor.execute("INSERT OR REPLACE INTO legal_documents (id, title, chunks_json, xml_content, updated_at) VALUES (?, ?, ?, ?, ?)",
+                       (doc_id, title, json.dumps(chunks, ensure_ascii=False), xml_str, datetime.utcnow().isoformat()))
+        
+        print(f"[Crawler Cache] Saved: {title} -> {opp_id} with XML")
         
     conn.commit()
     conn.close()
