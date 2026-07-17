@@ -1,0 +1,315 @@
+[
+  {
+    "id": "sme_tax_reduction",
+    "title": "Chương trình Giảm Thuế Thu Nhập Doanh Nghiệp Cho SME",
+    "benefits": "Giảm thuế suất thuế thu nhập doanh nghiệp (CIT) xuống 15-17% (so với mức phổ thông 20%).",
+    "target_companies": "Doanh nghiệp nhỏ và vừa tại Việt Nam",
+    "geography": "Toàn quốc",
+    "deadline": "2026-12-31",
+    "required_documents": [
+      "Báo cáo tài chính năm gần nhất",
+      "Báo cáo tình hình sử dụng lao động"
+    ],
+    "eligibility_rules": {
+      "criterion_group_id": "sme_tax_reduction_rules",
+      "logic": "ALL",
+      "rules": [
+        {
+          "criterion_id": "sme_revenue_limit",
+          "description": "Doanh thu năm không quá 50 tỷ VND",
+          "field": "revenue",
+          "operator": "LTE",
+          "expected_value": 50000000000,
+          "required": true,
+          "citation": {
+            "document_id": "law_sme_support_2017",
+            "article": "Điều 4",
+            "page": 2,
+            "quote": "Doanh nghiệp nhỏ và vừa có doanh thu năm không quá 50 tỷ đồng...",
+            "source_url": "https://vbpl.vn/tw/Pages/vbpq-toanvan.aspx?ItemID=12345"
+          }
+        },
+        {
+          "criterion_id": "sme_employee_limit",
+          "description": "Số lượng lao động tham gia bảo hiểm xã hội không quá 100 người",
+          "field": "employee_count",
+          "operator": "LTE",
+          "expected_value": 100,
+          "required": true,
+          "citation": {
+            "document_id": "law_sme_support_2017",
+            "article": "Điều 4",
+            "page": 2,
+            "quote": "Doanh nghiệp nhỏ có số lao động tham gia bảo hiểm xã hội bình quân năm không quá 100 người...",
+            "source_url": "https://vbpl.vn/tw/Pages/vbpq-toanvan.aspx?ItemID=12345"
+          }
+        }
+      ]
+    },
+    "source_legal_documents": [
+      "law_sme_support_2017"
+    ]
+  },
+  {
+    "id": "high_tech_certification",
+    "title": "Ưu Đãi Thuế Cho Doanh Nghiệp Công Nghệ Cao (HTE)",
+    "benefits": "Miễn thuế CIT trong 4 năm đầu, giảm 50% trong 9 năm tiếp theo, thuế suất ưu đãi 10% trong 15 năm.",
+    "target_companies": "Doanh nghiệp sản xuất sản phẩm công nghệ cao hoặc ứng dụng công nghệ cao",
+    "geography": "Toàn quốc",
+    "deadline": "2028-12-31",
+    "required_documents": [
+      "Thuyết minh dự án ứng dụng/sản xuất công nghệ cao",
+      "Báo cáo nhân sự R&D và bằng cấp liên quan",
+      "Báo cáo kiểm toán chi phí R&D"
+    ],
+    "eligibility_rules": {
+      "criterion_group_id": "hte_rules",
+      "logic": "ALL",
+      "rules": [
+        {
+          "criterion_id": "hte_rd_ratio",
+          "description": "Tỷ lệ chi phí R&D trên tổng doanh thu tối thiểu 2% (0.02)",
+          "field": "rd_spend_ratio",
+          "operator": "GTE",
+          "expected_value": 0.02,
+          "required": true,
+          "citation": {
+            "document_id": "decision_19_2021_qd_ttg",
+            "article": "Điều 5",
+            "page": 3,
+            "quote": "Tỷ lệ chi phí cho hoạt động nghiên cứu và phát triển của doanh nghiệp tối thiểu đạt 2% tổng doanh thu...",
+            "source_url": "https://vbpl.vn/tw/Pages/vbpq-toanvan.aspx?ItemID=54321"
+          }
+        },
+        {
+          "criterion_id": "hte_employee_limit",
+          "description": "Có quy mô nhân sự hoạt động liên tục (employee_count >= 10)",
+          "field": "employee_count",
+          "operator": "GTE",
+          "expected_value": 10,
+          "required": true,
+          "citation": {
+            "document_id": "decision_19_2021_qd_ttg",
+            "article": "Điều 5",
+            "page": 3,
+            "quote": "Doanh nghiệp phải có số lượng lao động hoạt động thường xuyên...",
+            "source_url": "https://vbpl.vn/tw/Pages/vbpq-toanvan.aspx?ItemID=54321"
+          }
+        }
+      ]
+    },
+    "source_legal_documents": [
+      "decision_19_2021_qd_ttg"
+    ]
+  },
+  {
+    "id": "nic_hoa_lac_incentives",
+    "title": "Chương Trình Ưu Đãi Đặc Biệt Cho Thành Viên NIC Hòa Lạc",
+    "benefits": "Miễn tiền thuê đất toàn bộ thời hạn thuê, hỗ trợ thủ tục hải quan nhanh, ưu đãi thuế nhập khẩu thiết bị R&D.",
+    "target_companies": "Doanh nghiệp công nghệ đổi mới sáng tạo đặt trụ sở tại NIC Hòa Lạc",
+    "geography": "Khu công nghệ cao Hòa Lạc, Hà Nội",
+    "deadline": null,
+    "required_documents": [
+      "Giấy chứng nhận đăng ký doanh nghiệp tại Hòa Lạc",
+      "Quyết định chấp thuận chủ trương đầu tư tại NIC"
+    ],
+    "eligibility_rules": {
+      "criterion_group_id": "nic_hl_rules",
+      "logic": "ALL",
+      "rules": [
+        {
+          "criterion_id": "nic_location_check",
+          "description": "Trụ sở chính hoặc cơ sở R&D nằm tại NIC Hòa Lạc",
+          "field": "location",
+          "operator": "EQ",
+          "expected_value": "NIC Hoa Lac",
+          "required": true,
+          "citation": {
+            "document_id": "decree_94_2020_nd_cp",
+            "article": "Điều 8",
+            "page": 5,
+            "quote": "Doanh nghiệp đầu tư tại Trung tâm Đổi mới sáng tạo Quốc gia cơ sở Hòa Lạc...",
+            "source_url": "https://vbpl.vn/tw/Pages/vbpq-toanvan.aspx?ItemID=9988"
+          }
+        },
+        {
+          "criterion_id": "nic_industry_check",
+          "description": "Hoạt động trong ngành công nghệ ưu tiên (AI, Semiconductor, Biotechnology, Automation)",
+          "field": "industry",
+          "operator": "IN",
+          "expected_value": [
+            "Artificial Intelligence",
+            "Semiconductor",
+            "Biotechnology",
+            "Automation"
+          ],
+          "required": true,
+          "citation": {
+            "document_id": "decree_94_2020_nd_cp",
+            "article": "Điều 8",
+            "page": 5,
+            "quote": "Các ngành công nghệ ưu tiên thu hút đầu tư bao gồm công nghệ số, bán dẫn, sinh học...",
+            "source_url": "https://vbpl.vn/tw/Pages/vbpq-toanvan.aspx?ItemID=9988"
+          }
+        }
+      ]
+    },
+    "source_legal_documents": [
+      "decree_94_2020_nd_cp"
+    ]
+  },
+  {
+    "id": "green_innovation_grant",
+    "title": "Quỹ Tài Trợ Phát Triển Công Nghệ Xanh và Năng Lượng Tái Tạo",
+    "benefits": "Tài trợ vốn không hoàn lại lên đến 1 tỷ VND cho dự án nghiên cứu và thương mại hóa sản phẩm xanh.",
+    "target_companies": "Doanh nghiệp công nghệ xanh, tiết kiệm năng lượng tại Việt Nam",
+    "geography": "Toàn quốc",
+    "deadline": "2026-10-15",
+    "required_documents": [
+      "Hồ sơ năng lực công nghệ",
+      "Đề án chi tiết ứng dụng năng lượng tái tạo",
+      "Giấy chứng nhận đăng ký kinh doanh chứng minh vốn điều lệ"
+    ],
+    "eligibility_rules": {
+      "criterion_group_id": "green_rules",
+      "logic": "ALL",
+      "rules": [
+        {
+          "criterion_id": "green_industry_check",
+          "description": "Lĩnh vực kinh doanh là Công nghệ xanh / Đổi mới sáng tạo xanh",
+          "field": "industry",
+          "operator": "EQ",
+          "expected_value": "Green Energy / Innovation",
+          "required": true,
+          "citation": {
+            "document_id": "decision_1658_qd_ttg",
+            "article": "Mục II.3",
+            "page": 2,
+            "quote": "Khuyến khích và hỗ trợ tài chính cho doanh nghiệp khởi nghiệp đổi mới sáng tạo trong lĩnh vực kinh tế xanh...",
+            "source_url": "https://vbpl.vn/tw/Pages/vbpq-toanvan.aspx?ItemID=7766"
+          }
+        },
+        {
+          "criterion_id": "green_capital_check",
+          "description": "Vốn điều lệ đăng ký tối thiểu 20 tỷ VND (20.000.000.000)",
+          "field": "registered_capital",
+          "operator": "GTE",
+          "expected_value": 20000000000,
+          "required": true,
+          "citation": {
+            "document_id": "decision_1658_qd_ttg",
+            "article": "Mục II.3",
+            "page": 3,
+            "quote": "Đối tượng nhận tài trợ là doanh nghiệp có quy mô vốn pháp định hoặc vốn tự có từ 20 tỷ đồng trở lên...",
+            "source_url": "https://vbpl.vn/tw/Pages/vbpq-toanvan.aspx?ItemID=7766"
+          }
+        }
+      ]
+    },
+    "source_legal_documents": [
+      "decision_1658_qd_ttg"
+    ]
+  },
+  {
+    "id": "fdi_semiconductor_incentive",
+    "title": "Chính Sách Hỗ Trợ Đặc Biệt Dự Án FDI Bán Dẫn và R&D",
+    "benefits": "Thuế suất ưu đãi đặc biệt 5% CIT trong 30 năm, miễn thuế nhập khẩu tài sản cố định tạo dự án R&D.",
+    "target_companies": "Tập đoàn công nghệ nước ngoài đầu tư nhà máy bán dẫn lớn",
+    "geography": "Các khu công nghệ cao trọng điểm",
+    "deadline": "2027-12-31",
+    "required_documents": [
+      "Giấy chứng nhận đăng ký đầu tư (IRC)",
+      "Báo cáo đánh giá công nghệ dự án bán dẫn"
+    ],
+    "eligibility_rules": {
+      "criterion_group_id": "fdi_semi_rules",
+      "logic": "ALL",
+      "rules": [
+        {
+          "criterion_id": "fdi_capital_check",
+          "description": "Tổng vốn đăng ký thực hiện dự án tối thiểu 100 tỷ VND",
+          "field": "registered_capital",
+          "operator": "GTE",
+          "expected_value": 100000000000,
+          "required": true,
+          "citation": {
+            "document_id": "investment_law_2020",
+            "article": "Điều 20",
+            "page": 10,
+            "quote": "Dự án đầu tư thành lập mới trung tâm nghiên cứu và phát triển có tổng vốn đầu tư từ 100 tỷ đồng trở lên...",
+            "source_url": "https://vbpl.vn/tw/Pages/vbpq-toanvan.aspx?ItemID=1122"
+          }
+        },
+        {
+          "criterion_id": "fdi_industry_check",
+          "description": "Lĩnh vực kinh doanh là Công nghệ bán dẫn (Semiconductor)",
+          "field": "industry",
+          "operator": "EQ",
+          "expected_value": "Semiconductor",
+          "required": true,
+          "citation": {
+            "document_id": "investment_law_2020",
+            "article": "Điều 20",
+            "page": 10,
+            "quote": "Sản xuất sản phẩm linh kiện điện tử, vi mạch, bán dẫn là ngành nghề đặc biệt ưu đãi đầu tư...",
+            "source_url": "https://vbpl.vn/tw/Pages/vbpq-toanvan.aspx?ItemID=1122"
+          }
+        }
+      ]
+    },
+    "source_legal_documents": [
+      "investment_law_2020"
+    ]
+  },
+  {
+    "id": "national_ai_program",
+    "title": "Chương Trình Khoa Học Công Nghệ Quốc Gia Về Trí Tuệ Nhân Tạo",
+    "benefits": "Hỗ trợ 100% kinh phí đề tài nghiên cứu AI, ưu tiên kết nối đối tác công nghệ quốc tế.",
+    "target_companies": "Doanh nghiệp nghiên cứu và phát triển giải pháp AI tại Việt Nam",
+    "geography": "Toàn quốc",
+    "deadline": "2026-11-30",
+    "required_documents": [
+      "Hồ sơ đề tài khoa học công nghệ",
+      "Danh sách chuyên gia R&D AI"
+    ],
+    "eligibility_rules": {
+      "criterion_group_id": "national_ai_rules",
+      "logic": "ALL",
+      "rules": [
+        {
+          "criterion_id": "ai_industry_check",
+          "description": "Hoạt động trong ngành Trí tuệ nhân tạo (Artificial Intelligence)",
+          "field": "industry",
+          "operator": "EQ",
+          "expected_value": "Artificial Intelligence",
+          "required": true,
+          "citation": {
+            "document_id": "decision_127_qd_ttg",
+            "article": "Mục III.1",
+            "page": 2,
+            "quote": "Hỗ trợ nghiên cứu, phát triển công nghệ lõi và sản phẩm trí tuệ nhân tạo trọng điểm...",
+            "source_url": "https://vbpl.vn/tw/Pages/vbpq-toanvan.aspx?ItemID=3344"
+          }
+        },
+        {
+          "criterion_id": "ai_rd_check",
+          "description": "Tỷ lệ chi phí R&D tối thiểu 5% (0.05)",
+          "field": "rd_spend_ratio",
+          "operator": "GTE",
+          "expected_value": 0.05,
+          "required": true,
+          "citation": {
+            "document_id": "decision_127_qd_ttg",
+            "article": "Mục III.1",
+            "page": 2,
+            "quote": "Doanh nghiệp chủ trì đề tài R&D phải phân bổ chi phí nghiên cứu không dưới 5% doanh thu hàng năm...",
+            "source_url": "https://vbpl.vn/tw/Pages/vbpq-toanvan.aspx?ItemID=3344"
+          }
+        }
+      ]
+    },
+    "source_legal_documents": [
+      "decision_127_qd_ttg"
+    ]
+  }
+]

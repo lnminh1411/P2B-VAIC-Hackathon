@@ -1,0 +1,275 @@
+{
+  "AItech_Vietnam_LLC": {
+    "company_name": {
+      "value": "AItech Vietnam LLC",
+      "source_type": "PITCH_DECK",
+      "source_uri": "pitch_deck.pdf",
+      "source_location": "page 1",
+      "evidence_quote": "AItech Vietnam LLC",
+      "observed_at": "2026-07-17T14:00:00+07:00",
+      "confidence": "HIGH",
+      "status": "EXTRACTED",
+      "conflicts": []
+    },
+    "tax_code": {
+      "value": "0109988776",
+      "source_type": "BUSINESS_REGISTRATION",
+      "source_uri": "business_registration.pdf",
+      "source_location": "page 1",
+      "evidence_quote": "Mã số doanh nghiệp: 0109988776",
+      "observed_at": "2026-07-17T14:00:00+07:00",
+      "confidence": "HIGH",
+      "status": "EXTRACTED",
+      "conflicts": []
+    },
+    "industry": {
+      "value": "Artificial Intelligence",
+      "source_type": "PITCH_DECK",
+      "source_uri": "pitch_deck.pdf",
+      "source_location": "page 3",
+      "evidence_quote": "Core technology: Generative AI for business optimization",
+      "observed_at": "2026-07-17T14:00:00+07:00",
+      "confidence": "MEDIUM",
+      "status": "EXTRACTED",
+      "conflicts": []
+    },
+    "location": {
+      "value": "NIC Hoa Lac",
+      "source_type": "BUSINESS_REGISTRATION",
+      "source_uri": "business_registration.pdf",
+      "source_location": "page 1",
+      "evidence_quote": "Địa chỉ trụ sở chính: Lô E2a-II, Khu công nghệ cao Hòa Lạc",
+      "observed_at": "2026-07-17T14:00:00+07:00",
+      "confidence": "HIGH",
+      "status": "EXTRACTED",
+      "conflicts": []
+    },
+    "employee_count": {
+      "value": 18,
+      "source_type": "PITCH_DECK",
+      "source_uri": "pitch_deck.pdf",
+      "source_location": "page 8",
+      "evidence_quote": "Our team: 18 members, including 15 R&D engineers",
+      "observed_at": "2026-07-17T14:00:00+07:00",
+      "confidence": "MEDIUM",
+      "status": "EXTRACTED",
+      "conflicts": []
+    },
+    "rd_spend_ratio": {
+      "value": 0.08,
+      "source_type": "PITCH_DECK",
+      "source_uri": "pitch_deck.pdf",
+      "source_location": "page 12",
+      "evidence_quote": "We allocate 8% of revenue directly to R&D activities",
+      "observed_at": "2026-07-17T14:00:00+07:00",
+      "confidence": "MEDIUM",
+      "status": "EXTRACTED",
+      "conflicts": []
+    },
+    "revenue": {
+      "value": 4500000000,
+      "source_type": "PITCH_DECK",
+      "source_uri": "pitch_deck.pdf",
+      "source_location": "page 10",
+      "evidence_quote": "Revenue 2025: 4.5 billion VND",
+      "observed_at": "2026-07-17T14:00:00+07:00",
+      "confidence": "MEDIUM",
+      "status": "EXTRACTED",
+      "conflicts": []
+    },
+    "registered_capital": {
+      "value": 5000000000,
+      "source_type": "BUSINESS_REGISTRATION",
+      "source_uri": "business_registration.pdf",
+      "source_location": "page 1",
+      "evidence_quote": "Vốn điều lệ: 5.000.000.000 đồng",
+      "observed_at": "2026-07-17T14:00:00+07:00",
+      "confidence": "HIGH",
+      "status": "EXTRACTED",
+      "conflicts": []
+    },
+    "metadata": {}
+  },
+  "FDI_SemiVina_Corp": {
+    "company_name": {
+      "value": "FDI SemiVina Corp",
+      "source_type": "BUSINESS_REGISTRATION",
+      "source_uri": "fdi_registration.pdf",
+      "source_location": "page 1",
+      "evidence_quote": "Tên doanh nghiệp: CÔNG TY TNHH SEMIVINA (FDI)",
+      "observed_at": "2026-07-17T14:00:00+07:00",
+      "confidence": "HIGH",
+      "status": "EXTRACTED",
+      "conflicts": []
+    },
+    "tax_code": {
+      "value": "0401122334",
+      "source_type": "BUSINESS_REGISTRATION",
+      "source_uri": "fdi_registration.pdf",
+      "source_location": "page 1",
+      "evidence_quote": "Mã số thuế: 0401122334",
+      "observed_at": "2026-07-17T14:00:00+07:00",
+      "confidence": "HIGH",
+      "status": "EXTRACTED",
+      "conflicts": []
+    },
+    "industry": {
+      "value": "Semiconductor",
+      "source_type": "BUSINESS_REGISTRATION",
+      "source_uri": "fdi_registration.pdf",
+      "source_location": "page 2",
+      "evidence_quote": "Ngành nghề kinh doanh chính: Sản xuất linh kiện bán dẫn",
+      "observed_at": "2026-07-17T14:00:00+07:00",
+      "confidence": "HIGH",
+      "status": "EXTRACTED",
+      "conflicts": []
+    },
+    "location": {
+      "value": "Da Nang High-Tech Park",
+      "source_type": "BUSINESS_REGISTRATION",
+      "source_uri": "fdi_registration.pdf",
+      "source_location": "page 1",
+      "evidence_quote": "Địa chỉ: Lô A1, Đường số 1, Khu công nghệ cao Đà Nẵng",
+      "observed_at": "2026-07-17T14:00:00+07:00",
+      "confidence": "HIGH",
+      "status": "EXTRACTED",
+      "conflicts": []
+    },
+    "employee_count": {
+      "value": 250,
+      "source_type": "BUSINESS_REGISTRATION",
+      "source_uri": "fdi_registration.pdf",
+      "source_location": "page 3",
+      "evidence_quote": "Số lượng lao động đăng ký: 250 người",
+      "observed_at": "2026-07-17T14:00:00+07:00",
+      "confidence": "HIGH",
+      "status": "EXTRACTED",
+      "conflicts": []
+    },
+    "rd_spend_ratio": {
+      "value": 0.03,
+      "source_type": "BUSINESS_REGISTRATION",
+      "source_uri": "fdi_registration.pdf",
+      "source_location": "page 4",
+      "evidence_quote": "Cam kết chi đầu tư phát triển công nghệ R&D đạt 3% tổng doanh thu hàng năm",
+      "observed_at": "2026-07-17T14:00:00+07:00",
+      "confidence": "HIGH",
+      "status": "EXTRACTED",
+      "conflicts": []
+    },
+    "revenue": {
+      "value": 120000000000,
+      "source_type": "BUSINESS_REGISTRATION",
+      "source_uri": "fdi_registration.pdf",
+      "source_location": "page 4",
+      "evidence_quote": "Kế hoạch doanh thu năm đầu: 120.000.000.000 đồng",
+      "observed_at": "2026-07-17T14:00:00+07:00",
+      "confidence": "HIGH",
+      "status": "EXTRACTED",
+      "conflicts": []
+    },
+    "registered_capital": {
+      "value": 150000000000,
+      "source_type": "BUSINESS_REGISTRATION",
+      "source_uri": "fdi_registration.pdf",
+      "source_location": "page 1",
+      "evidence_quote": "Vốn đầu tư thực hiện dự án: 150 tỷ đồng",
+      "observed_at": "2026-07-17T14:00:00+07:00",
+      "confidence": "HIGH",
+      "status": "EXTRACTED",
+      "conflicts": []
+    },
+    "metadata": {}
+  },
+  "SolarGreen_Tech_JSC": {
+    "company_name": {
+      "value": "SolarGreen Tech JSC",
+      "source_type": "WEBSITE",
+      "source_uri": "https://solargreen.vn/about",
+      "source_location": "about section",
+      "evidence_quote": "SolarGreen Tech Joint Stock Company",
+      "observed_at": "2026-07-17T14:00:00+07:00",
+      "confidence": "MEDIUM",
+      "status": "EXTRACTED",
+      "conflicts": []
+    },
+    "tax_code": {
+      "value": "0311223344",
+      "source_type": "WEBSITE",
+      "source_uri": "https://solargreen.vn/contact",
+      "source_location": "footer",
+      "evidence_quote": "MST: 0311223344",
+      "observed_at": "2026-07-17T14:00:00+07:00",
+      "confidence": "MEDIUM",
+      "status": "EXTRACTED",
+      "conflicts": []
+    },
+    "industry": {
+      "value": "Green Energy / Innovation",
+      "source_type": "WEBSITE",
+      "source_uri": "https://solargreen.vn/products",
+      "source_location": "homepage",
+      "evidence_quote": "Leading provider of smart solar storage and renewable energy solutions",
+      "observed_at": "2026-07-17T14:00:00+07:00",
+      "confidence": "MEDIUM",
+      "status": "EXTRACTED",
+      "conflicts": []
+    },
+    "location": {
+      "value": "Ho Chi Minh City",
+      "source_type": "WEBSITE",
+      "source_uri": "https://solargreen.vn/contact",
+      "source_location": "contact page",
+      "evidence_quote": "HQ Address: 456 Nguyen Hue, District 1, Ho Chi Minh City",
+      "observed_at": "2026-07-17T14:00:00+07:00",
+      "confidence": "MEDIUM",
+      "status": "EXTRACTED",
+      "conflicts": []
+    },
+    "employee_count": {
+      "value": 45,
+      "source_type": "WEBSITE",
+      "source_uri": "https://solargreen.vn/team",
+      "source_location": "team page",
+      "evidence_quote": "A team of 45 dedicate experts",
+      "observed_at": "2026-07-17T14:00:00+07:00",
+      "confidence": "MEDIUM",
+      "status": "EXTRACTED",
+      "conflicts": []
+    },
+    "rd_spend_ratio": {
+      "value": 0.015,
+      "source_type": "WEBSITE",
+      "source_uri": "https://solargreen.vn/about",
+      "source_location": "R&D page",
+      "evidence_quote": "We invest approximately 1.5% of our revenue in solar storage R&D",
+      "observed_at": "2026-07-17T14:00:00+07:00",
+      "confidence": "MEDIUM",
+      "status": "EXTRACTED",
+      "conflicts": []
+    },
+    "revenue": {
+      "value": 15000000000,
+      "source_type": "WEBSITE",
+      "source_uri": "https://solargreen.vn/investors",
+      "source_location": "2025 financial highlights",
+      "evidence_quote": "2025 annual revenue: 15 billion VND",
+      "observed_at": "2026-07-17T14:00:00+07:00",
+      "confidence": "MEDIUM",
+      "status": "EXTRACTED",
+      "conflicts": []
+    },
+    "registered_capital": {
+      "value": 20000000000,
+      "source_type": "WEBSITE",
+      "source_uri": "https://solargreen.vn/investors",
+      "source_location": "charter capital",
+      "evidence_quote": "Charter capital: 20 billion VND",
+      "observed_at": "2026-07-17T14:00:00+07:00",
+      "confidence": "MEDIUM",
+      "status": "EXTRACTED",
+      "conflicts": []
+    },
+    "metadata": {}
+  }
+}
