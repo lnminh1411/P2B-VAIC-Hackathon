@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from typing import Optional, List, Any, Dict
 
-from app.engine.db import get_db_connection
+from app.engine.db import get_db_connection, init_db
 from app.schemas.passport import CompanyPassport
 from app.schemas.policy import PolicyOpportunity
 from app.engine.retrieval import HybridRetrievalEngine
@@ -27,6 +27,10 @@ app = FastAPI(
     description="AI-native platform helping Vietnamese businesses navigate legal policies and incentives.",
     version="1.0.0"
 )
+
+@app.on_event("startup")
+def on_startup():
+    init_db()
 
 # CORS configuration - strict origin whitelist
 ALLOWED_ORIGINS = [
