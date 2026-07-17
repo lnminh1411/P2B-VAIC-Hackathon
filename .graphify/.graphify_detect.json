@@ -52,9 +52,9 @@
     "video": []
   },
   "total_files": 42,
-  "total_words": 30693,
+  "total_words": 31100,
   "needs_graph": false,
-  "warning": "Corpus is ~30,693 words - fits in a single context window. You may not need a graph.",
+  "warning": "Corpus is ~31,100 words - fits in a single context window. You may not need a graph.",
   "skipped_sensitive": [
     "backend/app/seed/filled_grant_demo.docx [office conversion requires async - use pipeline]",
     "backend/app/seed/grant_template.docx [office conversion requires async - use pipeline]"
@@ -66,8 +66,8 @@
     "source": "default-auto",
     "root": ".",
     "git_root": ".",
-    "head": "2cd737c566a41cabf08e7bdf755aa2422b83cdef",
-    "candidate_count": 140,
+    "head": "c40b528834475fc2ed6b35fe227b63afba46ab91",
+    "candidate_count": 145,
     "included_count": 42,
     "excluded_untracked_count": 80,
     "excluded_ignored_count": 5172,
