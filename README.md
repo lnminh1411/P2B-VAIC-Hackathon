@@ -1,0 +1,86 @@
+# P2B (Policy-to-Business) — Nền tảng Hỗ trợ Tiếp cận Chính sách Ưu đãi cho Doanh nghiệp
+
+P2B là nền tảng AI-native giúp các doanh nghiệp nhỏ và vừa (SMEs) và các startup tại Việt Nam tự động hóa quy trình tìm kiếm, đánh giá điều kiện và chuẩn bị hồ sơ xin thụ hưởng các chính sách ưu đãi, tài trợ và chương trình hỗ trợ của Chính phủ.
+
+---
+
+## 🏗️ Kiến trúc Hệ thống (4 Vertical Slices)
+
+1. **Hồ sơ Doanh nghiệp (Company Passport & Provenance)**:
+   - Tổng hợp dữ liệu từ hồ sơ đăng ký kinh doanh, pitch deck, website doanh nghiệp.
+   - Theo dõi nguồn gốc cấp trường thông tin (Field-level Provenance) với trạng thái minh bạch (`EXTRACTED`, `USER_CONFIRMED`, `CONFLICTED`, `MISSING`).
+   - Xử lý mâu thuẫn dữ liệu từ các nguồn (Data Conflicts) một cách trực quan.
+
+2. **Tìm kiếm Kết hợp (Hybrid RAG Retrieval)**:
+   - Định dạng văn bản pháp luật thành các khối chunk có gán nhãn ngữ cảnh.
+   - Kết hợp tìm kiếm lexical (FTS5/BM25) và tìm kiếm ngữ nghĩa Vector Cosine Similarity (mô hình `multilingual-e5-base` chạy offline).
+   - Xếp hạng nâng cao bằng cơ chế Score Fusion (0.4 BM25 + 0.4 Vector + 0.2 Metadata).
+
+3. **Công cụ Thẩm định Điều kiện (Deterministic Eligibility Engine)**:
+   - Thẩm định điều kiện theo cơ chế Rule Engine có cấu trúc, hoàn toàn tách biệt khỏi các ảo tưởng (hallucination) của LLM.
+   - Hỗ trợ các toán tử số học, ngày tháng và kiểm tra logic phức tạp (`ALL`, `ANY`).
+   - Trả kết quả theo trạng thái logic 3 trị (`MET`, `NOT_MET`, `MISSING_INFO`).
+
+4. **Trợ lý Điền Đơn (Human-in-the-Loop Application Prep)**:
+   - Tự động hóa điền mẫu đăng ký `.docx` dựa trên các trường thông tin đã được thẩm định và xác thực.
+   - Cơ chế chặn các trường thiếu hoặc mâu thuẫn để tránh lỗi hồ sơ.
+   - Quy trình duyệt hồ sơ (Approve/Reject) và lưu vết Audit Logs đầy đủ.
+
+---
+
+## 🛠️ Công nghệ Sử dụng
+
+- **Backend**: FastAPI (Python 3.10+), SQLite (Database & Audit trail), `docxtpl` & `python-docx` (Document Generator)
+- **RAG & NLP**: `sentence-transformers` (Local embedding inference với `multilingual-e5-base`), `rank-bm25` (Lexical matching)
+- **Frontend**: React (Vite, TypeScript, TailwindCSS/Vanilla CSS), Lucide Icons
+- **Offline Fallback**: Tích hợp sẵn bộ nhớ đệm (embeddings cache) và mô hình cục bộ giúp chạy demo 100% không phụ thuộc Internet.
+
+---
+
+## 🚀 Hướng dẫn Cài đặt & Chạy ứng dụng
+
+### 1. Chuẩn bị Backend
+Di chuyển vào thư mục dự án và cài đặt các thư viện Python:
+```bash
+# Tạo môi trường ảo (khuyến nghị)
+python -m venv venv
+venv\Scripts\activate  # Windows
+
+# Cài đặt thư viện
+pip install -r requirements.txt
+
+# Khởi tạo và seed dữ liệu cơ sở SQLite
+$env:PYTHONPATH="backend"
+python backend/app/engine/db.py
+```
+
+### 2. Tiền tạo bộ nhớ đệm Embeddings (Tùy chọn)
+Chạy script để sinh trước cache vector cho tài liệu pháp luật (giúp chạy offline cực nhanh):
+```bash
+python backend/app/seed/generate_cache.py
+```
+
+### 3. Chạy Server Backend
+```bash
+uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+### 4. Chuẩn bị Frontend
+Di chuyển vào thư mục frontend và khởi động Vite dev server:
+```bash
+cd frontend
+npm install
+npm run dev -- --host 127.0.0.1 --port 5173
+```
+Mở trình duyệt truy cập: `http://127.0.0.1:5173`
+
+---
+
+## 🧪 Chạy Kiểm thử (Unit Tests)
+
+Dự án cung cấp bộ unit test tự động xác thực độ chuẩn xác của RAG và Eligibility Engine dựa trên dữ liệu Ground Truth:
+```bash
+$env:PYTHONPATH="backend"
+python -m unittest backend/tests/test_golden_path.py
+```
+> Bộ test kiểm tra 3 doanh nghiệp seed với 6 chính sách khác nhau để đảm bảo logic khớp 100% với kịch bản demo.
