@@ -29,7 +29,15 @@ def get_db_connection():
             while True:
                 part_name = f"{gz_path}.part{part_num:03d}"
                 if not os.path.exists(part_name):
-                    break
+                    # Try to download from GitHub
+                    url = f"https://raw.githubusercontent.com/lnminh1411/P2B-VAIC-Hackathon/main/backend/app/p2b_database.sqlite.gz.part{part_num:03d}"
+                    try:
+                        import urllib.request
+                        print(f"Downloading split database part from {url}...")
+                        urllib.request.urlretrieve(url, part_name)
+                    except Exception as e:
+                        print(f"Failed to find/download part {part_num}: {e}")
+                        break
                 parts.append(part_name)
                 part_num += 1
             if parts:
