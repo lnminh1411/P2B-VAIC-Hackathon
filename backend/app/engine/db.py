@@ -175,10 +175,16 @@ def init_db():
                 )
             print(f"Seeded {len(opps)} policy opportunities.")
 
-    # Seed Legal Documents if empty
-    cursor.execute("SELECT COUNT(*) FROM legal_documents")
+    # Seed Legal Documents
+    seed_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "seed")
+    try:
+        from app.seed.corpus_generator import create_legal_corpus
+        create_legal_corpus(seed_dir)
+    except Exception as e:
+        print(f"[Database Warning] Failed to run corpus_generator: {e}")
+
+    cursor.execute("SELECT COUNT(*) FROM legal_documents WHERE id = ?", ("decision_10_2021_qd_ttg",))
     if cursor.fetchone()[0] == 0:
-        seed_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "seed")
         corpus_file = os.path.join(seed_dir, "legal_corpus.json")
         if os.path.exists(corpus_file):
             with open(corpus_file, "r", encoding="utf-8") as f:
@@ -186,7 +192,6 @@ def init_db():
             from bs4 import BeautifulSoup
             import xml.etree.ElementTree as ET
             for doc in corpus:
-                # Reconstruct text content to generate basic XML structure
                 root_el = ET.Element("document")
                 root_el.set("id", doc["id"])
                 root_el.set("number", doc["id"].upper().replace("_", "/"))
@@ -203,7 +208,7 @@ def init_db():
                 xml_str = BeautifulSoup(ET.tostring(root_el, encoding="utf-8"), "xml").prettify()
                 
                 cursor.execute(
-                    "INSERT INTO legal_documents (id, title, chunks_json, xml_content, updated_at) VALUES (?, ?, ?, ?, ?)",
+                    "INSERT OR REPLACE INTO legal_documents (id, title, chunks_json, xml_content, updated_at) VALUES (?, ?, ?, ?, ?)",
                     (doc["id"], doc["title"], json.dumps(doc["chunks"], ensure_ascii=False), xml_str, datetime.utcnow().isoformat())
                 )
             print(f"Seeded {len(corpus)} legal documents with XML content.")

@@ -168,7 +168,20 @@ class HybridRetrievalEngine:
                     )
                     embeddings.extend([emb.values for emb in response.embeddings])
             except Exception as e:
-                print(f"[Retrieval Error] Gemini batch embedding failed: {e}")
+                print(f"[Retrieval Warning] Gemini batch embedding text-embedding-004 failed: {e}. Trying embedding-001...")
+                try:
+                    embeddings = []
+                    batch_size = 100
+                    for i in range(0, len(missing_prefixed), batch_size):
+                        batch = missing_prefixed[i:i+batch_size]
+                        response = self.gemini_client.models.embed_content(
+                            model="embedding-001",
+                            contents=batch,
+                        )
+                        embeddings.extend([emb.values for emb in response.embeddings])
+                except Exception as e2:
+                    print(f"[Retrieval Error] Gemini batch embedding-001 failed: {e2}. Populating zero vector fallbacks.")
+                    embeddings = [[0.0] * 768] * len(missing_prefixed)
                 
         elif self.model:
             try:
@@ -200,19 +213,30 @@ class HybridRetrievalEngine:
             
         if self.use_gemini and self.gemini_client:
             try:
-                # Use Gemini text-embedding-004
                 response = self.gemini_client.models.embed_content(
                     model="text-embedding-004",
                     contents=prefixed_text,
                 )
                 embedding = response.embeddings[0].values
                 self.embeddings_cache[prefixed_text] = embedding
-                # Save dynamically to disk
                 self.save_cache_to_disk()
                 return embedding
             except Exception as e:
-                print(f"[Retrieval Warning] Gemini embedding failed: {e}. Falling back to zero vector.")
-                return [0.0] * 768
+                print(f"[Retrieval Warning] Gemini text-embedding-004 failed: {e}. Trying embedding-001...")
+                try:
+                    response = self.gemini_client.models.embed_content(
+                        model="embedding-001",
+                        contents=prefixed_text,
+                    )
+                    embedding = response.embeddings[0].values
+                    self.embeddings_cache[prefixed_text] = embedding
+                    self.save_cache_to_disk()
+                    return embedding
+                except Exception as e2:
+                    print(f"[Retrieval Warning] Gemini embedding-001 failed: {e2}. Caching zero vector fallback.")
+                    # CACHE zero vector fallback in dictionary so subsequent lookups hit memory cache instantly!
+                    self.embeddings_cache[prefixed_text] = [0.0] * 768
+                    return [0.0] * 768
 
         if self.model:
             try:
