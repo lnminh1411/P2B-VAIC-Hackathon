@@ -93,6 +93,16 @@ Store `content_hash` per doc. On-demand ingestion/diff command compares hash (no
 
 `MISSING_INFO` → template-based question from missing field name (e.g., `"Vốn điều lệ hiện tại là bao nhiêu?"`) → rendered inline in UI as editable field. No LLM in critical path for clarification wording.
 
+### Frontend Design (Approved in Grilling)
+
+- **Styling**: Tailwind CSS v4. Configured in `index.css` via `@import "tailwindcss";` and `@tailwindcss/vite` plugin.
+- **Layout**: Single-page responsive dashboard containing Passport (Left) and Policy RAG (Right).
+- **Evidence Reviewer**: Sliding side-drawer (transitions in from right) to keep workspace focused.
+- **Document Upload**: Full modal with drag-and-drop file upload UI, simulated Gemini Vision scanning laser line, and step-by-step AI extraction progress.
+- **Conflict Resolution**: Side-by-side comparison cards for `CONFLICTED` fields with quick selection ("Use A" / "Use B") and custom override.
+- **Interactive Checklist**: Tri-state document checklist (Matched / Missing / Under Review) with manual file upload/attach and waive options.
+- **Policy Change Alerts**: Pulsing amber badge on affected cards. Clicking opens a modal showing a red/green text diff of policy clause changes.
+
 ---
 
 ## Scope Cut (roadmap/slide only)
@@ -134,7 +144,7 @@ Rule engine operators · tri-state · provenance preservation · retrieval golde
 | **4-10** | CLI vertical slice: parse docs → Passport w/ provenance → retrieve 1 opportunity → run 1 rule → return evidence+citation | One slice e2e before any UI |
 | **10-18** | **Must-have:** cached corpus, metadata filter, FTS5+vector fusion, operators used in golden dataset, tri-state, checklist, golden tests. **Stretch:** LLM reranking, change detection/alerts, unused operators, LLM-generated clarification wording | Release metrics pass, no conclusion without citation |
 | **18-24** | HITL: review/approve/reject, 1 .docx template fill (only evidence-backed fields), audit trail, download endpoint | Exported file = no hallucination, reflects review |
-| **24-29** | React UI: 3 screens only — (1) Passport+provenance (2) Ranked opportunities+alerts (3) Eligibility+checklist+review | Golden path from UI, no manual DB/scripts |
+| **24-29** | React UI: Responsive single-page dashboard with animated sliding drawers and modals for upload simulation, conflict resolution, and policy diffs | Golden path from UI, no manual DB/scripts |
 | **29-32** | Demo freeze: 5× golden run, cached mode test, latency check, backup video, pitch finalize | Stable demo + fallback plan |
 | **32-40** | Buffer+sleep. Bug fixes only. No refactor/new features/provider changes | — |
 
