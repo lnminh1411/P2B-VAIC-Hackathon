@@ -71,8 +71,8 @@ Trải nghiệm phiên bản thử nghiệm trực tuyến tại: [https://p2b-z
 Hệ thống Vector của P2B được thiết kế chuyên biệt để xử lý dữ liệu lớn luật pháp Việt Nam (VBPL) với hiệu năng cao nhất trên GPU local và tài nguyên tiết kiệm nhất trên CPU production.
 
 ### 1. Ingestion Pipeline & Chunking (GPU Local)
-*   **Bộ lọc Whitelist:** Tự động lọc bộ dữ liệu `tmquan/vbpl-vn` trên Hugging Face theo cơ quan ban hành liên quan đến kinh tế/doanh nghiệp (Bộ Tài chính, Bộ Kế hoạch và Đầu tư, Ngân hàng Nhà nước...) kết hợp keyword pháp lý hỗ trợ.
-*   **Phục hồi văn bản bị thiếu:** Với các văn bản thiếu body text, pipeline tự động kết nối qua MoJ API gateway (`https://vbpl-bientap-gateway.moj.gov.vn`) để tải bản thảo XML đầy đủ.
+*   **Bộ lọc Whitelist:** Tự động lọc bộ dữ liệu [tmquan/vbpl-vn](https://huggingface.co/datasets/tmquan/vbpl-vn) trên Hugging Face (dựa trên cơ sở dữ liệu pháp luật chính thức [vbpl.vn](https://vbpl.vn)) theo cơ quan ban hành liên quan đến kinh tế/doanh nghiệp (Bộ Tài chính, Bộ Kế hoạch và Đầu tư, Ngân hàng Nhà nước...) kết hợp keyword pháp lý hỗ trợ.
+*   **Phục hồi văn bản bị thiếu:** Với các văn bản thiếu body text, pipeline tự động kết nối qua cổng thông tin MoJ API gateway (`https://vbpl-bientap-gateway.moj.gov.vn` liên kết với [vbpl.vn](https://vbpl.vn)) để tải bản thảo XML đầy đủ.
 *   **Article-level Chunking:** Tách văn bản luật chính xác theo từng **Điều** (`Điều X`), tự động xử lý inline headings lỗi không xuống dòng. Trích xuất được **19,488 chunks** từ 682 văn bản luật cốt lõi, chiều dài trung bình **1,769 ký tự/chunk**.
 *   **Mã hóa đa luồng:** Chạy SentenceTransformer `intfloat/multilingual-e5-base` song song thông qua `ThreadPoolExecutor` và `ThreadedConnectionPool` trên **GPU NVIDIA RTX 3050** tại local với khóa GPU lock an toàn.
 
@@ -229,8 +229,8 @@ Experience the live application at: [https://p2b-zeta.vercel.app/](https://p2b-z
 The P2B Vector Engine is engineered to parse the Vietnamese legal document corpus (VBPL) efficiently using local GPU for population and resource-restricted CPU runtime for production.
 
 ### 1. Ingestion Pipeline & Chunking (Local GPU)
-*   **Whitelist Filtering:** Filters `tmquan/vbpl-vn` Hugging Face dataset by economic ministries and support keywords.
-*   **Empty Text Resolution:** Connects to the official MoJ gateway (`https://vbpl-bientap-gateway.moj.gov.vn`) to scrape full XML drafts for empty records.
+*   **Whitelist Filtering:** Filters [tmquan/vbpl-vn](https://huggingface.co/datasets/tmquan/vbpl-vn) Hugging Face dataset (originating from [vbpl.vn](https://vbpl.vn)) by economic ministries and support keywords.
+*   **Empty Text Resolution:** Connects to the official MoJ gateway (`https://vbpl-bientap-gateway.moj.gov.vn` linked to [vbpl.vn](https://vbpl.vn)) to scrape full XML drafts for empty records.
 *   **Article-level Chunking:** Splits documents on semantic article levels (`Điều X`), cleaning up inline headings. Produced **19,488 chunks** from 682 documents with a mean length of **1,769 characters**.
 *   **Multithreaded Encoding:** Concurrently embeds chunks using `ThreadPoolExecutor`, `ThreadedConnectionPool` and `intfloat/multilingual-e5-base` on local **NVIDIA RTX 3050 GPU** with thread-safe locking.
 
