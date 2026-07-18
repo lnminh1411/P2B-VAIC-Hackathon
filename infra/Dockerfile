@@ -13,14 +13,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates python3 python3-venv poppler-utils tesseract-ocr tesseract-ocr-vie libreoffice-writer fonts-noto-core clamav \
     && rm -rf /var/lib/apt/lists/*
 RUN python3 -m venv /opt/markitdown \
-    && /opt/markitdown/bin/pip install --no-cache-dir 'markitdown[pdf]==0.1.6'
+    && /opt/markitdown/bin/pip install --no-cache-dir 'markitdown[pdf]==0.1.6' onnxruntime tokenizers numpy
 RUN useradd --create-home --uid 10001 p2b
 COPY --from=api-builder /out/p2b-api /usr/local/bin/p2b-service
 COPY --from=api-builder /out/p2b-migrate /usr/local/bin/p2b-migrate
 COPY --from=api-builder /out/p2b-worker /usr/local/bin/p2b-worker
 COPY --from=api-builder /out/p2b-crawler /usr/local/bin/p2b-crawler
+COPY scripts/calculate_embeddings.py /usr/local/bin/calculate_embeddings.py
 COPY infra/entrypoint.sh /usr/local/bin/p2b-entrypoint
-RUN chmod 0755 /usr/local/bin/p2b-entrypoint
+RUN chmod 0755 /usr/local/bin/p2b-entrypoint /usr/local/bin/calculate_embeddings.py
 USER p2b
 ENV PATH="/opt/markitdown/bin:${PATH}"
 ENV HTTP_ADDR=:8080
