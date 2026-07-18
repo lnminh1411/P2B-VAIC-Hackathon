@@ -55,5 +55,5 @@ WITH workspace_insert AS (
     ON CONFLICT (workspace_id, subject) DO NOTHING
 )
 INSERT INTO audit_events (workspace_id, actor_subject, action, aggregate_type, aggregate_id, metadata)
-SELECT $1::uuid, $1::uuid, $4, 'workspace', $1, jsonb_build_object('email', $3)
+SELECT $1::uuid, $1::uuid, $4, 'workspace', $1, jsonb_build_object('email', $3::text)
 ON CONFLICT (workspace_id, action) WHERE action = 'auth.bootstrap' DO NOTHING`
