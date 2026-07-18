@@ -41,7 +41,6 @@ export function Shell({ page, companyName, workspaces, activeWorkspaceId, onWork
           <button className="sidebar-close" aria-label={shellLabels.close_nav} onClick={() => setMobileOpen(false)}><X /></button>
         </div>
         <WorkspaceSwitcher workspaces={workspaces} activeWorkspaceId={activeWorkspaceId} onChange={onWorkspaceChange} onCreate={onCreateWorkspace} />
-        <div className="workspace-chip"><span className="live-dot" />{shellLabels.workspace_label}<strong>{companyName || shellLabels.not_set}</strong></div>
         <nav aria-label="Điều hướng chính">
           {navigation.filter(item => item.id !== 'admin' || user?.isAdmin).map(({ id, icon: Icon }) => (
             <button key={id} className="nav-item" data-active={page === id} onClick={() => navigate(id)}>

@@ -89,33 +89,7 @@ export function OpportunitiesPage({ run, onMatch, matching, selected, onSelect, 
           )}
         </div>
         
-        <aside className="panel match-explainer">
-          <span>TRẠNG THÁI MATCHING</span>
-          <h3>Rule + lexical + vector</h3>
-          <ol>
-            <li>
-              <b>01</b>
-              <div>
-                <strong>{o.explainer_1_title}</strong>
-                <p>{o.explainer_1_desc}</p>
-              </div>
-            </li>
-            <li>
-              <b>02</b>
-              <div>
-                <strong>{o.explainer_2_title}</strong>
-                <p>{o.explainer_2_desc}</p>
-              </div>
-            </li>
-            <li>
-              <b>03</b>
-              <div>
-                <strong>{o.explainer_3_title}</strong>
-                <p>{o.explainer_3_desc}</p>
-              </div>
-            </li>
-          </ol>
-        </aside>
+
       </div>
       
       <AnimatePresence>

@@ -89,8 +89,10 @@ func (b *Bootstrapper) List(ctx context.Context, principal authn.Principal) ([]d
 		return nil, errors.New("workspace database is unavailable")
 	}
 	rows, err := b.queryer.Query(ctx, `
-		SELECT w.id::text, w.display_name, wm.role, w.created_at
-		FROM workspace_members wm JOIN workspaces w ON w.id = wm.workspace_id
+		SELECT w.id::text, COALESCE(c.legal_name, w.display_name) AS display_name, wm.role, w.created_at
+		FROM workspace_members wm 
+		JOIN workspaces w ON w.id = wm.workspace_id
+		LEFT JOIN companies c ON c.workspace_id = w.id
 		WHERE wm.subject = $1::uuid ORDER BY w.created_at, w.id`, principal.Subject)
 	if err != nil {
 		return nil, fmt.Errorf("list workspaces: %w", err)

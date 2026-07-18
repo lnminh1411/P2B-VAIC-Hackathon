@@ -58,7 +58,7 @@ export function PassportPage({ passport, candidates, onConfirm, onSaveField, onR
     <>
       <section className="page-heading split-heading">
         <div>
-          <span className="kicker">COMPANY PASSPORT · VERSION {passport.version}</span>
+          <span className="kicker">COMPANY PASSPORT</span>
           <h1>{p.h1}<em>{p.h1_em}</em></h1>
           <p>{p.desc}</p>
           {refreshError && <p className="inline-error" role="alert">{refreshError}</p>}
@@ -102,7 +102,6 @@ export function PassportPage({ passport, candidates, onConfirm, onSaveField, onR
                 <section className="panel field-group" key={group}>
                   <div className="panel-title">
                     <div>
-                      <span>FIELD GROUP</span>
                       <h2>{group}</h2>
                     </div>
                   </div>
@@ -196,7 +195,7 @@ function EvidencePanel({ field, editing, busy, onEdit, onCancel, onSave }: { fie
   return (
     <aside className="panel evidence-panel">
       <div className="evidence-head">
-        <span>{editing ? p.edit_title : 'PROVENANCE'}</span>
+        <span>{editing ? p.edit_title : ''}</span>
         {editing ? <button aria-label="Hủy chỉnh sửa" onClick={onCancel}><X /></button> : <button aria-label={`Chỉnh sửa dữ kiện ${field.label}`} onClick={onEdit}><PencilLine /></button>}
       </div>
       {editing ? (
