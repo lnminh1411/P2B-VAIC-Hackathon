@@ -10,12 +10,12 @@ const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <AuthProvider>
-      <QueryClientProvider client={queryClient}>
-        <I18nProvider>
+    <I18nProvider>
+      <AuthProvider>
+        <QueryClientProvider client={queryClient}>
           <App />
-        </I18nProvider>
-      </QueryClientProvider>
-    </AuthProvider>
+        </QueryClientProvider>
+      </AuthProvider>
+    </I18nProvider>
   </StrictMode>,
 )
