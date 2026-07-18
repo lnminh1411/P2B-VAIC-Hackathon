@@ -42,6 +42,8 @@ func ValidateCandidates(markdown string, candidates []Candidate) ([]Candidate, [
 			rejected = append(rejected, RejectedCandidate{Candidate: candidate, Reason: "evidence quote is too short"})
 		case !strings.Contains(normalizedDocument, normalizeEvidence(candidate.Quote)):
 			rejected = append(rejected, RejectedCandidate{Candidate: candidate, Reason: "evidence quote not found in source"})
+		case passportservice.ValidateEvidence(candidate.FieldKey, candidate.Quote) != nil:
+			rejected = append(rejected, RejectedCandidate{Candidate: candidate, Reason: "evidence does not match the field concept"})
 		default:
 			candidate.Quote = strings.TrimSpace(candidate.Quote)
 			valid = append(valid, candidate)
@@ -51,5 +53,8 @@ func ValidateCandidates(markdown string, candidates []Candidate) ([]Candidate, [
 }
 
 func normalizeEvidence(value string) string {
+	value = strings.ReplaceAll(value, "\r\n", "\n")
+	value = strings.ReplaceAll(value, "\u00ad", "")
+	value = strings.ReplaceAll(value, "-\n", " ")
 	return strings.Join(strings.Fields(value), " ")
 }

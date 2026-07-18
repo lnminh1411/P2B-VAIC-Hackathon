@@ -78,4 +78,14 @@ describe('PassportPage', () => {
     expect(screen.getByText('dang-ky-doanh-nghiep.pdf')).toBeInTheDocument()
     expect(screen.queryByText(/Trang 7/)).not.toBeInTheDocument()
   })
+
+  it('lets the user upload additional PDF evidence', async () => {
+    const onRefresh = vi.fn().mockResolvedValue(undefined)
+    render(<PassportPage passport={passport} candidates={[]} onConfirm={vi.fn()} onSaveField={vi.fn()} onRefresh={onRefresh} busy={false} />)
+
+    const file = new File(['%PDF-1.7'], 'bo-sung.pdf', { type: 'application/pdf' })
+    fireEvent.change(screen.getByLabelText('Tài liệu cập nhật'), { target: { files: [file] } })
+
+    await waitFor(() => expect(onRefresh).toHaveBeenCalledWith([file]))
+  })
 })

@@ -2,6 +2,8 @@ import { Bell, Building2, FileCheck2, LayoutDashboard, LibraryBig, LogOut, Menu,
 import { AnimatePresence, motion } from 'motion/react'
 import { useState, type ReactNode } from 'react'
 import { useAuth } from '../auth/context'
+import type { Workspace } from '../lib/types'
+import { WorkspaceSwitcher } from './WorkspaceSwitcher'
 
 export type Page = 'overview' | 'passport' | 'opportunities' | 'application' | 'alerts' | 'admin'
 
@@ -14,7 +16,7 @@ const navigation: Array<{ id: Page; label: string; icon: typeof LayoutDashboard 
   { id: 'admin', label: 'Policy review', icon: ShieldCheck },
 ]
 
-export function Shell({ page, companyName, onNavigate, children, unreadAlerts = 0 }: { page: Page; companyName: string; onNavigate: (page: Page) => void; children: ReactNode; unreadAlerts?: number }) {
+export function Shell({ page, companyName, workspaces, activeWorkspaceId, onWorkspaceChange, onCreateWorkspace, onNavigate, children, unreadAlerts = 0 }: { page: Page; companyName: string; workspaces: Workspace[]; activeWorkspaceId?: string; onWorkspaceChange: (workspaceId: string) => void; onCreateWorkspace: () => void; onNavigate: (page: Page) => void; children: ReactNode; unreadAlerts?: number }) {
   const { user, signOut } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
@@ -32,7 +34,8 @@ export function Shell({ page, companyName, onNavigate, children, unreadAlerts = 
           <div><strong>P2B</strong><span>Policy to Business</span></div>
           <button className="sidebar-close" aria-label="Đóng điều hướng" onClick={() => setMobileOpen(false)}><X /></button>
         </div>
-        <div className="workspace-chip"><span className="live-dot" />Workspace doanh nghiệp<strong>{companyName}</strong></div>
+        <WorkspaceSwitcher workspaces={workspaces} activeWorkspaceId={activeWorkspaceId} onChange={onWorkspaceChange} onCreate={onCreateWorkspace} />
+        <div className="workspace-chip"><span className="live-dot" />Workspace doanh nghiệp<strong>{companyName || 'Chưa thiết lập'}</strong></div>
         <nav aria-label="Điều hướng chính">
           {navigation.filter(item => item.id !== 'admin' || user?.isAdmin).map(({ id, label, icon: Icon }) => (
             <button key={id} className="nav-item" data-active={page === id} onClick={() => navigate(id)}>

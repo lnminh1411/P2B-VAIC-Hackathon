@@ -11,6 +11,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -29,20 +30,28 @@ type contextKey string
 const workspaceKey contextKey = "workspace"
 const principalKey contextKey = "principal"
 
+type Workspace = domain.Workspace
+
+type WorkspaceManager interface {
+	Ensure(context.Context, authn.Principal) error
+	Resolve(context.Context, authn.Principal, string) (string, error)
+	List(context.Context, authn.Principal) ([]Workspace, error)
+	Create(context.Context, authn.Principal, string) (Workspace, error)
+}
+
 type Config struct {
-	DevAuth               bool
-	WebOrigin             string
-	Verifier              authn.Verifier
-	WorkspaceBootstrapper interface {
-		Ensure(context.Context, authn.Principal) error
-	}
-	UploadSigner interface {
+	DevAuth          bool
+	WebOrigin        string
+	Verifier         authn.Verifier
+	WorkspaceManager WorkspaceManager
+	UploadSigner     interface {
 		CreateUploadURL(context.Context, string) (string, error)
 	}
 	ExtractionStore interface {
 		RegisterSource(context.Context, pipeline.Source) error
 		MarkUploaded(context.Context, string, string) error
 		EnqueueBuild(context.Context, string, pipeline.BuildRequest) (pipeline.Job, error)
+		EnqueueRefresh(context.Context, string, []string, string, string) (pipeline.Job, error)
 		Job(context.Context, string, string) (pipeline.Job, error)
 		Passport(context.Context, string) (domain.Passport, error)
 		Candidates(context.Context, string) ([]passportdomain.Candidate, error)
@@ -57,9 +66,11 @@ type Config struct {
 }
 
 type Server struct {
-	service     *platform.Service
-	config      Config
-	idempotency *idempotencyStore
+	service       *platform.Service
+	config        Config
+	idempotency   *idempotencyStore
+	devMu         sync.Mutex
+	devWorkspaces map[string][]Workspace
 }
 
 func NewServer(service *platform.Service) http.Handler {
@@ -67,7 +78,7 @@ func NewServer(service *platform.Service) http.Handler {
 }
 
 func NewServerWithConfig(service *platform.Service, config Config) http.Handler {
-	server := &Server{service: service, config: config, idempotency: newIdempotencyStore()}
+	server := &Server{service: service, config: config, idempotency: newIdempotencyStore(), devWorkspaces: map[string][]Workspace{}}
 	router := chi.NewRouter()
 	router.Use(server.recoverer, server.securityHeaders, server.cors, server.limitBody)
 	router.Get("/health/live", func(w http.ResponseWriter, _ *http.Request) {
@@ -94,9 +105,12 @@ func NewServerWithConfig(service *platform.Service, config Config) http.Handler 
 		r.Use(server.authenticate)
 		r.Use(server.idempotencyMiddleware)
 		r.Get("/auth/me", server.authMe)
+		r.Get("/workspaces", server.listWorkspaces)
+		r.Post("/workspaces", server.createWorkspace)
 		r.Post("/uploads/presign", server.presignUpload)
 		r.Post("/uploads/{sourceID}/complete", server.completeUpload)
 		r.Post("/passports/build", server.buildPassport)
+		r.Post("/passports/refresh", server.refreshPassport)
 		r.Get("/jobs/{jobID}", server.getJob)
 		r.Get("/passport", server.getPassport)
 		r.Get("/passport/versions", server.getPassportVersions)
@@ -134,7 +148,7 @@ func (s *Server) authenticate(next http.Handler) http.Handler {
 			if workspaceID == "" {
 				workspaceID = "local-development-workspace"
 			}
-			principal = authn.Principal{Subject: workspaceID, Email: "founder@p2b.local", Name: "P2B Founder", Roles: []string{"admin"}}
+			principal = authn.Principal{Subject: "local-development-account", Email: "founder@p2b.local", Name: "P2B Founder", Roles: []string{"admin"}}
 		} else {
 			token, ok := bearerToken(r.Header.Get("Authorization"))
 			if !ok || s.config.Verifier == nil {
@@ -157,17 +171,81 @@ func (s *Server) authenticate(next http.Handler) http.Handler {
 			writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "Valid Supabase bearer token required")
 			return
 		}
-		if !s.config.DevAuth && s.config.WorkspaceBootstrapper != nil {
-			if err := s.config.WorkspaceBootstrapper.Ensure(r.Context(), principal); err != nil {
+		if !s.config.DevAuth && s.config.WorkspaceManager != nil {
+			if err := s.config.WorkspaceManager.Ensure(r.Context(), principal); err != nil {
 				slog.ErrorContext(r.Context(), "workspace bootstrap failed", "error", err)
 				writeError(w, http.StatusServiceUnavailable, "WORKSPACE_UNAVAILABLE", "Workspace is temporarily unavailable")
 				return
 			}
+			selected, err := s.config.WorkspaceManager.Resolve(r.Context(), principal, r.Header.Get("X-Workspace-ID"))
+			if err != nil {
+				writeError(w, http.StatusForbidden, "WORKSPACE_FORBIDDEN", "You do not have access to this business workspace")
+				return
+			}
+			workspaceID = selected
 		}
 		ctx := context.WithValue(r.Context(), workspaceKey, workspaceID)
 		ctx = context.WithValue(ctx, principalKey, principal)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func (s *Server) listWorkspaces(w http.ResponseWriter, r *http.Request) {
+	currentPrincipal := principal(r)
+	if s.config.WorkspaceManager != nil && !s.config.DevAuth {
+		workspaces, err := s.config.WorkspaceManager.List(r.Context(), currentPrincipal)
+		if err != nil {
+			writeError(w, http.StatusServiceUnavailable, "WORKSPACES_UNAVAILABLE", "Business workspaces are temporarily unavailable")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"workspaces": workspaces, "active_workspace_id": workspace(r)})
+		return
+	}
+	workspaces := s.devWorkspaceList(currentPrincipal.Subject, workspace(r))
+	writeJSON(w, http.StatusOK, map[string]any{"workspaces": workspaces, "active_workspace_id": workspace(r)})
+}
+
+func (s *Server) createWorkspace(w http.ResponseWriter, r *http.Request) {
+	if !requireIdempotency(w, r) {
+		return
+	}
+	var input struct {
+		DisplayName string `json:"display_name"`
+	}
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	input.DisplayName = strings.TrimSpace(input.DisplayName)
+	if input.DisplayName == "" || len([]rune(input.DisplayName)) > 200 {
+		writeError(w, http.StatusUnprocessableEntity, "INVALID_INPUT", "display_name is required and limited to 200 characters")
+		return
+	}
+	if s.config.WorkspaceManager != nil && !s.config.DevAuth {
+		created, err := s.config.WorkspaceManager.Create(r.Context(), principal(r), input.DisplayName)
+		if err != nil {
+			writeError(w, http.StatusServiceUnavailable, "WORKSPACE_UNAVAILABLE", "Business workspace could not be created")
+			return
+		}
+		writeJSON(w, http.StatusCreated, created)
+		return
+	}
+	created := Workspace{ID: uuid.NewString(), DisplayName: input.DisplayName, Role: "OWNER", CreatedAt: time.Now().UTC()}
+	currentPrincipal := principal(r)
+	s.devMu.Lock()
+	s.devWorkspaces[currentPrincipal.Subject] = append(s.devWorkspaces[currentPrincipal.Subject], created)
+	s.devMu.Unlock()
+	writeJSON(w, http.StatusCreated, created)
+}
+
+func (s *Server) devWorkspaceList(principalID, activeID string) []Workspace {
+	s.devMu.Lock()
+	defer s.devMu.Unlock()
+	workspaces := append([]Workspace(nil), s.devWorkspaces[principalID]...)
+	if len(workspaces) == 0 {
+		workspaces = []Workspace{{ID: activeID, DisplayName: activeID, Role: "OWNER", CreatedAt: time.Now().UTC()}}
+		s.devWorkspaces[principalID] = append([]Workspace(nil), workspaces...)
+	}
+	return workspaces
 }
 
 func (s *Server) requireAdmin(next http.Handler) http.Handler {
@@ -331,6 +409,33 @@ func (s *Server) buildPassport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	job, err := s.service.BuildPassport(workspace(r), input)
+	if err != nil {
+		writeError(w, http.StatusUnprocessableEntity, "INVALID_INPUT", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusAccepted, job)
+}
+
+func (s *Server) refreshPassport(w http.ResponseWriter, r *http.Request) {
+	if !requireIdempotency(w, r) {
+		return
+	}
+	var input struct {
+		SourceIDs []string `json:"source_ids"`
+	}
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	request := pipeline.BuildRequest{SourceIDs: input.SourceIDs}
+	if err := pipeline.ValidateRefreshRequest(request); err != nil {
+		writeError(w, http.StatusUnprocessableEntity, "INVALID_INPUT", err.Error())
+		return
+	}
+	if s.config.ExtractionStore == nil {
+		writeError(w, http.StatusServiceUnavailable, "EXTRACTION_UNAVAILABLE", "Extraction pipeline is not configured")
+		return
+	}
+	job, err := s.config.ExtractionStore.EnqueueRefresh(r.Context(), workspace(r), input.SourceIDs, r.Header.Get("Idempotency-Key"), principal(r).Subject)
 	if err != nil {
 		writeError(w, http.StatusUnprocessableEntity, "INVALID_INPUT", err.Error())
 		return

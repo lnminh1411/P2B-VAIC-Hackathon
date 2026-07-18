@@ -1,6 +1,6 @@
 import type { Session } from '@supabase/supabase-js'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { setApiAccessToken } from '../lib/api'
+import { setApiAccessToken, setApiWorkspaceId } from '../lib/api'
 import { AuthBoundary } from './AuthBoundary'
 import { devAuthEnabled, supabaseConfigured } from './config'
 import { AuthContext } from './context'
@@ -22,6 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const applySession = useCallback((session: Session | null) => {
     setApiAccessToken(session?.access_token)
+    setApiWorkspaceId(undefined)
     setUser(session?.user ? mapAuthUser(session.user) : undefined)
     setStatus(session?.user ? 'authenticated' : 'anonymous')
   }, [])

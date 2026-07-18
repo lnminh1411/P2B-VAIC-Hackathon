@@ -1,5 +1,5 @@
 import * as Tabs from '@radix-ui/react-tabs'
-import { Check, ChevronRight, FileSearch, PencilLine, Quote, ShieldCheck, X } from 'lucide-react'
+import { Check, ChevronRight, FileSearch, PencilLine, Quote, ShieldCheck, UploadCloud, X } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { StatusBadge } from '../../components/StatusBadge'
 import { displayValue, formatDate } from '../../lib/format'
@@ -19,24 +19,34 @@ type PassportPageProps = {
   candidates: Candidate[]
   onConfirm: (candidate: Candidate) => Promise<void>
   onSaveField: (fieldKey: string, value: unknown) => Promise<void>
+  onRefresh?: (files: File[]) => Promise<void>
+  refreshBusy?: boolean
   busy: boolean
 }
 
-export function PassportPage({ passport, candidates, onConfirm, onSaveField, busy }: PassportPageProps) {
+export function PassportPage({ passport, candidates, onConfirm, onSaveField, onRefresh, refreshBusy = false, busy }: PassportPageProps) {
   const fields = passport.fields
   const visibleFields = groupedFieldKeys.map(key => fields[key]).filter((field): field is PassportField => Boolean(field))
   const [selectedKey, setSelectedKey] = useState('legal_name')
   const [editingKey, setEditingKey] = useState<string>()
+  const [refreshError, setRefreshError] = useState<string>()
   const selected = fields[selectedKey] ?? visibleFields[0]
   const pending = candidates.filter(candidate => candidate.status !== 'ACCEPTED')
   const confirmedCount = visibleFields.filter(field => field.status === 'CONFIRMED').length
   const confirmAll = async () => { for (const candidate of pending) await onConfirm(candidate) }
   const edit = (field: PassportField) => { setSelectedKey(field.key); setEditingKey(field.key) }
   const save = async (fieldKey: string, value: unknown) => { await onSaveField(fieldKey, value); setEditingKey(undefined) }
+  const refresh = (files: File[]) => {
+    setRefreshError(undefined)
+    if (files.length > 10) { setRefreshError('Tối đa 10 file PDF.'); return }
+    if (files.some(file => file.size > 20 * 1024 * 1024)) { setRefreshError('Mỗi file PDF phải nhỏ hơn hoặc bằng 20 MB.'); return }
+    if (files.some(file => file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf'))) { setRefreshError('Chỉ chấp nhận file PDF.'); return }
+    void onRefresh?.(files).catch(error => setRefreshError(error instanceof Error ? error.message : 'Không thể cập nhật tài liệu'))
+  }
 
   return (
     <>
-      <section className="page-heading split-heading"><div><span className="kicker">COMPANY PASSPORT · VERSION {passport.version}</span><h1>Hồ sơ doanh nghiệp <em>có thể kiểm chứng.</em></h1><p>Mỗi dữ kiện đi cùng bằng chứng, mức tin cậy và lịch sử thay đổi.</p></div><div className="heading-actions">{pending.length > 0 && <button className="button primary" disabled={busy} onClick={confirmAll}><Check />Xác nhận tất cả ({pending.length})</button>}</div></section>
+      <section className="page-heading split-heading"><div><span className="kicker">COMPANY PASSPORT · VERSION {passport.version}</span><h1>Hồ sơ doanh nghiệp <em>có thể kiểm chứng.</em></h1><p>Mỗi dữ kiện đi cùng bằng chứng, mức tin cậy và lịch sử thay đổi.</p>{refreshError && <p className="inline-error" role="alert">{refreshError}</p>}</div><div className="heading-actions">{onRefresh && <label className="button secondary upload-refresh"><UploadCloud />{refreshBusy ? 'Đang phân tích…' : 'Cập nhật tài liệu'}<input aria-label="Tài liệu cập nhật" type="file" accept="application/pdf,.pdf" multiple disabled={refreshBusy} onChange={event => { const files = Array.from(event.target.files ?? []); if (files.length) refresh(files); event.currentTarget.value = '' }} /></label>}{pending.length > 0 && <button className="button primary" disabled={busy} onClick={confirmAll}><Check />Xác nhận tất cả ({pending.length})</button>}</div></section>
       <div className="passport-summary"><div className="company-monogram">{companyMonogram(passport.company_name)}</div><div><h2>{passport.company_name}</h2><p>{passport.website}</p><span>Workspace riêng tư · cập nhật {formatDate(passport.updated_at)}</span></div><div className="passport-score"><strong>{confirmedCount}/{visibleFields.length}</strong><span>dữ kiện xác nhận</span></div></div>
       <Tabs.Root className="passport-tabs" defaultValue="fields">
         <Tabs.List aria-label="Nội dung Company Passport"><Tabs.Trigger value="fields">Dữ kiện</Tabs.Trigger><Tabs.Trigger value="candidates">AI đề xuất <b>{pending.length}</b></Tabs.Trigger><Tabs.Trigger value="history">Lịch sử phiên bản</Tabs.Trigger></Tabs.List>

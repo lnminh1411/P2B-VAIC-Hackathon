@@ -12,16 +12,18 @@ import (
 )
 
 type FieldDefinition struct {
-	Label    string
-	DataType string
+	Label                  string
+	DataType               string
+	EvidenceTerms          []string
+	ForbiddenEvidenceTerms []string
 }
 
 var fieldDefinitions = map[string]FieldDefinition{
 	"legal_name": {Label: "Tên pháp lý", DataType: "string"}, "tax_code": {Label: "Mã số thuế", DataType: "string"},
 	"legal_form": {Label: "Loại hình doanh nghiệp", DataType: "string"}, "incorporation_date": {Label: "Ngày thành lập", DataType: "date"},
-	"operating_status": {Label: "Trạng thái hoạt động", DataType: "string"}, "charter_capital": {Label: "Vốn điều lệ", DataType: "money"},
+	"operating_status": {Label: "Trạng thái hoạt động", DataType: "string"}, "charter_capital": {Label: "Vốn điều lệ", DataType: "money", EvidenceTerms: []string{"vốn điều lệ", "charter capital"}},
 	"revenue": {Label: "Doanh thu", DataType: "money"}, "assets": {Label: "Tổng tài sản", DataType: "money"},
-	"employee_count": {Label: "Số lao động", DataType: "integer"}, "registered_address": {Label: "Địa chỉ đăng ký", DataType: "string"},
+	"employee_count": {Label: "Số lao động", DataType: "integer", EvidenceTerms: []string{"số lao động", "số nhân viên", "tổng số lao động", "tổng số nhân viên", "employee count", "headcount"}, ForbiddenEvidenceTerms: []string{"môi giới", "broker", "cộng tác viên"}}, "registered_address": {Label: "Địa chỉ đăng ký", DataType: "string"},
 	"province": {Label: "Tỉnh/thành", DataType: "string"}, "industrial_zone": {Label: "Khu công nghiệp", DataType: "string"},
 	"industry_codes": {Label: "Ngành nghề", DataType: "string_array"}, "products": {Label: "Sản phẩm", DataType: "string_array"},
 	"technologies": {Label: "Công nghệ", DataType: "string_array"}, "markets": {Label: "Thị trường", DataType: "string_array"},
@@ -126,6 +128,28 @@ func CanonicalFieldTypes() map[string]string {
 func LookupField(key string) (FieldDefinition, bool) {
 	definition, exists := fieldDefinitions[key]
 	return definition, exists
+}
+
+func ValidateEvidence(fieldKey, quote string) error {
+	definition, exists := LookupField(fieldKey)
+	if !exists {
+		return fmt.Errorf("unknown passport field %q", fieldKey)
+	}
+	text := strings.ToLower(strings.Join(strings.Fields(quote), " "))
+	for _, forbidden := range definition.ForbiddenEvidenceTerms {
+		if strings.Contains(text, forbidden) {
+			return fmt.Errorf("evidence uses a disallowed concept for passport field %q", fieldKey)
+		}
+	}
+	if len(definition.EvidenceTerms) == 0 {
+		return nil
+	}
+	for _, term := range definition.EvidenceTerms {
+		if strings.Contains(text, term) {
+			return nil
+		}
+	}
+	return fmt.Errorf("evidence does not identify passport field %q", fieldKey)
 }
 
 func ValidateFieldValue(key string, value any) error {

@@ -1,5 +1,12 @@
 export type FieldStatus = 'MISSING' | 'EXTRACTED' | 'NEEDS_REVIEW' | 'CONFIRMED' | 'CONFLICTED' | 'STALE'
 
+export interface Workspace {
+  id: string
+  display_name: string
+  role: string
+  created_at: string
+}
+
 export interface Evidence {
   source_id: string
   source_name: string

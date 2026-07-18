@@ -2,6 +2,13 @@ package domain
 
 import "time"
 
+type Workspace struct {
+	ID          string    `json:"id"`
+	DisplayName string    `json:"display_name"`
+	Role        string    `json:"role"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
 type FieldStatus string
 
 const (

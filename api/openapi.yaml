@@ -21,6 +21,15 @@ paths:
       operationId: presignUpload
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/UploadRequest" } } } }
       responses: { "201": { description: Signed upload operation }, "422": { $ref: "#/components/responses/Error" } }
+  /v1/workspaces:
+    get:
+      operationId: listWorkspaces
+      responses: { "200": { description: Businesses available to the authenticated account } }
+    post:
+      operationId: createWorkspace
+      parameters: [ { $ref: "#/components/parameters/IdempotencyKey" } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/CreateWorkspaceRequest" } } } }
+      responses: { "201": { description: Business workspace created }, "422": { $ref: "#/components/responses/Error" } }
   /v1/uploads/{source_id}/complete:
     post:
       operationId: completeUpload
@@ -34,6 +43,12 @@ paths:
       parameters: [ { $ref: "#/components/parameters/IdempotencyKey" } ]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/BuildPassportRequest" } } } }
       responses: { "202": { description: Extraction job accepted }, "400": { $ref: "#/components/responses/Error" } }
+  /v1/passports/refresh:
+    post:
+      operationId: refreshPassport
+      parameters: [ { $ref: "#/components/parameters/IdempotencyKey" } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/RefreshPassportRequest" } } } }
+      responses: { "202": { description: Incremental extraction job accepted }, "422": { $ref: "#/components/responses/Error" } }
   /v1/jobs/{job_id}:
     get:
       operationId: getJob
@@ -180,6 +195,17 @@ components:
           type: object
           required: [code, message]
           properties: { code: { type: string }, message: { type: string }, details: { type: array, items: { type: string } } }
+
+    CreateWorkspaceRequest:
+      type: object
+      required: [display_name]
+      properties:
+        display_name: { type: string, minLength: 1, maxLength: 200 }
+    RefreshPassportRequest:
+      type: object
+      required: [source_ids]
+      properties:
+        source_ids: { type: array, minItems: 1, maxItems: 10, items: { type: string, format: uuid } }
     UploadRequest:
       type: object
       required: [filename, content_type, size_bytes]

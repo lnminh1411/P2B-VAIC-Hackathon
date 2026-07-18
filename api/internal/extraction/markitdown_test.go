@@ -49,3 +49,20 @@ func TestMarkItDownConverterRejectsOversizedOutput(t *testing.T) {
 		t.Fatal("expected oversized output error")
 	}
 }
+
+func TestMarkItDownConverterRejectsLowQualityTextInsteadOfPublishingEmptyFacts(t *testing.T) {
+	directory := t.TempDir()
+	program := filepath.Join(directory, "fake-markitdown")
+	if err := os.WriteFile(program, []byte("#!/bin/sh\nprintf '[Image]'\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	input := filepath.Join(directory, "scanned.pdf")
+	if err := os.WriteFile(input, []byte("%PDF-1.7"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	converter := MarkItDownConverter{Executable: program, Timeout: 5 * time.Second, MaxOutputBytes: 1024}
+	if _, err := converter.Convert(context.Background(), input); err == nil {
+		t.Fatal("expected low quality extraction error")
+	}
+}

@@ -1,13 +1,20 @@
-import type { Alert, Application, Candidate, Checklist, EnrichmentRun, MatchRun, Passport } from './types'
+import type { Alert, Application, Candidate, Checklist, EnrichmentRun, MatchRun, Passport, Workspace } from './types'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080'
 const WORKSPACE = 'p2b-local-development'
 const DEV_AUTH = import.meta.env.VITE_DEV_AUTH === 'true'
 let accessToken: string | undefined
+let activeWorkspaceId: string | undefined
 
 export function setApiAccessToken(token?: string) {
   accessToken = token
 }
+
+export function setApiWorkspaceId(workspaceId?: string) {
+  activeWorkspaceId = workspaceId
+}
+
+export function getApiWorkspaceId() { return activeWorkspaceId }
 
 class ApiError extends Error {
   constructor(message: string, public status: number, public code?: string, public details?: string[]) { super(message) }
@@ -17,7 +24,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers)
   headers.set('Content-Type', 'application/json')
   if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`)
-  if (DEV_AUTH) headers.set('X-Workspace-ID', WORKSPACE)
+  const workspaceId = activeWorkspaceId ?? (DEV_AUTH ? WORKSPACE : undefined)
+  if (workspaceId) headers.set('X-Workspace-ID', workspaceId)
   if (init.method && init.method !== 'GET') headers.set('Idempotency-Key', crypto.randomUUID())
   const response = await fetch(`${API_URL}${path}`, { ...init, headers })
   if (!response.ok) {
@@ -30,6 +38,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export const api = {
   health: () => request<{ status: string; mode: string }>('/health/ready'),
+  workspaces: () => request<{ workspaces: Workspace[]; active_workspace_id: string }>('/v1/workspaces'),
+  createWorkspace: (displayName: string) => request<Workspace>('/v1/workspaces', { method: 'POST', body: JSON.stringify({ display_name: displayName }) }),
   passport: () => request<Passport>('/v1/passport'),
   candidates: () => request<{ candidates: Candidate[] }>('/v1/passport/candidates'),
   uploadPDF: async (file: File) => {
@@ -47,6 +57,7 @@ export const api = {
     return signed
   },
   buildPassport: (input: { company_name: string; website: string; support_needs: string[]; source_names: string[]; source_ids: string[] }) => request<{ id: string; status: string; progress: number }>('/v1/passports/build', { method: 'POST', body: JSON.stringify(input) }),
+  refreshPassport: (sourceIds: string[]) => request<{ id: string; status: string; progress: number }>('/v1/passports/refresh', { method: 'POST', body: JSON.stringify({ source_ids: sourceIds }) }),
 	job: (id: string) => request<{ id: string; status: string; progress: number; last_error?: string }>(`/v1/jobs/${id}`),
   confirmField: (fieldKey: string, value: unknown, version: number) => request<Passport>(`/v1/passport/fields/${fieldKey}`, { method: 'PUT', body: JSON.stringify({ value, expected_version: version }) }),
   match: () => request<MatchRun>('/v1/matches', { method: 'POST', body: '{}' }),
@@ -61,7 +72,8 @@ export const api = {
   downloadApplication: async (applicationId: string) => {
     const headers = new Headers()
     if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`)
-    if (DEV_AUTH) headers.set('X-Workspace-ID', WORKSPACE)
+    const workspaceId = activeWorkspaceId ?? (DEV_AUTH ? WORKSPACE : undefined)
+    if (workspaceId) headers.set('X-Workspace-ID', workspaceId)
     const response = await fetch(`${API_URL}/v1/applications/${applicationId}/download`, { headers })
     if (!response.ok) throw new ApiError('Không thể tải PDF', response.status)
     return response.blob()

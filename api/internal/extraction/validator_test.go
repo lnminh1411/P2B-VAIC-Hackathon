@@ -30,6 +30,16 @@ func TestValidateCandidatesNormalizesWhitespaceWithoutInventingText(t *testing.T
 	}
 }
 
+func TestValidateCandidatesHandlesPDFWordHyphenationInEvidence(t *testing.T) {
+	markdown := "Tên doanh nghiệp: Công ty Cổ phần Sao Việt\nVốn điều-\nlệ: 5.000.000.000 đồng"
+	candidates := []Candidate{{FieldKey: "charter_capital", Value: float64(5000000000), DataType: "money", Confidence: 0.9, Quote: "Vốn điều lệ: 5.000.000.000 đồng"}}
+
+	valid, rejected := ValidateCandidates(markdown, candidates)
+	if len(valid) != 1 || len(rejected) != 0 {
+		t.Fatalf("valid = %#v, rejected = %#v", valid, rejected)
+	}
+}
+
 func TestValidateCandidatesUsesPassportCanonicalFieldKeys(t *testing.T) {
 	markdown := "Loại hình doanh nghiệp: Công ty cổ phần"
 	candidates := []Candidate{
@@ -53,6 +63,26 @@ func TestValidateCandidatesRejectsValueThatDoesNotMatchDeclaredType(t *testing.T
 
 	valid, rejected := ValidateCandidates(markdown, candidates)
 
+	if len(valid) != 0 || len(rejected) != 1 {
+		t.Fatalf("valid = %#v, rejected = %#v", valid, rejected)
+	}
+}
+
+func TestValidateCandidatesKeepsCharterCapitalWhenLabelAndValueAreGrounded(t *testing.T) {
+	markdown := "Thông tin đăng ký doanh nghiệp\nVốn điều lệ: 5.000.000.000 đồng"
+	candidates := []Candidate{{FieldKey: "charter_capital", Value: float64(5000000000), DataType: "money", Confidence: .96, Quote: "Vốn điều lệ: 5.000.000.000 đồng"}}
+
+	valid, rejected := ValidateCandidates(markdown, candidates)
+	if len(valid) != 1 || valid[0].FieldKey != "charter_capital" || len(rejected) != 0 {
+		t.Fatalf("valid = %#v, rejected = %#v", valid, rejected)
+	}
+}
+
+func TestValidateCandidatesRejectsBrokerHeadcountAsEmployeeCount(t *testing.T) {
+	markdown := "Nhân lực môi giới: 25 người"
+	candidates := []Candidate{{FieldKey: "employee_count", Value: float64(25), DataType: "integer", Confidence: .96, Quote: markdown}}
+
+	valid, rejected := ValidateCandidates(markdown, candidates)
 	if len(valid) != 0 || len(rejected) != 1 {
 		t.Fatalf("valid = %#v, rejected = %#v", valid, rejected)
 	}

@@ -49,6 +49,8 @@ a { color: inherit; }
 .button.secondary { background: #191520; border-color: var(--line-strong); color: var(--soft); }
 .button.secondary:hover:not(:disabled) { background: #211b2c; border-color: rgba(205, 181, 255, .38); }
 .button.wide { width: 100%; }
+.upload-refresh { position: relative; overflow: hidden; }
+.upload-refresh input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 .text-button { border: 0; background: transparent; display: inline-flex; gap: .35rem; align-items: center; color: var(--lavender); cursor: pointer; }
 .text-button svg { width: 16px; }
 
@@ -62,6 +64,13 @@ a { color: inherit; }
 .brand-mark svg { width: 19px; }
 .workspace-chip { border: 1px solid var(--line); border-radius: var(--radius); background: #121017; padding: .75rem; margin-bottom: 1.25rem; color: var(--muted); font-size: .66rem; letter-spacing: .05em; text-transform: uppercase; position: relative; }
 .workspace-chip strong { color: var(--text); display: block; font-size: .78rem; letter-spacing: 0; text-transform: none; padding: .35rem 0 0 1rem; }
+.workspace-switcher { display: grid; gap: .35rem; margin-bottom: .65rem; }
+.workspace-switcher label { color: var(--muted); font-size: .62rem; letter-spacing: .06em; text-transform: uppercase; }
+.workspace-select-row { display: grid; grid-template-columns: minmax(0, 1fr) 32px; gap: .35rem; }
+.workspace-switcher select { width: 100%; min-height: 34px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); padding: 0 .5rem; font-size: .7rem; }
+.workspace-add { width: 32px; height: 34px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: transparent; color: var(--lavender); display: grid; place-items: center; cursor: pointer; }
+.workspace-add:hover { background: var(--surface-3); }
+.workspace-add svg { width: 15px; }
 .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); display: inline-block; margin-right: .4rem; box-shadow: 0 0 0 4px rgba(102, 223, 173, .09); }
 .sidebar nav { display: grid; gap: .25rem; }
 .nav-item { border: 1px solid transparent; background: transparent; color: #8f8899; min-height: 43px; border-radius: var(--radius-sm); padding: 0 .7rem; display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: .65rem; text-align: left; cursor: pointer; font-size: .82rem; }

@@ -31,6 +31,17 @@ Trải nghiệm phiên bản thử nghiệm trực tuyến tại: [https://p2b-z
 *   **Phân loại trạng thái:** Kết quả trả về gồm `MET` (Đạt), `NOT_MET` (Không đạt) hoặc `MISSING_INFO` (Thiếu thông tin chứng minh).
 *   **Xếp hạng tự động:** Gợi ý các chính sách hỗ trợ/tài trợ có tỷ lệ khớp cao nhất cho doanh nghiệp.
 
+### 2.1. Runtime & dữ liệu
+1. Supabase Auth xác thực Google; Railway PostgreSQL bootstrap workspace.
+2. Frontend upload PDF trực tiếp vào private Supabase Storage qua signed URL.
+3. API ghi nguồn upload vào Railway PostgreSQL, xác nhận upload hoàn tất và enqueue job bền vững.
+4. Worker tải PDF bằng server credential, kiểm kích thước/PDF signature/SHA-256, dùng MarkItDown chuyển PDF thành Markdown rồi gọi `gemini-3.1-flash-lite` với structured output.
+5. Chỉ candidate có quote khớp nguồn mới được lưu `NEEDS_REVIEW`; người dùng xác nhận mới tạo Passport version mới.
+6. Một tài khoản có thể sở hữu nhiều business workspace; mỗi request production phải qua membership check. Nút `Cập nhật tài liệu` tạo refresh job chỉ phân tích PDF mới, không reset Passport hiện tại.
+7. MarkItDown output có quality gate; PDF scanned/ít text sẽ chạy OCR fallback bằng `pdftoppm` + `tesseract` (`OCR_LANGUAGES` mặc định `vie+eng`).
+8. Job queue dùng lease, `FOR UPDATE SKIP LOCKED`, retry/backoff và dead-letter. Worker xử lý tuần tự để giới hạn RAM.
+9. Production policy corpus, website crawler, enrichment candidates và alerts mặc định trống cho đến khi adapter thật được kết nối.
+
 ### 3. Danh sách kiểm tra & Chuẩn bị Hồ sơ Ứng tuyển (Evidence-Gated Checklist)
 *   **Sinh Checklist tự động:** Dựa trên các điều kiện luật của chính sách, hệ thống tạo checklist các văn bản bắt buộc cần nộp.
 *   **Khóa hồ sơ theo bằng chứng:** Chỉ khi toàn bộ các trường thông tin quan trọng được xác minh nguồn dẫn, đơn ứng tuyển mới cho phép hoàn tất và phê duyệt.

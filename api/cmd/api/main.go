@@ -56,7 +56,7 @@ func main() {
 			slog.Error("database unavailable", "error", err)
 			os.Exit(1)
 		}
-		config.WorkspaceBootstrapper = tenancy.NewBootstrapper(database)
+		config.WorkspaceManager = tenancy.NewBootstrapper(database)
 		config.ReadinessChecker = database
 		uploadSigner, signerErr := storageadapter.NewSupabaseSigner(
 			os.Getenv("SUPABASE_URL"),
