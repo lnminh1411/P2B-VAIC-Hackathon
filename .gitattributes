@@ -1,3 +1,1 @@
-# Force LF line endings for all SQL migration files
-api/migrations/sql/*.sql text eol=lf
 infra/entrypoint.sh text eol=lf
