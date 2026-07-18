@@ -8,8 +8,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/p2b/p2b/internal/authn"
+	"github.com/p2b/p2b/internal/domain"
 	"github.com/p2b/p2b/internal/platform"
 )
 
@@ -31,8 +33,8 @@ func (v verifierStub) Verify(_ context.Context, _ string) (authn.Principal, erro
 }
 
 func TestProductionAuthDerivesWorkspaceFromVerifiedPrincipal(t *testing.T) {
-	principal := authn.Principal{Subject: "0f34fe4f-37dc-43c0-9277-67e49b7b06b5", Email: "founder@greentech.vn", Name: "Nguyễn Minh Anh"}
-	server := NewServerWithConfig(platform.NewDemoService(), Config{
+	principal := authn.Principal{Subject: "0f34fe4f-37dc-43c0-9277-67e49b7b06b5", Email: "founder@example.vn", Name: "Nguyễn Minh Anh"}
+	server := NewServerWithConfig(newTestService(), Config{
 		WebOrigin: "https://app.p2b.vn",
 		Verifier:  verifierStub{principal: principal},
 	})
@@ -75,8 +77,8 @@ func TestAdminPoliciesRequiresTrustedAdminRole(t *testing.T) {
 		{name: "admin allowed", roles: []string{"admin"}, wantStatus: http.StatusOK},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			principal := authn.Principal{Subject: "0f34fe4f-37dc-43c0-9277-67e49b7b06b5", Email: "founder@greentech.vn", Roles: test.roles}
-			server := NewServerWithConfig(platform.NewDemoService(), Config{Verifier: verifierStub{principal: principal}})
+			principal := authn.Principal{Subject: "0f34fe4f-37dc-43c0-9277-67e49b7b06b5", Email: "founder@example.vn", Roles: test.roles}
+			server := NewServerWithConfig(newTestService(), Config{Verifier: verifierStub{principal: principal}})
 			request := httptest.NewRequest(http.MethodGet, "/v1/admin/policies", nil)
 			request.Header.Set("Authorization", "Bearer verified-token")
 			response := httptest.NewRecorder()
@@ -103,7 +105,7 @@ func TestReadinessReflectsDatabaseHealth(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			server := NewServerWithConfig(platform.NewDemoService(), Config{ReadinessChecker: readinessStub{err: test.err}})
+			server := NewServerWithConfig(newTestService(), Config{ReadinessChecker: readinessStub{err: test.err}})
 			request := httptest.NewRequest(http.MethodGet, "/health/ready", nil)
 			response := httptest.NewRecorder()
 
@@ -120,11 +122,11 @@ func TestReadinessReflectsDatabaseHealth(t *testing.T) {
 }
 
 func TestGoldenPathBuildConfirmMatchAndGenerate(t *testing.T) {
-	server := NewServer(platform.NewDemoService())
+	server := NewServer(newTestService())
 
 	build := request(t, server, http.MethodPost, "/v1/passports/build", map[string]any{
-		"company_name":  "GreenTech Việt Nam",
-		"website":       "https://greentech.example.vn",
+		"company_name":  "Công ty kiểm thử P2B",
+		"website":       "https://company.example.vn",
 		"support_needs": []string{"công nghệ xanh", "vốn"},
 		"source_names":  []string{"dang-ky-doanh-nghiep.pdf", "pitch-deck.pdf"},
 	})
@@ -174,7 +176,7 @@ func TestGoldenPathBuildConfirmMatchAndGenerate(t *testing.T) {
 
 	policyID := ""
 	for _, result := range matchResponse.Results {
-		if result.PolicyID == "green-hcm" && result.TemplateReady {
+		if result.PolicyID == "test-ready" && result.TemplateReady {
 			policyID = result.PolicyID
 		}
 	}
@@ -226,7 +228,7 @@ func TestGoldenPathBuildConfirmMatchAndGenerate(t *testing.T) {
 }
 
 func TestRejectsOversizedBodyAndStaleVersion(t *testing.T) {
-	server := NewServer(platform.NewDemoService())
+	server := NewServer(newTestService())
 	request(t, server, http.MethodPost, "/v1/passports/build", map[string]any{"company_name": "P2B", "support_needs": []string{"vốn"}})
 
 	response := request(t, server, http.MethodPut, "/v1/passport/fields/legal_name", map[string]any{"value": "Tên mới", "expected_version": 999})
@@ -244,8 +246,18 @@ func TestRejectsOversizedBodyAndStaleVersion(t *testing.T) {
 	}
 }
 
+func TestPresignFailsClosedWithoutStorageSigner(t *testing.T) {
+	server := NewServer(platform.NewService(nil))
+	response := request(t, server, http.MethodPost, "/v1/uploads/presign", map[string]any{
+		"filename": "company.pdf", "content_type": "application/pdf", "size_bytes": 128,
+	})
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503: %s", response.Code, response.Body.String())
+	}
+}
+
 func TestIdempotencyReplaysResponseAndRejectsKeyReuse(t *testing.T) {
-	server := NewServer(platform.NewDemoService())
+	server := NewServer(newTestService())
 	body := map[string]any{"company_name": "P2B Idempotent"}
 
 	first := requestWithKey(t, server, http.MethodPost, "/v1/passports/build", body, "build-once")
@@ -289,4 +301,18 @@ func decode(t *testing.T, response *httptest.ResponseRecorder, target any) {
 	if err := json.NewDecoder(response.Body).Decode(target); err != nil {
 		t.Fatalf("decode: %v: %s", err, response.Body.String())
 	}
+}
+
+func newTestService() *platform.Service {
+	now := time.Now().UTC()
+	policy := domain.Policy{
+		ID: "test-ready", Version: 1, Title: "Chính sách kiểm thử", Agency: "Cơ quan kiểm thử",
+		Benefit: "Hỗ trợ kiểm thử", SupportType: "Công nghệ xanh", Lifecycle: "ACTIVE", VerifiedAt: now, Deadline: now.AddDate(0, 1, 0), TemplateReady: true,
+		Rules: []domain.Rule{
+			{ID: "legal-name", FieldKey: "legal_name", Operator: domain.OpExists, Required: true},
+			{ID: "website", FieldKey: "website", Operator: domain.OpExists, Required: true},
+		},
+		Checklist: []domain.ChecklistTemplateItem{{Key: "registration", Title: "Hồ sơ doanh nghiệp", Required: true, FieldKeys: []string{"legal_name", "website"}}},
+	}
+	return platform.NewService([]domain.Policy{policy})
 }

@@ -30,8 +30,16 @@ export default function App() {
 
   const buildMutation = useMutation({
     mutationFn: async (input: CompanyOnboardingInput) => {
-      await Promise.all(input.files.map(file => api.uploadPDF(file)))
-      return api.buildPassport(buildPassportPayload(input))
+	  const uploads = await Promise.all(input.files.map(file => api.uploadPDF(file)))
+	  const job = await api.buildPassport(buildPassportPayload(input, uploads.map(upload => upload.source_id)))
+	  if (job.status === 'SUCCEEDED') return job
+	  for (let attempt = 0; attempt < 480; attempt += 1) {
+		await new Promise(resolve => window.setTimeout(resolve, 1500))
+		const current = await api.job(job.id)
+		if (current.status === 'SUCCEEDED') return current
+		if (current.status === 'FAILED' || current.status === 'DEAD_LETTER') throw new Error(current.last_error || 'Không thể trích xuất tài liệu')
+	  }
+	  throw new Error('Quá thời gian xử lý tài liệu; bạn có thể thử lại sau')
     },
     onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['passport'] }), queryClient.invalidateQueries({ queryKey: ['candidates'] })]); setPage('passport') },
   })

@@ -17,7 +17,10 @@ func TestApplicationBlockersReturnsEmptyJSONCollection(t *testing.T) {
 }
 
 func TestCreateChecklistRequiresEveryReferencedField(t *testing.T) {
-	service := NewDemoService()
+	service := NewService([]domain.Policy{{
+		ID: "registration-policy", Version: 1, Title: "Registration policy", Lifecycle: "ACTIVE",
+		Checklist: []domain.ChecklistTemplateItem{{Key: "registration", Title: "Registration", Required: true, FieldKeys: []string{"legal_name", "tax_code"}}},
+	}})
 	workspaceID := "checklist-all-fields"
 	_, err := service.BuildPassport(workspaceID, BuildPassportInput{CompanyName: "Công ty kiểm thử"})
 	if err != nil {
@@ -34,7 +37,7 @@ func TestCreateChecklistRequiresEveryReferencedField(t *testing.T) {
 		}
 	}
 	if policyID == "" {
-		t.Fatal("demo policy with registration checklist not found")
+		t.Fatal("test policy with registration checklist not found")
 	}
 
 	checklist, err := service.CreateChecklist(workspaceID, policyID)

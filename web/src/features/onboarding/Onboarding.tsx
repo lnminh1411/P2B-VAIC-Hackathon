@@ -29,12 +29,12 @@ export function Onboarding({ onSubmit, busy, error }: { onSubmit: (data: Company
         <motion.section className="onboarding-copy" initial={{ opacity: 0, x: -18 }} animate={{ opacity: 1, x: 0 }}>
           <span className="kicker">COMPANY PROFILING · BƯỚC 1/4</span>
           <h1>Biến hồ sơ doanh nghiệp thành <em>cơ hội hỗ trợ.</em></h1>
-          <p>P2B đọc tài liệu, xây Company Passport có nguồn dẫn, rồi đối chiếu hàng trăm điều kiện chính sách.</p>
+          <p>P2B tạo Company Passport từ dữ liệu bạn cung cấp. Dữ kiện tự động chỉ xuất hiện khi có nguồn và evidence kiểm chứng được.</p>
           <div className="proof-row"><span><b>01</b>Thông tin có dẫn nguồn</span><span><b>02</b>AI không tự quyết định</span><span><b>03</b>Review trước khi xuất</span></div>
           <blockquote><strong>51,3%</strong><span>doanh nghiệp khảo sát chưa biết đến Luật Hỗ trợ DNNVV.</span><cite>PCI 2021 · VCCI</cite></blockquote>
         </motion.section>
         <motion.form className="onboarding-form" onSubmit={submit} initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .08 }}>
-          <div className="form-heading"><span>Khởi tạo Company Passport</span><small>Khoảng 3–5 phút</small></div>
+          <div className="form-heading"><span>Khởi tạo Company Passport</span><small>Bước thiết lập ban đầu</small></div>
           <label>Tên doanh nghiệp<input value={company} onChange={event => setCompany(event.target.value)} maxLength={200} required /></label>
           <label>Website doanh nghiệp<div className="input-icon"><Link2 /><input value={website} onChange={event => setWebsite(event.target.value)} type="url" placeholder="https://" /></div></label>
           <fieldset><legend>Bạn đang tìm hỗ trợ gì?</legend><div className="choice-cloud">{needs.map(need => <button type="button" key={need} data-selected={selected.includes(need)} onClick={() => toggle(need)}>{need}</button>)}</div></fieldset>
@@ -42,8 +42,8 @@ export function Onboarding({ onSubmit, busy, error }: { onSubmit: (data: Company
           {files.length > 0 && <div className="file-list">{files.map(file => <span key={`${file.name}-${file.size}`}><FileText />{file.name}</span>)}</div>}
           {fileError && <p className="inline-error" role="alert">{fileError}</p>}
           {error && <p className="inline-error" role="alert">{error}</p>}
-          <button className="button primary wide" disabled={!canSubmit || busy}>{busy ? 'Đang phân tích hồ sơ…' : 'Xây Company Passport'}<ArrowRight /></button>
-          <p className="form-note">AI chỉ tạo đề xuất. Bạn sẽ kiểm tra từng dữ kiện trước khi matching.</p>
+          <button className="button primary wide" disabled={!canSubmit || busy}>{busy ? 'AI đang đọc và kiểm chứng tài liệu…' : 'Xây Company Passport'}<ArrowRight /></button>
+          <p className="form-note">PDF được lưu riêng tư, chuyển thành Markdown bằng MarkItDown rồi Gemini trích xuất dữ kiện có dẫn nguồn. Website chưa được crawl tự động.</p>
         </motion.form>
       </main>
     </div>

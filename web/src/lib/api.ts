@@ -1,7 +1,7 @@
 import type { Alert, Application, Candidate, Checklist, EnrichmentRun, MatchRun, Passport } from './types'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080'
-const WORKSPACE = 'p2b-browser-demo'
+const WORKSPACE = 'p2b-local-development'
 const DEV_AUTH = import.meta.env.VITE_DEV_AUTH === 'true'
 let accessToken: string | undefined
 
@@ -43,9 +43,11 @@ export const api = {
     form.append('', file)
     const response = await fetch(signed.upload_url, { method: 'PUT', headers: { 'x-upsert': 'false' }, body: form })
     if (!response.ok) throw new ApiError(`Không thể tải lên ${file.name}`, response.status)
+	await request<void>(`/v1/uploads/${signed.source_id}/complete`, { method: 'POST' })
     return signed
   },
-  buildPassport: (input: { company_name: string; website: string; support_needs: string[]; source_names: string[] }) => request<{ id: string }>('/v1/passports/build', { method: 'POST', body: JSON.stringify(input) }),
+  buildPassport: (input: { company_name: string; website: string; support_needs: string[]; source_names: string[]; source_ids: string[] }) => request<{ id: string; status: string; progress: number }>('/v1/passports/build', { method: 'POST', body: JSON.stringify(input) }),
+	job: (id: string) => request<{ id: string; status: string; progress: number; last_error?: string }>(`/v1/jobs/${id}`),
   confirmField: (fieldKey: string, value: unknown, version: number) => request<Passport>(`/v1/passport/fields/${fieldKey}`, { method: 'PUT', body: JSON.stringify({ value, expected_version: version }) }),
   match: () => request<MatchRun>('/v1/matches', { method: 'POST', body: '{}' }),
   startEnrichment: (policyId: string) => request<EnrichmentRun>('/v1/enrichment-runs', { method: 'POST', body: JSON.stringify({ policy_id: policyId }) }),

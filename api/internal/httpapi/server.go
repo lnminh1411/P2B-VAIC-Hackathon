@@ -16,6 +16,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/p2b/p2b/internal/authn"
+	"github.com/p2b/p2b/internal/domain"
+	passportdomain "github.com/p2b/p2b/internal/passport"
+	"github.com/p2b/p2b/internal/pipeline"
 	"github.com/p2b/p2b/internal/platform"
 )
 
@@ -35,6 +38,15 @@ type Config struct {
 	}
 	UploadSigner interface {
 		CreateUploadURL(context.Context, string) (string, error)
+	}
+	ExtractionStore interface {
+		RegisterSource(context.Context, pipeline.Source) error
+		MarkUploaded(context.Context, string, string) error
+		EnqueueBuild(context.Context, string, pipeline.BuildRequest) (pipeline.Job, error)
+		Job(context.Context, string, string) (pipeline.Job, error)
+		Passport(context.Context, string) (domain.Passport, error)
+		Candidates(context.Context, string) ([]passportdomain.Candidate, error)
+		ConfirmField(context.Context, string, string, string, any, int) (domain.Passport, error)
 	}
 	ReadinessChecker interface {
 		Ping(context.Context) error
@@ -80,6 +92,7 @@ func NewServerWithConfig(service *platform.Service, config Config) http.Handler 
 		r.Use(server.idempotencyMiddleware)
 		r.Get("/auth/me", server.authMe)
 		r.Post("/uploads/presign", server.presignUpload)
+		r.Post("/uploads/{sourceID}/complete", server.completeUpload)
 		r.Post("/passports/build", server.buildPassport)
 		r.Get("/jobs/{jobID}", server.getJob)
 		r.Get("/passport", server.getPassport)
@@ -116,7 +129,7 @@ func (s *Server) authenticate(next http.Handler) http.Handler {
 		if s.config.DevAuth {
 			workspaceID = strings.TrimSpace(r.Header.Get("X-Workspace-ID"))
 			if workspaceID == "" {
-				workspaceID = "demo-workspace"
+				workspaceID = "local-development-workspace"
 			}
 			principal = authn.Principal{Subject: workspaceID, Email: "founder@p2b.local", Name: "P2B Founder", Roles: []string{"admin"}}
 		} else {
@@ -246,7 +259,7 @@ func (s *Server) presignUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	sourceID := uuid.NewString()
 	if s.config.UploadSigner == nil {
-		writeJSON(w, http.StatusCreated, map[string]any{"source_id": sourceID, "upload_url": "demo://signed-upload", "expires_in": 300, "mode": "DEMO_LOCAL"})
+		writeError(w, http.StatusServiceUnavailable, "STORAGE_UNAVAILABLE", "Private upload is not configured")
 		return
 	}
 	objectKey := workspace(r) + "/sources/" + sourceID + ".pdf"
@@ -255,7 +268,38 @@ func (s *Server) presignUpload(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "STORAGE_UNAVAILABLE", "Private upload is temporarily unavailable")
 		return
 	}
+	if s.config.ExtractionStore != nil {
+		if err = s.config.ExtractionStore.RegisterSource(r.Context(), pipeline.Source{ID: sourceID, WorkspaceID: workspace(r), Filename: input.Filename, ContentType: input.ContentType, SizeBytes: input.SizeBytes, ObjectKey: objectKey}); err != nil {
+			slog.ErrorContext(r.Context(), "register upload source failed", "error", err)
+			writeError(w, http.StatusServiceUnavailable, "SOURCE_UNAVAILABLE", "Upload source could not be registered")
+			return
+		}
+	}
 	writeJSON(w, http.StatusCreated, map[string]any{"source_id": sourceID, "object_key": objectKey, "upload_url": uploadURL, "expires_in": 7200, "mode": "SUPABASE_SIGNED"})
+}
+
+func (s *Server) completeUpload(w http.ResponseWriter, r *http.Request) {
+	if !requireIdempotency(w, r) {
+		return
+	}
+	if s.config.ExtractionStore == nil {
+		writeError(w, http.StatusServiceUnavailable, "EXTRACTION_UNAVAILABLE", "Extraction pipeline is not configured")
+		return
+	}
+	sourceID := chi.URLParam(r, "sourceID")
+	if _, err := uuid.Parse(sourceID); err != nil {
+		writeError(w, http.StatusNotFound, "SOURCE_NOT_FOUND", "Upload source not found")
+		return
+	}
+	if err := s.config.ExtractionStore.MarkUploaded(r.Context(), workspace(r), sourceID); err != nil {
+		if errors.Is(err, pipeline.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "SOURCE_NOT_FOUND", "Upload source not found")
+			return
+		}
+		writeError(w, http.StatusServiceUnavailable, "SOURCE_UNAVAILABLE", "Upload source could not be finalized")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) buildPassport(w http.ResponseWriter, r *http.Request) {
@@ -264,6 +308,23 @@ func (s *Server) buildPassport(w http.ResponseWriter, r *http.Request) {
 	}
 	var input platform.BuildPassportInput
 	if !decodeJSON(w, r, &input) {
+		return
+	}
+	if err := platform.ValidateBuildPassportInput(&input); err != nil {
+		writeError(w, http.StatusUnprocessableEntity, "INVALID_INPUT", err.Error())
+		return
+	}
+	if s.config.ExtractionStore != nil {
+		principal := principal(r)
+		job, err := s.config.ExtractionStore.EnqueueBuild(r.Context(), workspace(r), pipeline.BuildRequest{
+			CompanyName: input.CompanyName, Website: input.Website, SupportNeeds: input.SupportNeeds, SourceIDs: input.SourceIDs,
+			IdempotencyKey: r.Header.Get("Idempotency-Key"), ActorSubject: principal.Subject,
+		})
+		if err != nil {
+			writeError(w, http.StatusUnprocessableEntity, "INVALID_INPUT", err.Error())
+			return
+		}
+		writeJSON(w, http.StatusAccepted, job)
 		return
 	}
 	job, err := s.service.BuildPassport(workspace(r), input)
@@ -275,6 +336,19 @@ func (s *Server) buildPassport(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getJob(w http.ResponseWriter, r *http.Request) {
+	if s.config.ExtractionStore != nil {
+		job, err := s.config.ExtractionStore.Job(r.Context(), workspace(r), chi.URLParam(r, "jobID"))
+		if err != nil {
+			if errors.Is(err, pipeline.ErrNotFound) {
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Job not found")
+				return
+			}
+			writeError(w, http.StatusServiceUnavailable, "PIPELINE_UNAVAILABLE", "Extraction status is temporarily unavailable")
+			return
+		}
+		writeJSON(w, http.StatusOK, job)
+		return
+	}
 	job, err := s.service.Job(workspace(r), chi.URLParam(r, "jobID"))
 	if err != nil {
 		respondServiceError(w, err)
@@ -284,12 +358,30 @@ func (s *Server) getJob(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getPassport(w http.ResponseWriter, r *http.Request) {
+	if s.config.ExtractionStore != nil {
+		passport, err := s.config.ExtractionStore.Passport(r.Context(), workspace(r))
+		if err != nil {
+			writeError(w, http.StatusServiceUnavailable, "PASSPORT_UNAVAILABLE", "Company Passport is temporarily unavailable")
+			return
+		}
+		writeJSON(w, http.StatusOK, passport)
+		return
+	}
 	writeJSON(w, http.StatusOK, s.service.Passport(workspace(r)))
 }
 func (s *Server) getPassportVersions(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, []any{s.service.Passport(workspace(r))})
 }
 func (s *Server) getCandidates(w http.ResponseWriter, r *http.Request) {
+	if s.config.ExtractionStore != nil {
+		candidates, err := s.config.ExtractionStore.Candidates(r.Context(), workspace(r))
+		if err != nil {
+			writeError(w, http.StatusServiceUnavailable, "CANDIDATES_UNAVAILABLE", "Extracted candidates are temporarily unavailable")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"candidates": candidates})
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"candidates": s.service.Candidates(workspace(r))})
 }
 
@@ -299,6 +391,19 @@ func (s *Server) confirmField(w http.ResponseWriter, r *http.Request) {
 		ExpectedVersion int `json:"expected_version"`
 	}
 	if !decodeJSON(w, r, &input) {
+		return
+	}
+	if s.config.ExtractionStore != nil {
+		pass, err := s.config.ExtractionStore.ConfirmField(r.Context(), workspace(r), principal(r).Subject, chi.URLParam(r, "fieldKey"), input.Value, input.ExpectedVersion)
+		if err != nil {
+			if errors.Is(err, pipeline.ErrVersionConflict) {
+				writeError(w, http.StatusConflict, "VERSION_CONFLICT", "Passport changed; reload before confirming")
+				return
+			}
+			writeError(w, http.StatusUnprocessableEntity, "INVALID_FIELD", err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, pass)
 		return
 	}
 	pass, err := s.service.ConfirmField(workspace(r), chi.URLParam(r, "fieldKey"), input.Value, input.ExpectedVersion)
@@ -537,6 +642,11 @@ func (s *Server) adminPolicies(w http.ResponseWriter, _ *http.Request) {
 
 func workspace(r *http.Request) string {
 	value, _ := r.Context().Value(workspaceKey).(string)
+	return value
+}
+
+func principal(r *http.Request) authn.Principal {
+	value, _ := r.Context().Value(principalKey).(authn.Principal)
 	return value
 }
 

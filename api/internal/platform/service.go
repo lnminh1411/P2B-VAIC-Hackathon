@@ -2,7 +2,6 @@ package platform
 
 import (
 	"errors"
-	"fmt"
 	"slices"
 	"sort"
 	"strings"
@@ -27,8 +26,8 @@ type Service struct {
 	policies   []domain.Policy
 }
 
-func NewDemoService() *Service {
-	return &Service{workspaces: map[string]*workspaceState{}, policies: demoPolicies()}
+func NewService(policies []domain.Policy) *Service {
+	return &Service{workspaces: map[string]*workspaceState{}, policies: slices.Clone(policies)}
 }
 
 func (s *Service) workspace(id string) *workspaceState {
@@ -40,23 +39,15 @@ func (s *Service) workspace(id string) *workspaceState {
 	state = &workspaceState{
 		Passport: domain.Passport{ID: uuid.NewString(), WorkspaceID: id, Version: 1, Fields: map[string]domain.PassportField{}, UpdatedAt: now},
 		Jobs:     map[string]Job{}, Matches: map[string]MatchRun{}, Enrichment: map[string]EnrichmentRun{},
-		Checklists: map[string]Checklist{}, Applications: map[string]Application{},
-		Alerts: []Alert{{ID: uuid.NewString(), Type: "POLICY_NEW", Title: "Cơ hội mới cho doanh nghiệp công nghệ", Message: "Quỹ đổi mới sáng tạo đang nhận hồ sơ đến cuối năm.", PolicyID: "innovation-fund", Severity: "info", OccurredAt: now}},
+		Checklists: map[string]Checklist{}, Applications: map[string]Application{}, Alerts: []Alert{},
 	}
 	s.workspaces[id] = state
 	return state
 }
 
 func (s *Service) BuildPassport(workspaceID string, input BuildPassportInput) (Job, error) {
-	input.CompanyName = strings.TrimSpace(input.CompanyName)
-	if input.CompanyName == "" || len(input.CompanyName) > 200 {
-		return Job{}, errors.New("company_name is required and limited to 200 characters")
-	}
-	if len(input.SourceNames) > 10 {
-		return Job{}, errors.New("at most 10 PDF sources are allowed")
-	}
-	if input.Website != "" && !strings.HasPrefix(strings.ToLower(input.Website), "https://") {
-		return Job{}, errors.New("website must use https")
+	if err := ValidateBuildPassportInput(&input); err != nil {
+		return Job{}, err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -74,16 +65,27 @@ func (s *Service) BuildPassport(workspaceID string, input BuildPassportInput) (J
 	}
 	state.Passport.Version++
 	state.Passport.UpdatedAt = now
-	state.Candidates = demoCandidates(input, now)
-	for _, candidate := range state.Candidates {
-		updated, err := passportservice.MergeCandidate(state.Passport, candidate)
-		if err == nil {
-			state.Passport = updated
-		}
-	}
+	state.Candidates = nil
 	job := Job{ID: uuid.NewString(), Type: "PASSPORT_BUILD", Status: "SUCCEEDED", Progress: 100, CreatedAt: now}
 	state.Jobs[job.ID] = job
 	return job, nil
+}
+
+func ValidateBuildPassportInput(input *BuildPassportInput) error {
+	input.CompanyName = strings.TrimSpace(input.CompanyName)
+	if input.CompanyName == "" || len(input.CompanyName) > 200 {
+		return errors.New("company_name is required and limited to 200 characters")
+	}
+	if len(input.SourceNames) > 10 {
+		return errors.New("at most 10 PDF sources are allowed")
+	}
+	if len(input.SourceIDs) > 10 {
+		return errors.New("at most 10 PDF sources are allowed")
+	}
+	if input.Website != "" && !strings.HasPrefix(strings.ToLower(input.Website), "https://") {
+		return errors.New("website must use https")
+	}
+	return nil
 }
 
 func (s *Service) Passport(workspaceID string) domain.Passport {
@@ -162,7 +164,7 @@ func (s *Service) Match(workspaceID string) MatchRun {
 		}
 		evaluation := eligibility.Evaluate(state.Passport, policy.Rules)
 		score, reasons := rank(policy, state.Passport, evaluation)
-		run.Results = append(run.Results, MatchResult{PolicyID: policy.ID, PolicyVersion: policy.Version, Title: policy.Title, Agency: policy.Agency, Benefit: policy.Benefit, BenefitAmount: policy.BenefitAmount, Deadline: policy.Deadline, Score: score, Eligibility: evaluation, RankingReasons: reasons, TemplateReady: policy.TemplateReady, RetrievalMode: "HYBRID_DEMO"})
+		run.Results = append(run.Results, MatchResult{PolicyID: policy.ID, PolicyVersion: policy.Version, Title: policy.Title, Agency: policy.Agency, Benefit: policy.Benefit, BenefitAmount: policy.BenefitAmount, Deadline: policy.Deadline, Score: score, Eligibility: evaluation, RankingReasons: reasons, TemplateReady: policy.TemplateReady, RetrievalMode: "RULE_ENGINE_ONLY"})
 	}
 	sort.SliceStable(run.Results, func(i, j int) bool { return run.Results[i].Score > run.Results[j].Score })
 	state.Matches[run.ID] = run
@@ -187,22 +189,7 @@ func (s *Service) StartEnrichment(workspaceID, policyID string) (EnrichmentRun, 
 	if !ok || policy.Lifecycle != "ACTIVE" {
 		return EnrichmentRun{}, ErrNotFound
 	}
-	evaluation := eligibility.Evaluate(state.Passport, policy.Rules)
-	run := EnrichmentRun{ID: uuid.NewString(), PolicyID: policyID, Status: "NEEDS_REVIEW", CreatedAt: time.Now().UTC()}
-	labels := passportservice.CanonicalFields()
-	for _, criterion := range evaluation.Criteria {
-		if criterion.Status != eligibility.StatusMissingInfo {
-			continue
-		}
-		value := suggestedValue(criterion.FieldKey)
-		if value == nil {
-			continue
-		}
-		run.Candidates = append(run.Candidates, EnrichmentCandidate{ID: uuid.NewString(), FieldKey: criterion.FieldKey, Label: labels[criterion.FieldKey], Value: value, Confidence: .78, Status: "NEEDS_REVIEW", Warning: "Nguồn công khai cần người dùng xác nhận", Evidence: domain.Evidence{SourceID: "web-demo", SourceName: "Cổng thông tin doanh nghiệp", URL: "https://business.gov.vn/", Quote: fmt.Sprintf("Thông tin tham chiếu về %s", labels[criterion.FieldKey]), ContentHash: "sha256:demo-public-source", ObservedAt: time.Now().UTC()}})
-	}
-	if len(run.Candidates) == 0 {
-		run.Status = "NO_RESULTS"
-	}
+	run := EnrichmentRun{ID: uuid.NewString(), PolicyID: policyID, Status: "NO_RESULTS", Candidates: []EnrichmentCandidate{}, CreatedAt: time.Now().UTC()}
 	state.Enrichment[run.ID] = run
 	return run, nil
 }
