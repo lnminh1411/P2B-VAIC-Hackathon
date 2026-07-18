@@ -3,6 +3,8 @@ package extraction
 import (
 	"fmt"
 	"strings"
+
+	passportservice "github.com/p2b/p2b/internal/passport"
 )
 
 type Candidate struct {
@@ -18,34 +20,7 @@ type RejectedCandidate struct {
 	Reason    string
 }
 
-var canonicalFields = map[string]string{
-	"legal_name":             "string",
-	"tax_code":               "string",
-	"company_type":           "string",
-	"founded_date":           "date",
-	"operating_status":       "string",
-	"charter_capital":        "money",
-	"revenue":                "money",
-	"assets":                 "money",
-	"employee_count":         "integer",
-	"address":                "string",
-	"province":               "string",
-	"industrial_zone":        "string",
-	"business_sectors":       "string_array",
-	"products":               "string_array",
-	"technologies":           "string_array",
-	"markets":                "string_array",
-	"fdi_status":             "boolean",
-	"foreign_ownership_rate": "number",
-	"women_owned":            "boolean",
-	"rd_capability":          "string",
-	"intellectual_property":  "string_array",
-	"certifications":         "string_array",
-	"innovation_projects":    "string_array",
-	"green_projects":         "string_array",
-	"funding_need":           "money",
-	"funding_use_plan":       "string",
-}
+var canonicalFields = passportservice.CanonicalFieldTypes()
 
 func ValidateCandidates(markdown string, candidates []Candidate) ([]Candidate, []RejectedCandidate) {
 	normalizedDocument := normalizeEvidence(markdown)
@@ -53,11 +28,14 @@ func ValidateCandidates(markdown string, candidates []Candidate) ([]Candidate, [
 	rejected := make([]RejectedCandidate, 0)
 	for _, candidate := range candidates {
 		expectedType, known := canonicalFields[candidate.FieldKey]
+		valueError := passportservice.ValidateFieldValue(candidate.FieldKey, candidate.Value)
 		switch {
 		case !known:
 			rejected = append(rejected, RejectedCandidate{Candidate: candidate, Reason: "unknown field"})
 		case candidate.DataType != expectedType:
 			rejected = append(rejected, RejectedCandidate{Candidate: candidate, Reason: fmt.Sprintf("unexpected datatype %q", candidate.DataType)})
+		case valueError != nil:
+			rejected = append(rejected, RejectedCandidate{Candidate: candidate, Reason: valueError.Error()})
 		case candidate.Confidence < 0 || candidate.Confidence > 1:
 			rejected = append(rejected, RejectedCandidate{Candidate: candidate, Reason: "confidence outside 0..1"})
 		case len([]rune(strings.TrimSpace(candidate.Quote))) < 4:

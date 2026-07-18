@@ -22,12 +22,10 @@ func TestBuildPassportDoesNotInventCompanyFacts(t *testing.T) {
 	}
 
 	passport := service.Passport(workspaceID)
-	if len(passport.Fields) != 2 {
-		t.Fatalf("fields = %#v, want only user-provided legal_name and website", passport.Fields)
-	}
 	for _, key := range []string{"tax_code", "employee_count", "province", "charter_capital", "technologies", "green_project"} {
-		if _, exists := passport.Fields[key]; exists {
-			t.Fatalf("invented field %q must not exist", key)
+		field, exists := passport.Fields[key]
+		if !exists || field.Value != nil || field.Status != domain.FieldMissing {
+			t.Fatalf("field %q = %#v, want empty MISSING placeholder", key, field)
 		}
 	}
 	if candidates := service.Candidates(workspaceID); len(candidates) != 0 {
@@ -57,5 +55,17 @@ func TestEnrichmentReturnsNoResultsWithoutARealCollector(t *testing.T) {
 	}
 	if run.Status != "NO_RESULTS" || len(run.Candidates) != 0 {
 		t.Fatalf("run = %#v, want NO_RESULTS without invented evidence", run)
+	}
+}
+
+func TestMatchReturnsEmptyArrayWhenNoPublishedPoliciesExist(t *testing.T) {
+	service := NewService(nil)
+	if _, err := service.BuildPassport("workspace", BuildPassportInput{CompanyName: "Công ty thật"}); err != nil {
+		t.Fatal(err)
+	}
+
+	run := service.Match("workspace")
+	if run.Results == nil || len(run.Results) != 0 {
+		t.Fatalf("results = %#v, want non-nil empty array", run.Results)
 	}
 }

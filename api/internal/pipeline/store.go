@@ -204,7 +204,7 @@ func (s *Store) Passport(ctx context.Context, workspaceID string) (domain.Passpo
 	if err = json.Unmarshal(encodedFields, &result.Fields); err != nil {
 		return domain.Passport{}, fmt.Errorf("decode passport fields: %w", err)
 	}
-	return result, nil
+	return passportdomain.EnsureCanonicalFields(result), nil
 }
 
 func (s *Store) Candidates(ctx context.Context, workspaceID string) ([]passportdomain.Candidate, error) {
@@ -271,23 +271,40 @@ func (s *Store) ConfirmField(ctx context.Context, workspaceID, actorSubject, fie
 		SELECT id, data_type, evidence FROM field_candidates
 		WHERE workspace_id = $1::uuid AND field_key = $2 AND status IN ('EXTRACTED','NEEDS_REVIEW','CONFLICTED')
 		ORDER BY created_at DESC LIMIT 1`, workspaceID, fieldKey).Scan(&candidateID, &dataType, &encodedEvidence); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return domain.Passport{}, errors.New("reviewable candidate not found")
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return domain.Passport{}, err
 		}
-		return domain.Passport{}, err
-	}
-	var evidence domain.Evidence
-	if err = json.Unmarshal(encodedEvidence, &evidence); err != nil {
-		return domain.Passport{}, err
 	}
 	fields := map[string]domain.PassportField{}
 	if err = json.Unmarshal(encodedFields, &fields); err != nil {
 		return domain.Passport{}, err
 	}
+	pass := passportdomain.EnsureCanonicalFields(domain.Passport{Fields: fields})
+	fields = pass.Fields
+	definition, known := passportdomain.LookupField(fieldKey)
+	if !known {
+		return domain.Passport{}, fmt.Errorf("unknown passport field %q", fieldKey)
+	}
 	if value == nil || fmt.Sprint(value) == "" {
 		return domain.Passport{}, errors.New("confirmed value is required")
 	}
-	fields[fieldKey] = domain.PassportField{Key: fieldKey, Label: fieldLabel(fieldKey), Value: value, DataType: dataType, Status: domain.FieldConfirmed, Confidence: 1, Evidence: []domain.Evidence{evidence}}
+	if err = passportdomain.ValidateFieldValue(fieldKey, value); err != nil {
+		return domain.Passport{}, err
+	}
+	field := fields[fieldKey]
+	evidence := field.Evidence
+	if len(encodedEvidence) > 0 {
+		var candidateEvidence domain.Evidence
+		if err = json.Unmarshal(encodedEvidence, &candidateEvidence); err != nil {
+			return domain.Passport{}, err
+		}
+		evidence = append(evidence, candidateEvidence)
+	}
+	evidence = append(evidence, domain.Evidence{
+		SourceID: "user-input", SourceName: "Người dùng xác nhận", Quote: fmt.Sprint(value),
+		ContentHash: fmt.Sprintf("user-confirmation:%s:v%d", actorSubject, currentVersion+1), ObservedAt: time.Now().UTC(),
+	})
+	fields[fieldKey] = domain.PassportField{Key: fieldKey, Label: definition.Label, Value: value, DataType: definition.DataType, Status: domain.FieldConfirmed, Confidence: 1, Evidence: evidence}
 	encodedFields, _ = json.Marshal(fields)
 	newVersion := currentVersion + 1
 	if _, err = transaction.Exec(ctx, `INSERT INTO passport_versions (passport_id, version, fields, support_needs, created_by) VALUES ($1, $2, $3, $4, $5)`, passportID, newVersion, encodedFields, supportNeeds, actorID); err != nil {
@@ -296,8 +313,10 @@ func (s *Store) ConfirmField(ctx context.Context, workspaceID, actorSubject, fie
 	if _, err = transaction.Exec(ctx, `UPDATE passports SET current_version = $2, updated_at = now() WHERE id = $1`, passportID, newVersion); err != nil {
 		return domain.Passport{}, err
 	}
-	if _, err = transaction.Exec(ctx, `UPDATE field_candidates SET status = 'ACCEPTED' WHERE id = $1`, candidateID); err != nil {
-		return domain.Passport{}, err
+	if candidateID != uuid.Nil {
+		if _, err = transaction.Exec(ctx, `UPDATE field_candidates SET status = 'ACCEPTED' WHERE id = $1`, candidateID); err != nil {
+			return domain.Passport{}, err
+		}
 	}
 	if err = transaction.Commit(ctx); err != nil {
 		return domain.Passport{}, err
@@ -317,19 +336,8 @@ func initialFields(workspaceID, companyName, website string, now time.Time) map[
 }
 
 func fieldLabel(key string) string {
-	labels := map[string]string{
-		"tax_code": "Mã số thuế", "company_type": "Loại hình", "founded_date": "Ngày thành lập",
-		"operating_status": "Trạng thái hoạt động", "charter_capital": "Vốn điều lệ", "revenue": "Doanh thu",
-		"assets": "Tổng tài sản", "employee_count": "Số nhân viên", "address": "Địa chỉ", "province": "Tỉnh/thành",
-		"industrial_zone": "Khu công nghiệp", "business_sectors": "Ngành nghề", "products": "Sản phẩm",
-		"technologies": "Công nghệ", "markets": "Thị trường", "fdi_status": "Doanh nghiệp FDI",
-		"foreign_ownership_rate": "Tỷ lệ sở hữu nước ngoài", "women_owned": "Doanh nghiệp nữ làm chủ",
-		"rd_capability": "Năng lực R&D", "intellectual_property": "Sở hữu trí tuệ", "certifications": "Chứng nhận",
-		"innovation_projects": "Dự án đổi mới", "green_projects": "Dự án công nghệ xanh", "funding_need": "Nhu cầu vốn",
-		"funding_use_plan": "Kế hoạch sử dụng vốn",
-	}
-	if label := labels[key]; label != "" {
-		return label
+	if definition, exists := passportdomain.LookupField(key); exists {
+		return definition.Label
 	}
 	return key
 }

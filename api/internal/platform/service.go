@@ -91,7 +91,7 @@ func ValidateBuildPassportInput(input *BuildPassportInput) error {
 func (s *Service) Passport(workspaceID string) domain.Passport {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return clonePassport(s.workspace(workspaceID).Passport)
+	return passportservice.EnsureCanonicalFields(clonePassport(s.workspace(workspaceID).Passport))
 }
 
 func (s *Service) Candidates(workspaceID string) []passportservice.Candidate {
@@ -117,7 +117,7 @@ func (s *Service) ConfirmField(workspaceID, key string, value any, expectedVersi
 			state.Candidates[index].Status = "ACCEPTED"
 		}
 	}
-	return clonePassport(updated), nil
+	return passportservice.EnsureCanonicalFields(clonePassport(updated)), nil
 }
 
 func (s *Service) Job(workspaceID, id string) (Job, error) {
@@ -157,7 +157,7 @@ func (s *Service) Match(workspaceID string) MatchRun {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	state := s.workspace(workspaceID)
-	run := MatchRun{ID: uuid.NewString(), PassportVersion: state.Passport.Version, CreatedAt: time.Now().UTC()}
+	run := MatchRun{ID: uuid.NewString(), PassportVersion: state.Passport.Version, CreatedAt: time.Now().UTC(), Results: make([]MatchResult, 0)}
 	for _, policy := range s.policies {
 		if policy.Lifecycle != "ACTIVE" {
 			continue

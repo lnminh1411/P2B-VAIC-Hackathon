@@ -53,10 +53,13 @@ export default function App() {
   const passport = passportQuery.data!
   if (!passport.company_name) return <Onboarding onSubmit={input => buildMutation.mutate(input)} busy={buildMutation.isPending} error={buildMutation.error ? message(buildMutation.error) : undefined} />
 
-  const confirmCandidate = async (candidate: NonNullable<typeof candidatesQuery.data>['candidates'][number]) => {
+  const saveField = async (fieldKey: string, value: unknown) => {
     const current = queryClient.getQueryData<typeof passport>(['passport']) ?? passportQuery.data!
-    const updated = await api.confirmField(candidate.field_key, candidate.value, current.version)
+    const updated = await api.confirmField(fieldKey, value, current.version)
     queryClient.setQueryData(['passport'], updated)
+  }
+  const confirmCandidate = async (candidate: NonNullable<typeof candidatesQuery.data>['candidates'][number]) => {
+    await saveField(candidate.field_key, candidate.value)
     await queryClient.invalidateQueries({ queryKey: ['candidates'] })
   }
   const acceptEvidence = async (candidateId: string) => {
@@ -81,8 +84,8 @@ export default function App() {
 
   return <Shell page={page} companyName={passport.company_name} onNavigate={setPage} unreadAlerts={(alertsQuery.data?.alerts ?? []).filter(alert => !alert.read).length}>
     {page === 'overview' && <Dashboard passport={passport} onNavigate={setPage} />}
-    {page === 'passport' && <PassportPage passport={passport} candidates={candidatesQuery.data?.candidates ?? []} onConfirm={confirmCandidate} busy={candidatesQuery.isFetching} />}
-    {page === 'opportunities' && <OpportunitiesPage run={matchRun} onMatch={() => matchMutation.mutate()} matching={matchMutation.isPending} selected={selectedPolicy} onSelect={setSelectedPolicy} onPrepare={prepare} enrichment={enrichment} onEnrich={policyId => enrichMutation.mutate(policyId)} onAcceptEvidence={candidateId => void acceptEvidence(candidateId)} busy={enrichMutation.isPending} />}
+    {page === 'passport' && <PassportPage passport={passport} candidates={candidatesQuery.data?.candidates ?? []} onConfirm={confirmCandidate} onSaveField={saveField} busy={candidatesQuery.isFetching} />}
+    {page === 'opportunities' && <OpportunitiesPage run={matchRun} onMatch={() => matchMutation.mutate()} matching={matchMutation.isPending} selected={selectedPolicy} onSelect={setSelectedPolicy} onPrepare={prepare} enrichment={enrichment} onEnrich={policyId => enrichMutation.mutate(policyId)} onAcceptEvidence={candidateId => void acceptEvidence(candidateId)} busy={enrichMutation.isPending} error={matchMutation.error ? message(matchMutation.error) : undefined} />}
     {page === 'application' && <ApplicationPage policy={selectedPolicy} checklist={checklist} application={application} onCreateChecklist={() => selectedPolicy && checklistMutation.mutate(selectedPolicy.policy_id)} onMarkAvailable={itemId => void markAvailable(itemId)} onCreateApplication={() => checklist && applicationMutation.mutate(checklist.id)} onSave={async sections => { if (application) setApplication(await api.updateApplication(application.id, application.version, sections)) }} onAction={action => void applicationAction(action)} onDownload={() => void download()} busy={checklistMutation.isPending || applicationMutation.isPending} error={workflowError} />}
     {page === 'alerts' && <AlertsPage alerts={alertsQuery.data?.alerts ?? []} onRead={id => api.readAlert(id).then(() => queryClient.invalidateQueries({ queryKey: ['alerts'] }))} />}
     {page === 'admin' && (adminQuery.isLoading ? <LoadingState label="Đang tải review queue…" /> : adminQuery.error ? <ErrorState message={message(adminQuery.error)} /> : <AdminPage policies={adminQuery.data?.policies ?? []} />)}

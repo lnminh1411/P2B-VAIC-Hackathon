@@ -5,16 +5,18 @@ import { StatusBadge } from '../../components/StatusBadge'
 import { displayValue, formatDate } from '../../lib/format'
 import type { EnrichmentRun, MatchResult, MatchRun } from '../../lib/types'
 
-export function OpportunitiesPage({ run, onMatch, matching, selected, onSelect, onPrepare, enrichment, onEnrich, onAcceptEvidence, busy }: {
-  run?: MatchRun; onMatch: () => void; matching: boolean; selected?: MatchResult; onSelect: (result?: MatchResult) => void; onPrepare: (result: MatchResult) => void; enrichment?: EnrichmentRun; onEnrich: (policyId: string) => void; onAcceptEvidence: (id: string) => void; busy: boolean
+export function OpportunitiesPage({ run, onMatch, matching, selected, onSelect, onPrepare, enrichment, onEnrich, onAcceptEvidence, busy, error }: {
+  run?: MatchRun; onMatch: () => void; matching: boolean; selected?: MatchResult; onSelect: (result?: MatchResult) => void; onPrepare: (result: MatchResult) => void; enrichment?: EnrichmentRun; onEnrich: (policyId: string) => void; onAcceptEvidence: (id: string) => void; busy: boolean; error?: string
 }) {
   const [query, setQuery] = useState('')
-  const results = (run?.results ?? []).filter(result => (result.title + result.benefit + result.agency).toLowerCase().includes(query.toLowerCase()))
-  const retrievalMode = run?.results[0]?.retrieval_mode ?? 'NO_PUBLISHED_CORPUS'
-  if (!run) return <EmptyMatching onMatch={onMatch} matching={matching} />
+  const runResults = run?.results ?? []
+  const results = runResults.filter(result => (result.title + result.benefit + result.agency).toLowerCase().includes(query.toLowerCase()))
+  const retrievalMode = runResults[0]?.retrieval_mode ?? 'NO_PUBLISHED_CORPUS'
+  if (!run) return <EmptyMatching onMatch={onMatch} matching={matching} error={error} />
   return (
     <>
       <section className="page-heading split-heading"><div><span className="kicker">POLICY MATCHING · PASSPORT v{run.passport_version}</span><h1>Cơ hội được xếp hạng theo <em>khả năng hành động.</em></h1><p>Hệ thống chỉ đánh giá policy đã publish. Eligibility do rule engine xác định.</p></div><button className="button secondary" onClick={onMatch} disabled={matching}><Sparkles />Chạy lại matching</button></section>
+      {error && <p className="inline-error" role="alert">{error}</p>}
       <div className="search-toolbar"><div className="search-input"><Search /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Tìm trong kết quả…" aria-label="Tìm cơ hội" /></div><span><b>{results.length}</b> chính sách đã duyệt</span><span className="retrieval-mode">{retrievalMode.replaceAll('_', ' ')}</span></div>
       <div className="opportunity-layout"><div className="opportunity-list">{results.length === 0 ? <div className="page-state"><FileSearch /><strong>Chưa có policy đã publish</strong><span>Corpus production hiện trống; hệ thống không hiển thị policy mẫu.</span></div> : results.map((result, index) => <motion.article className="opportunity-card" key={result.policy_id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * .05 }}><div className="match-score"><strong>{result.score}</strong><span>match score</span></div><div className="opportunity-main"><div className="opportunity-head"><div><span>{result.agency}</span><h2>{result.title}</h2></div><StatusBadge status={result.eligibility.status} /></div><p>{result.benefit}</p><div className="policy-meta"><span><Banknote />{result.benefit_amount || 'Theo chương trình'}</span><span><CalendarClock />Hạn {formatDate(result.deadline)}</span><span><MapPin />Việt Nam</span></div><div className="reason-row">{result.ranking_reasons.slice(0, 2).map(reason => <span key={reason}><Check />{reason}</span>)}</div></div><button className="card-open" aria-label={`Mở ${result.title}`} onClick={() => onSelect(result)}><ArrowRight /></button></motion.article>)}</div><aside className="panel match-explainer"><span>TRẠNG THÁI MATCHING</span><h3>Không dùng dữ liệu policy mẫu</h3><ol><li><b>01</b><p><strong>Published corpus</strong>Chỉ policy đã review mới được xét</p></li><li><b>02</b><p><strong>Rule engine</strong>Kiểm tra tiêu chí bằng dữ kiện đã xác nhận</p></li><li><b>03</b><p><strong>Evidence</strong>Thiếu dữ liệu được giữ là MISSING_INFO</p></li></ol></aside></div>
       <AnimatePresence>{selected && <PolicyDrawer result={selected} onClose={() => onSelect(undefined)} onPrepare={() => onPrepare(selected)} enrichment={enrichment} onEnrich={() => onEnrich(selected.policy_id)} onAccept={onAcceptEvidence} busy={busy} />}</AnimatePresence>
@@ -22,8 +24,8 @@ export function OpportunitiesPage({ run, onMatch, matching, selected, onSelect, 
   )
 }
 
-function EmptyMatching({ onMatch, matching }: { onMatch: () => void; matching: boolean }) {
-  return <div className="matching-empty"><div className="orbit-mark"><Sparkles /></div><span className="kicker">COMPANY PROFILING HOÀN TẤT</span><h1>Tìm chính sách phù hợp với Passport hiện tại.</h1><p>P2B chỉ đối chiếu policy đã publish. Nếu corpus production chưa có policy, kết quả sẽ để trống thay vì dùng dữ liệu mẫu.</p><button className="button primary" onClick={onMatch} disabled={matching}>{matching ? 'Đang kiểm tra policy…' : 'Bắt đầu policy matching'}<Search /></button><div className="matching-proof"><span><FileSearch />Policy đã review</span><span><Check />Rule engine</span><span><Sparkles />Không dùng demo data</span></div></div>
+function EmptyMatching({ onMatch, matching, error }: { onMatch: () => void; matching: boolean; error?: string }) {
+  return <div className="matching-empty"><div className="orbit-mark"><Sparkles /></div><span className="kicker">COMPANY PROFILING HOÀN TẤT</span><h1>Tìm chính sách phù hợp với Passport hiện tại.</h1><p>P2B chỉ đối chiếu policy đã publish. Nếu corpus production chưa có policy, kết quả sẽ để trống thay vì dùng dữ liệu mẫu.</p>{error && <p className="inline-error" role="alert">{error}</p>}<button className="button primary" onClick={onMatch} disabled={matching}>{matching ? 'Đang kiểm tra policy…' : 'Bắt đầu policy matching'}<Search /></button><div className="matching-proof"><span><FileSearch />Policy đã review</span><span><Check />Rule engine</span><span><Sparkles />Không dùng demo data</span></div></div>
 }
 
 function PolicyDrawer({ result, onClose, onPrepare, enrichment, onEnrich, onAccept, busy }: { result: MatchResult; onClose: () => void; onPrepare: () => void; enrichment?: EnrichmentRun; onEnrich: () => void; onAccept: (id: string) => void; busy: boolean }) {
