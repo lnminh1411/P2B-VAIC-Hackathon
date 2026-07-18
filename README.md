@@ -1,3 +1,13 @@
+<p align="center">
+  <img src="docs/partners-Startup-Wheel-2-1457523754.png" height="80" />
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="docs/image_mq89wa3204e6-708052919_122106772845310881_1859218663441673925_n-3300313680-removebg-preview.png" height="80" />
+</p>
+
+<p align="center">
+  <strong>Project was built in 48 hours for Vietnam AI Innovation Challenge Hackathon</strong>
+</p>
+
 # P2B - Workspace AI-native Hỗ trợ Đăng ký Chương trình Tài trợ Doanh nghiệp
 **P2B** là một không gian làm việc số (workspace) tích hợp trí tuệ nhân tạo (AI-native) toàn diện, giúp doanh nghiệp tự động hóa quy trình phân tích tài liệu pháp lý, đối chiếu tiêu chuẩn tài trợ và chuẩn bị hồ sơ ứng tuyển chất lượng cao.
 
