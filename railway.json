@@ -5,6 +5,7 @@
     "dockerfilePath": "infra/Dockerfile"
   },
   "deploy": {
+    "startCommand": "/usr/local/bin/p2b-entrypoint",
     "preDeployCommand": "/usr/local/bin/p2b-migrate",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 5
