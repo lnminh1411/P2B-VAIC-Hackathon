@@ -56,8 +56,8 @@ type Config struct {
 		Passport(context.Context, string) (domain.Passport, error)
 		Candidates(context.Context, string) ([]passportdomain.Candidate, error)
 		ConfirmField(context.Context, string, string, string, any, int) (domain.Passport, error)
-		SaveMatchRun(context.Context, string, []byte) error
-		LatestMatchRun(context.Context, string) ([]byte, error)
+		SaveMatchRun(ctx context.Context, matchID string, workspaceID string, passportID string, passportVersion int, retrievalMode string, resultsJSON []byte) error
+		LatestMatchRun(ctx context.Context, workspaceID string) (string, int, []byte, time.Time, error)
 	}
 	PolicyStore interface {
 		Policies(context.Context, bool) ([]domain.Policy, error)
@@ -560,8 +560,8 @@ func (s *Server) createMatch(w http.ResponseWriter, r *http.Request) {
 		}
 		matchRun := s.service.MatchPassportHybrid(workspace(r), pass, documents, mode)
 		if s.config.ExtractionStore != nil {
-			runJSON, _ := json.Marshal(matchRun)
-			if err := s.config.ExtractionStore.SaveMatchRun(r.Context(), workspace(r), runJSON); err != nil {
+			resultsJSON, _ := json.Marshal(matchRun.Results)
+			if err := s.config.ExtractionStore.SaveMatchRun(r.Context(), matchRun.ID, workspace(r), pass.ID, pass.Version, mode, resultsJSON); err != nil {
 				slog.Error("failed to save match run cache", "error", err)
 			}
 		}
@@ -570,8 +570,8 @@ func (s *Server) createMatch(w http.ResponseWriter, r *http.Request) {
 	}
 	matchRun := s.service.MatchPassport(workspace(r), pass)
 	if s.config.ExtractionStore != nil {
-		runJSON, _ := json.Marshal(matchRun)
-		if err := s.config.ExtractionStore.SaveMatchRun(r.Context(), workspace(r), runJSON); err != nil {
+		resultsJSON, _ := json.Marshal(matchRun.Results)
+		if err := s.config.ExtractionStore.SaveMatchRun(r.Context(), matchRun.ID, workspace(r), pass.ID, pass.Version, "RULE_ENGINE_ONLY", resultsJSON); err != nil {
 			slog.Error("failed to save match run cache", "error", err)
 		}
 	}
@@ -583,7 +583,7 @@ func (s *Server) getLatestMatch(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"results": []any{}})
 		return
 	}
-	runJSON, err := s.config.ExtractionStore.LatestMatchRun(r.Context(), workspace(r))
+	matchID, passportVersion, resultsJSON, createdAt, err := s.config.ExtractionStore.LatestMatchRun(r.Context(), workspace(r))
 	if err != nil {
 		if errors.Is(err, pipeline.ErrNotFound) {
 			writeJSON(w, http.StatusOK, map[string]any{"results": []any{}})
@@ -593,11 +593,17 @@ func (s *Server) getLatestMatch(w http.ResponseWriter, r *http.Request) {
 		respondServiceError(w, err)
 		return
 	}
-	var matchRun platform.MatchRun
-	if err := json.Unmarshal(runJSON, &matchRun); err != nil {
-		slog.Error("failed to unmarshal match run", "error", err)
+	var results []platform.MatchResult
+	if err := json.Unmarshal(resultsJSON, &results); err != nil {
+		slog.Error("failed to unmarshal match results", "error", err)
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to decode cached match run")
 		return
+	}
+	matchRun := platform.MatchRun{
+		ID:              matchID,
+		PassportVersion: passportVersion,
+		CreatedAt:       createdAt,
+		Results:         results,
 	}
 	s.service.LoadMatchRun(workspace(r), matchRun)
 	writeJSON(w, http.StatusOK, matchRun)

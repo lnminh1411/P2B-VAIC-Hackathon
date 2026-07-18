@@ -396,22 +396,26 @@ func fieldLabel(key string) string {
 	return key
 }
 
-func (s *Store) SaveMatchRun(ctx context.Context, workspaceID string, runJSON []byte) error {
+func (s *Store) SaveMatchRun(ctx context.Context, matchID string, workspaceID string, passportID string, passportVersion int, retrievalMode string, resultsJSON []byte) error {
 	_, err := s.database.Exec(ctx, `
-		INSERT INTO match_runs (workspace_id, run_data, updated_at)
-		VALUES ($1::uuid, $2, now())
-		ON CONFLICT (workspace_id) DO UPDATE SET run_data = EXCLUDED.run_data, updated_at = now()`, workspaceID, runJSON)
+		INSERT INTO match_runs (id, workspace_id, passport_id, passport_version, retrieval_mode, results, created_at)
+		VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, now())`,
+		matchID, workspaceID, passportID, passportVersion, retrievalMode, resultsJSON)
 	return err
 }
 
-func (s *Store) LatestMatchRun(ctx context.Context, workspaceID string) ([]byte, error) {
-	var runJSON []byte
-	err := s.database.QueryRow(ctx, `SELECT run_data FROM match_runs WHERE workspace_id = $1::uuid`, workspaceID).Scan(&runJSON)
+func (s *Store) LatestMatchRun(ctx context.Context, workspaceID string) (id string, passportVersion int, resultsJSON []byte, createdAt time.Time, err error) {
+	err = s.database.QueryRow(ctx, `
+		SELECT id, passport_version, results, created_at
+		FROM match_runs
+		WHERE workspace_id = $1::uuid
+		ORDER BY created_at DESC
+		LIMIT 1`, workspaceID).Scan(&id, &passportVersion, &resultsJSON, &createdAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrNotFound
+			return "", 0, nil, time.Time{}, ErrNotFound
 		}
-		return nil, err
+		return "", 0, nil, time.Time{}, err
 	}
-	return runJSON, nil
+	return id, passportVersion, resultsJSON, createdAt, nil
 }
