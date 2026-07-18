@@ -8,6 +8,18 @@
   <strong>Project was built in 48 hours for Vietnam AI Innovation Challenge Hackathon</strong>
 </p>
 
+---
+
+## 🎯 Đề bài / Problem Statement: Policy & Grant Navigator
+**National Innovation Center (NIC) • Innovation**
+
+An AI assistant that helps startups, FDI enterprises, and high-tech companies discover relevant government policies, incentives, and funding opportunities by:
+*   **Searching and interpreting** applicable laws, decrees, circulars, and government support programs based on the company’s needs.
+*   **Continuously monitoring** policy updates and newly announced funding programs.
+*   **Assisting organizations** in preparing and completing grant and funding application documents.
+
+---
+
 # P2B - Workspace AI-native Hỗ trợ Đăng ký Chương trình Tài trợ Doanh nghiệp
 **P2B** là một không gian làm việc số (workspace) tích hợp trí tuệ nhân tạo (AI-native) toàn diện, giúp doanh nghiệp tự động hóa quy trình phân tích tài liệu pháp lý, đối chiếu tiêu chuẩn tài trợ và chuẩn bị hồ sơ ứng tuyển chất lượng cao.
 
