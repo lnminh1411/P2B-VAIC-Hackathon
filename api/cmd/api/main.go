@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	applicationstore "github.com/p2b/p2b/internal/application"
 	"github.com/p2b/p2b/internal/extraction"
 	"github.com/p2b/p2b/internal/httpapi"
 	"github.com/p2b/p2b/internal/pipeline"
@@ -71,6 +72,18 @@ func main() {
 		}
 		config.UploadSigner = uploadSigner
 		config.ExtractionStore = pipeline.NewStore(database)
+		config.ApplicationStore = applicationstore.NewStore(database)
+		model := env("GEMINI_MODEL", extraction.GeminiStableModel)
+		gemini, geminiErr := extraction.NewGeminiExtractor(os.Getenv("GEMINI_API_KEY"), model, "", nil)
+		if geminiErr != nil {
+			slog.Error("application Gemini configuration failed", "error", geminiErr)
+			os.Exit(1)
+		}
+		config.ApplicationGenerator = gemini
+		config.TemplateConverter = extraction.MarkItDownConverter{
+			Executable: env("MARKITDOWN_BIN", "markitdown"), PDFTextExecutable: env("PDFTEXT_BIN", "pdftotext"),
+			OCRExecutable: env("TESSERACT_BIN", "tesseract"), PDFToImage: env("PDFTOPPM_BIN", "pdftoppm"), OCRLanguages: env("OCR_LANGUAGES", "vie+eng"),
+		}
 		policyStore := policystore.NewStore(database, extraction.ONNXEmbedder{})
 		policyContext, policyCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		publishedPolicies, policyErr := policyStore.Policies(policyContext, true)

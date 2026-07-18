@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	applicationdomain "github.com/p2b/p2b/internal/application"
 	"github.com/p2b/p2b/internal/authn"
 	"github.com/p2b/p2b/internal/domain"
 	passportdomain "github.com/p2b/p2b/internal/passport"
@@ -24,6 +24,8 @@ import (
 )
 
 const maxBodyBytes = 1 << 20
+const maxTemplateFileBytes = 10 << 20
+const maxTemplateBodyBytes = maxTemplateFileBytes + (1 << 20)
 
 type contextKey string
 
@@ -64,6 +66,20 @@ type Config struct {
 	}
 	DocumentSearcher interface {
 		SearchDocuments(context.Context, domain.Passport) ([]domain.DocumentMatch, string, error)
+	}
+	ApplicationStore interface {
+		CreateTemplate(context.Context, string, string, string, string, string) (applicationdomain.Template, error)
+		Templates(context.Context, string) ([]applicationdomain.Template, error)
+		Template(context.Context, string, string) (applicationdomain.Template, error)
+		SaveDraft(context.Context, string, platform.Application) error
+		Draft(context.Context, string, string) (platform.Application, error)
+		LatestDraft(context.Context, string) (platform.Application, error)
+	}
+	ApplicationGenerator interface {
+		GenerateApplication(context.Context, applicationdomain.GenerationRequest) (map[string]string, error)
+	}
+	TemplateConverter interface {
+		Convert(context.Context, string) (string, error)
 	}
 	ReadinessChecker interface {
 		Ping(context.Context) error
@@ -134,10 +150,13 @@ func NewServerWithConfig(service *platform.Service, config Config) http.Handler 
 		r.Get("/checklists/{checklistID}", server.getChecklist)
 		r.Put("/checklists/{checklistID}/items/{itemID}", server.updateChecklistItem)
 		r.Post("/applications", server.createApplication)
+		r.Get("/applications/latest", server.latestApplication)
 		r.Get("/applications/{applicationID}", server.getApplication)
 		r.Put("/applications/{applicationID}", server.updateApplication)
 		r.Post("/applications/{applicationID}/{action}", server.applicationAction)
 		r.Get("/applications/{applicationID}/download", server.downloadApplication)
+		r.Get("/application-templates", server.listApplicationTemplates)
+		r.Post("/application-templates", server.uploadApplicationTemplate)
 		r.Get("/alerts", server.listAlerts)
 		r.Post("/alerts/{alertID}/read", server.readAlert)
 		r.With(server.requireAdmin).Get("/admin/policies", server.adminPolicies)
@@ -309,12 +328,16 @@ func (s *Server) cors(next http.Handler) http.Handler {
 
 func (s *Server) limitBody(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.ContentLength > maxBodyBytes {
-			writeError(w, http.StatusRequestEntityTooLarge, "BODY_TOO_LARGE", "Request body exceeds 1 MB")
+		limit := int64(maxBodyBytes)
+		if r.URL.Path == "/v1/application-templates" {
+			limit = maxTemplateBodyBytes
+		}
+		if r.ContentLength > limit {
+			writeError(w, http.StatusRequestEntityTooLarge, "BODY_TOO_LARGE", "Request body exceeds allowed size")
 			return
 		}
 		if r.Body != nil {
-			r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+			r.Body = http.MaxBytesReader(w, r.Body, limit)
 		}
 		next.ServeHTTP(w, r)
 	})
@@ -739,82 +762,6 @@ func (s *Server) updateChecklistItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, checklist)
-}
-
-func (s *Server) createApplication(w http.ResponseWriter, r *http.Request) {
-	if !requireIdempotency(w, r) {
-		return
-	}
-	var input struct {
-		ChecklistID string `json:"checklist_id"`
-	}
-	if !decodeJSON(w, r, &input) {
-		return
-	}
-	application, err := s.service.CreateApplication(workspace(r), input.ChecklistID)
-	if err != nil {
-		respondServiceError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusCreated, application)
-}
-func (s *Server) getApplication(w http.ResponseWriter, r *http.Request) {
-	application, err := s.service.Application(workspace(r), chi.URLParam(r, "applicationID"))
-	if err != nil {
-		respondServiceError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, application)
-}
-
-func (s *Server) updateApplication(w http.ResponseWriter, r *http.Request) {
-	var input struct {
-		Sections        map[string]string `json:"sections"`
-		ExpectedVersion int               `json:"expected_version"`
-	}
-	if !decodeJSON(w, r, &input) {
-		return
-	}
-	application, err := s.service.UpdateApplication(workspace(r), chi.URLParam(r, "applicationID"), input.Sections, input.ExpectedVersion)
-	if err != nil {
-		respondServiceError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, application)
-}
-
-func (s *Server) applicationAction(w http.ResponseWriter, r *http.Request) {
-	if !requireIdempotency(w, r) {
-		return
-	}
-	action := chi.URLParam(r, "action")
-	if action != "submit" && action != "approve" && action != "generate" {
-		writeError(w, http.StatusNotFound, "NOT_FOUND", "Action not found")
-		return
-	}
-	application, err := s.service.TransitionApplication(workspace(r), chi.URLParam(r, "applicationID"), action)
-	if err != nil {
-		if errors.Is(err, platform.ErrBlocked) {
-			writeJSON(w, http.StatusConflict, map[string]any{"error": map[string]any{"code": "APPROVAL_BLOCKED", "message": "Required evidence is missing", "details": application.BlockingReasons}})
-			return
-		}
-		respondServiceError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, application)
-}
-
-func (s *Server) downloadApplication(w http.ResponseWriter, r *http.Request) {
-	data, filename, err := s.service.ApplicationPDF(workspace(r), chi.URLParam(r, "applicationID"))
-	if err != nil {
-		respondServiceError(w, err)
-		return
-	}
-	w.Header().Set("Content-Type", "application/pdf")
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
-	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(data)
 }
 
 func (s *Server) listAlerts(w http.ResponseWriter, r *http.Request) {
