@@ -3,14 +3,15 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 CREATE TABLE workspaces (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    owner_subject text NOT NULL UNIQUE,
+    owner_subject uuid NOT NULL UNIQUE,
+    display_name text NOT NULL DEFAULT 'Workspace doanh nghiệp',
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE TABLE workspace_members (
     workspace_id uuid NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-    subject text NOT NULL,
+    subject uuid NOT NULL,
     role text NOT NULL CHECK (role IN ('OWNER','ADMIN','MEMBER','REVIEWER')),
     created_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (workspace_id, subject)
@@ -52,7 +53,7 @@ CREATE TABLE passport_versions (
     version integer NOT NULL CHECK (version > 0),
     fields jsonb NOT NULL,
     support_needs text[] NOT NULL DEFAULT '{}',
-    created_by text NOT NULL,
+    created_by uuid NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (passport_id, version)
 );
@@ -101,7 +102,6 @@ CREATE TABLE document_chunks (
     embedding_model text,
     UNIQUE (document_version_id, ordinal)
 );
-CREATE INDEX document_chunks_fts_idx ON document_chunks USING gin(search_vector);
 
 CREATE TABLE policy_versions (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -121,11 +121,10 @@ CREATE TABLE policy_versions (
     source_document_version_ids uuid[] NOT NULL DEFAULT '{}',
     template_ready boolean NOT NULL DEFAULT false,
     verified_at timestamptz,
-    reviewer_subject text,
+    reviewer_subject uuid,
     created_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (policy_key, version)
 );
-CREATE UNIQUE INDEX one_active_policy_version_idx ON policy_versions(policy_key) WHERE lifecycle = 'ACTIVE';
 
 CREATE TABLE match_runs (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -175,7 +174,7 @@ CREATE TABLE application_templates (
     object_key text NOT NULL UNIQUE,
     placeholder_schema jsonb NOT NULL,
     active boolean NOT NULL DEFAULT false,
-    reviewed_by text NOT NULL,
+    reviewed_by uuid NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (policy_version_id, version)
 );
@@ -198,7 +197,7 @@ CREATE TABLE approval_snapshots (
     application_id uuid PRIMARY KEY REFERENCES applications(id) ON DELETE CASCADE,
     payload jsonb NOT NULL,
     payload_hash text NOT NULL,
-    approved_by text NOT NULL,
+    approved_by uuid NOT NULL,
     approved_at timestamptz NOT NULL
 );
 
@@ -228,20 +227,19 @@ CREATE TABLE jobs (
     payload jsonb NOT NULL,
     idempotency_key text NOT NULL UNIQUE,
     status text NOT NULL CHECK (status IN ('QUEUED','LEASED','SUCCEEDED','FAILED','DEAD_LETTER')),
-    attempts integer NOT NULL DEFAULT 0,
-    max_attempts integer NOT NULL DEFAULT 5,
+    attempts integer NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+    max_attempts integer NOT NULL DEFAULT 5 CHECK (max_attempts > 0),
     available_at timestamptz NOT NULL DEFAULT now(),
     lease_expires_at timestamptz,
     last_error text,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX jobs_claim_idx ON jobs(status, available_at) WHERE status IN ('QUEUED','LEASED');
 
 CREATE TABLE audit_events (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     workspace_id uuid REFERENCES workspaces(id) ON DELETE CASCADE,
-    actor_subject text NOT NULL,
+    actor_subject uuid NOT NULL,
     action text NOT NULL,
     aggregate_type text NOT NULL,
     aggregate_id text NOT NULL,
@@ -260,35 +258,30 @@ CREATE TABLE idempotency_keys (
     PRIMARY KEY (workspace_id, key)
 );
 
+CREATE INDEX workspace_members_subject_idx ON workspace_members(subject, workspace_id);
 CREATE INDEX company_sources_workspace_idx ON company_sources(workspace_id, created_at DESC);
+CREATE INDEX passport_versions_created_by_idx ON passport_versions(created_by);
 CREATE INDEX field_candidates_workspace_idx ON field_candidates(workspace_id, created_at DESC);
+CREATE INDEX field_candidates_passport_idx ON field_candidates(passport_id, created_at DESC);
+CREATE INDEX document_versions_document_idx ON document_versions(legal_document_id, version DESC);
+CREATE INDEX document_chunks_version_idx ON document_chunks(document_version_id, ordinal);
+CREATE INDEX document_chunks_fts_idx ON document_chunks USING gin(search_vector);
+CREATE INDEX document_chunks_embedding_idx ON document_chunks USING hnsw (embedding vector_cosine_ops) WHERE embedding IS NOT NULL;
+CREATE UNIQUE INDEX one_active_policy_version_idx ON policy_versions(policy_key) WHERE lifecycle = 'ACTIVE';
 CREATE INDEX match_runs_workspace_idx ON match_runs(workspace_id, created_at DESC);
+CREATE INDEX match_runs_passport_idx ON match_runs(passport_id, passport_version DESC);
+CREATE INDEX enrichment_runs_policy_idx ON enrichment_runs(policy_version_id, created_at DESC);
+CREATE INDEX enrichment_candidates_run_idx ON enrichment_candidates(enrichment_run_id, created_at DESC);
+CREATE INDEX checklists_policy_idx ON checklists(policy_version_id, created_at DESC);
+CREATE INDEX application_templates_policy_idx ON application_templates(policy_version_id, version DESC);
 CREATE INDEX applications_workspace_idx ON applications(workspace_id, updated_at DESC);
+CREATE INDEX applications_checklist_idx ON applications(checklist_id);
+CREATE INDEX applications_policy_idx ON applications(policy_version_id);
+CREATE INDEX applications_template_idx ON applications(template_id);
+CREATE INDEX exports_application_idx ON exports(application_id, created_at DESC);
 CREATE INDEX alerts_workspace_idx ON alerts(workspace_id, created_at DESC);
-
--- Business data is API-only. No anon/authenticated policies are created here;
--- the Railway API uses the service role after it verifies membership itself.
--- Enabling RLS prevents accidental exposure through Supabase's public REST API.
-ALTER TABLE workspaces ENABLE ROW LEVEL SECURITY;
-ALTER TABLE workspace_members ENABLE ROW LEVEL SECURITY;
-ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
-ALTER TABLE company_sources ENABLE ROW LEVEL SECURITY;
-ALTER TABLE passports ENABLE ROW LEVEL SECURITY;
-ALTER TABLE passport_versions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE field_candidates ENABLE ROW LEVEL SECURITY;
-ALTER TABLE legal_documents ENABLE ROW LEVEL SECURITY;
-ALTER TABLE document_versions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE document_chunks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE policy_versions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE match_runs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE enrichment_runs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE enrichment_candidates ENABLE ROW LEVEL SECURITY;
-ALTER TABLE checklists ENABLE ROW LEVEL SECURITY;
-ALTER TABLE application_templates ENABLE ROW LEVEL SECURITY;
-ALTER TABLE applications ENABLE ROW LEVEL SECURITY;
-ALTER TABLE approval_snapshots ENABLE ROW LEVEL SECURITY;
-ALTER TABLE exports ENABLE ROW LEVEL SECURITY;
-ALTER TABLE alerts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE jobs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE audit_events ENABLE ROW LEVEL SECURITY;
-ALTER TABLE idempotency_keys ENABLE ROW LEVEL SECURITY;
+CREATE INDEX jobs_claim_idx ON jobs(status, available_at) WHERE status IN ('QUEUED','LEASED');
+CREATE INDEX jobs_workspace_idx ON jobs(workspace_id, created_at DESC);
+CREATE INDEX audit_events_workspace_idx ON audit_events(workspace_id, created_at DESC);
+CREATE INDEX audit_events_actor_idx ON audit_events(actor_subject, created_at DESC);
+CREATE UNIQUE INDEX audit_events_bootstrap_once_idx ON audit_events(workspace_id, action) WHERE action = 'auth.bootstrap';
