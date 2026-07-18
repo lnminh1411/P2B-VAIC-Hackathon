@@ -1,0 +1,31 @@
+import { Check, Download, FileCheck2, FileText, LockKeyhole, Send, Sparkles } from 'lucide-react'
+import { useState } from 'react'
+import { StatusBadge } from '../../components/StatusBadge'
+import type { Application, Checklist, MatchResult } from '../../lib/types'
+
+export function ApplicationPage({ policy, checklist, application, onCreateChecklist, onMarkAvailable, onCreateApplication, onSave, onAction, onDownload, busy, error }: {
+  policy?: MatchResult; checklist?: Checklist; application?: Application; onCreateChecklist: () => void; onMarkAvailable: (itemId: string) => void; onCreateApplication: () => void; onSave: (sections: Record<string, string>) => void; onAction: (action: 'submit' | 'approve' | 'generate') => void; onDownload: () => void; busy: boolean; error?: string
+}) {
+  if (!policy) return <div className="application-empty"><FileCheck2 /><span className="kicker">APPLICATION PREPARATION</span><h1>Chọn một cơ hội để bắt đầu hồ sơ.</h1><p>Trong trang Cơ hội phù hợp, mở policy có template và chọn “Chuẩn bị hồ sơ”.</p></div>
+  return <><section className="page-heading split-heading"><div><span className="kicker">APPLICATION · {policy.agency}</span><h1>Biến điều kiện thành <em>bộ hồ sơ hành động.</em></h1><p>{policy.title}</p></div>{application && <StatusBadge status={application.status} />}</section>{!checklist ? <StartCard title="Tạo checklist từ policy version" copy="Rule engine xác định tài liệu bắt buộc. AI không tự đánh dấu tài liệu là đã có." action="Tạo checklist" onClick={onCreateChecklist} busy={busy} /> : !application ? <ChecklistReview checklist={checklist} onMarkAvailable={onMarkAvailable} onCreate={onCreateApplication} busy={busy} /> : <ApplicationEditor application={application} onSave={onSave} onAction={onAction} onDownload={onDownload} busy={busy} error={error} />}</>
+}
+
+function StartCard({ title, copy, action, onClick, busy }: { title: string; copy: string; action: string; onClick: () => void; busy: boolean }) {
+  return <section className="start-card panel"><div className="step-orb"><Sparkles /></div><span>BƯỚC 1/3</span><h2>{title}</h2><p>{copy}</p><button className="button primary" onClick={onClick} disabled={busy}>{action}<Check /></button></section>
+}
+
+function ChecklistReview({ checklist, onMarkAvailable, onCreate, busy }: { checklist: Checklist; onMarkAvailable: (itemId: string) => void; onCreate: () => void; busy: boolean }) {
+  const missing = checklist.items.filter(item => item.required && item.status !== 'AVAILABLE')
+  return <div className="application-grid"><section className="panel checklist-panel"><div className="panel-title"><div><span>BƯỚC 1/3 · DOCUMENT CHECKLIST</span><h2>Tài liệu cần chuẩn bị</h2></div><strong>{checklist.items.length - missing.length}/{checklist.items.length}</strong></div><div className="checklist-list">{checklist.items.map(item => <article key={item.id}><div className="doc-icon"><FileText /></div><div><strong>{item.title}</strong><p>{item.description || 'Theo yêu cầu của chương trình'}</p><small>{item.required ? 'Bắt buộc' : 'Tùy chọn'} · {item.field_keys.join(', ')}</small></div><StatusBadge status={item.status} />{item.status !== 'AVAILABLE' && <button className="button secondary" disabled={busy} onClick={() => onMarkAvailable(item.id)}>Xác nhận đã có</button>}</article>)}</div></section><aside className="panel approval-card"><LockKeyhole /><h3>Human approval gate</h3><p>Không thể duyệt và xuất PDF nếu tài liệu bắt buộc chưa có evidence.</p><ul><li><Check />Policy version được pin</li><li><Check />Passport version được pin</li><li><Check />Template đã được admin duyệt</li></ul><button className="button primary wide" disabled={missing.length > 0 || busy} onClick={onCreate}>Soạn hồ sơ nháp</button>{missing.length > 0 && <small>Còn {missing.length} tài liệu bắt buộc</small>}</aside></div>
+}
+
+function ApplicationEditor({ application, onSave, onAction, onDownload, busy, error }: { application: Application; onSave: (sections: Record<string, string>) => void; onAction: (action: 'submit' | 'approve' | 'generate') => void; onDownload: () => void; busy: boolean; error?: string }) {
+  const [sections, setSections] = useState(application.sections)
+  const update = (key: string, value: string) => setSections(current => ({ ...current, [key]: value }))
+  const nextAction = application.status === 'DRAFT_READY' ? 'submit' : application.status === 'PENDING_REVIEW' ? 'approve' : application.status === 'APPROVED' ? 'generate' : undefined
+  const nextLabel = nextAction === 'submit' ? 'Gửi review' : nextAction === 'approve' ? 'Phê duyệt snapshot' : 'Tạo PDF'
+  return <div className="application-grid"><section className="panel editor-panel"><div className="panel-title"><div><span>BƯỚC 2/3 · HUMAN REVIEW</span><h2>Nội dung hồ sơ</h2></div><StatusBadge status={application.status} /></div>{Object.entries(sections).map(([key, value]) => <label key={key}><span>{sectionLabel(key)}</span><textarea value={value} maxLength={10_000} onChange={event => update(key, event.target.value)} disabled={application.status !== 'DRAFT_READY'} /></label>)}<div className="editor-actions"><button className="button secondary" onClick={() => onSave(sections)} disabled={busy || application.status !== 'DRAFT_READY'}>Lưu phiên bản</button>{nextAction && <button className="button primary" onClick={() => onAction(nextAction)} disabled={busy}>{nextLabel}<Send /></button>}{application.status === 'GENERATED' && <button className="button primary" onClick={onDownload}><Download />Tải hồ sơ PDF</button>}</div>{error && <p className="inline-error" role="alert">{error}</p>}</section><aside className="panel snapshot-panel"><FileCheck2 /><h3>Approval snapshot</h3><p>Phiên bản được phê duyệt sẽ đóng băng Passport, policy, citation, checklist và nội dung hồ sơ.</p><dl><div><dt>Passport</dt><dd>v{application.version}</dd></div><div><dt>Policy</dt><dd>Đã pin</dd></div><div><dt>Template</dt><dd>v1 · DOCX</dd></div></dl>{application.blocking_reasons.length > 0 && <div className="blockers"><strong>Điểm chặn</strong>{application.blocking_reasons.map(reason => <span key={reason}>{reason}</span>)}</div>}</aside></div>
+}
+
+function sectionLabel(key: string) { return ({ company_overview: 'Tổng quan doanh nghiệp', support_need: 'Nhu cầu hỗ trợ', proposal: 'Đề xuất sử dụng nguồn hỗ trợ' } as Record<string, string>)[key] ?? key }
+
