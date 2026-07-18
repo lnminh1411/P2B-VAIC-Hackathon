@@ -8,6 +8,7 @@ import { useTranslation } from '../../lib/i18n'
 export function Dashboard({ passport, onNavigate }: { passport: Passport; onNavigate: (page: Page) => void }) {
   const { t } = useTranslation()
   const d = t('dashboard')
+  const fieldsLabels = t('fields') as Record<string, string>
 
   const fields = Object.values(passport.fields)
   const confirmed = fields.filter(field => field.status === 'CONFIRMED').length
@@ -69,7 +70,7 @@ export function Dashboard({ passport, onNavigate }: { passport: Passport; onNavi
           <div className="fact-grid">
             {keyFacts.map(field => (
               <div key={field.key}>
-                <span>{field.label}</span>
+                <span>{fieldsLabels[field.key] || field.label}</span>
                 <strong>{displayValue(field.value, field.data_type)}</strong>
                 <StatusBadge status={field.status} />
               </div>

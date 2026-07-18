@@ -116,8 +116,6 @@ function EmptyMatching({ onMatch, matching, error }: { onMatch: () => void; matc
   const o = t('opportunities')
   return (
     <div className="matching-empty">
-      <div className="orbit-mark"><Sparkles /></div>
-      <span className="kicker">{o.profiling_complete}</span>
       <h1>{o.empty_matching_h1}</h1>
       <p>{o.empty_matching_desc}</p>
       {error && <p className="inline-error" role="alert">{error}</p>}
@@ -125,11 +123,6 @@ function EmptyMatching({ onMatch, matching, error }: { onMatch: () => void; matc
         {matching ? o.busy_matching : o.start_matching}
         <Search />
       </button>
-      <div className="matching-proof">
-        <span><FileSearch />{o.proof_corpus}</span>
-        <span><Check />{o.proof_rules}</span>
-        <span><Sparkles />{o.proof_vector}</span>
-      </div>
     </div>
   )
 }

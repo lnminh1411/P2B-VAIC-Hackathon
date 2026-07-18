@@ -25,6 +25,7 @@ type PassportPageProps = {
 
 export function PassportPage({ passport, candidates, onConfirm, onSaveField, onRefresh, refreshBusy = false, busy }: PassportPageProps) {
   const { t } = useTranslation()
+  const fieldsLabels = t('fields') as Record<string, string>
   const p = t('passport')
 
   const groups: Record<string, string[]> = {
@@ -109,13 +110,13 @@ export function PassportPage({ passport, candidates, onConfirm, onSaveField, onR
                     <div className="field-row" key={field.key}>
                       <button className="field-select" onClick={() => setSelectedKey(field.key)}>
                         <div>
-                          <span>{field.label}</span>
+                          <span>{fieldsLabels[field.key] || field.label}</span>
                           <strong>{displayValue(field.value, field.data_type)}</strong>
                         </div>
                         <ChevronRight />
                       </button>
                       <StatusBadge status={field.status} />
-                      <button className="field-edit" aria-label={`Chỉnh sửa ${field.label}`} onClick={() => edit(field)}>
+                      <button className="field-edit" aria-label={`Chỉnh sửa ${fieldsLabels[field.key] || field.label}`} onClick={() => edit(field)}>
                         <PencilLine />
                       </button>
                     </div>
@@ -191,18 +192,19 @@ function companyMonogram(companyName: string) {
 
 function EvidencePanel({ field, editing, busy, onEdit, onCancel, onSave }: { field: PassportField; editing: boolean; busy: boolean; onEdit: () => void; onCancel: () => void; onSave: (fieldKey: string, value: unknown) => Promise<void> }) {
   const { t } = useTranslation()
+  const fieldsLabels = t('fields') as Record<string, string>
   const p = t('passport')
   return (
     <aside className="panel evidence-panel">
       <div className="evidence-head">
         <span>{editing ? p.edit_title : ''}</span>
-        {editing ? <button aria-label="Hủy chỉnh sửa" onClick={onCancel}><X /></button> : <button aria-label={`Chỉnh sửa dữ kiện ${field.label}`} onClick={onEdit}><PencilLine /></button>}
+        {editing ? <button aria-label="Hủy chỉnh sửa" onClick={onCancel}><X /></button> : <button aria-label={`Chỉnh sửa dữ kiện ${fieldsLabels[field.key] || field.label}`} onClick={onEdit}><PencilLine /></button>}
       </div>
       {editing ? (
         <FieldEditor field={field} busy={busy} onCancel={onCancel} onSave={onSave} />
       ) : (
         <>
-          <h3>{field.label}</h3>
+          <h3>{fieldsLabels[field.key] || field.label}</h3>
           <strong className="evidence-value">{displayValue(field.value, field.data_type)}</strong>
           <StatusBadge status={field.status} />
           <div className="confidence-line">
@@ -230,6 +232,7 @@ function EvidencePanel({ field, editing, busy, onEdit, onCancel, onSave }: { fie
 
 function FieldEditor({ field, busy, onCancel, onSave }: { field: PassportField; busy: boolean; onCancel: () => void; onSave: (fieldKey: string, value: unknown) => Promise<void> }) {
   const { t } = useTranslation()
+  const fieldsLabels = t('fields') as Record<string, string>
   const p = t('passport')
   const [draft, setDraft] = useState(toDraft(field.value, field.data_type))
   const [saving, setSaving] = useState(false)
@@ -251,8 +254,8 @@ function FieldEditor({ field, busy, onCancel, onSave }: { field: PassportField; 
 
   return (
     <form className="field-editor" onSubmit={submit}>
-      <h3>{field.label}</h3>
-      <label htmlFor={inputId}>{p.editor_value_label}{field.label}</label>
+      <h3>{fieldsLabels[field.key] || field.label}</h3>
+      <label htmlFor={inputId}>{p.editor_value_label}{fieldsLabels[field.key] || field.label}</label>
       {field.data_type === 'boolean' ? (
         <select id={inputId} value={draft} onChange={event => setDraft(event.target.value)}>
           <option value="">{p.editor_select_placeholder}</option>

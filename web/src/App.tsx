@@ -79,7 +79,7 @@ export default function App() {
   if (workspacesQuery.error) return <ErrorState message={message(workspacesQuery.error, pageStateLabels.unknown_error)} onRetry={() => workspacesQuery.refetch()} />
   if (passportQuery.error) return <ErrorState message={message(passportQuery.error, pageStateLabels.unknown_error)} onRetry={() => passportQuery.refetch()} />
   const passport = passportQuery.data
-  const shellProps = { workspaces, activeWorkspaceId: selectedWorkspaceId, onWorkspaceChange: (workspaceId: string) => { setApiWorkspaceId(workspaceId); setActiveWorkspaceId(workspaceId); setPage('overview') }, onCreateWorkspace: () => { const name = window.prompt(shellLabels.create_workspace_prompt)?.trim(); if (name) createWorkspaceMutation.mutate(name) } }
+  const shellProps = { workspaces, activeWorkspaceId: selectedWorkspaceId, onWorkspaceChange: (workspaceId: string) => { setApiWorkspaceId(workspaceId); setActiveWorkspaceId(workspaceId); setPage('overview') }, onCreateWorkspace: () => { createWorkspaceMutation.mutate(shellLabels.unnamed_workspace) } }
   if (!passport || !passport.company_name) return <Shell page="overview" companyName={passport?.company_name ?? ''} {...shellProps} onNavigate={setPage}><Onboarding onSubmit={input => buildMutation.mutate(input)} busy={buildMutation.isPending} error={buildMutation.error ? message(buildMutation.error, pageStateLabels.unknown_error) : undefined} /></Shell>
 
   const saveField = async (fieldKey: string, value: unknown) => {
