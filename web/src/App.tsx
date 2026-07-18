@@ -7,6 +7,7 @@ import { AlertsPage } from './features/alerts/AlertsPage'
 import { ApplicationPage } from './features/application/ApplicationPage'
 import { Dashboard } from './features/dashboard/Dashboard'
 import { Onboarding } from './features/onboarding/Onboarding'
+import { buildPassportPayload, type CompanyOnboardingInput } from './features/onboarding/buildPassportPayload'
 import { OpportunitiesPage } from './features/opportunities/OpportunitiesPage'
 import { PassportPage } from './features/passport/PassportPage'
 import { api, ApiError } from './lib/api'
@@ -28,9 +29,9 @@ export default function App() {
   const adminQuery = useQuery({ queryKey: ['admin-policies'], queryFn: api.adminPolicies, enabled: page === 'admin' })
 
   const buildMutation = useMutation({
-    mutationFn: async (input: { company_name: string; website: string; support_needs: string[]; files: File[] }) => {
+    mutationFn: async (input: CompanyOnboardingInput) => {
       await Promise.all(input.files.map(file => api.uploadPDF(file)))
-      return api.buildPassport({ ...input, source_names: input.files.map(file => file.name) })
+      return api.buildPassport(buildPassportPayload(input))
     },
     onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['passport'] }), queryClient.invalidateQueries({ queryKey: ['candidates'] })]); setPage('passport') },
   })

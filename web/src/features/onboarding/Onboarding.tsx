@@ -1,10 +1,11 @@
 import { ArrowRight, FileText, Link2, LockKeyhole, Sparkles, UploadCloud } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useMemo, useState, type FormEvent } from 'react'
+import type { CompanyOnboardingInput } from './buildPassportPayload'
 
 const needs = ['Vốn ưu đãi', 'Thuế', 'R&D', 'Chuyển đổi số', 'Đào tạo', 'Công nghệ xanh', 'Đổi mới sáng tạo']
 
-export function Onboarding({ onSubmit, busy, error }: { onSubmit: (data: { company_name: string; website: string; support_needs: string[]; files: File[] }) => void; busy: boolean; error?: string }) {
+export function Onboarding({ onSubmit, busy, error }: { onSubmit: (data: CompanyOnboardingInput) => void; busy: boolean; error?: string }) {
   const [company, setCompany] = useState('')
   const [website, setWebsite] = useState('')
   const [selected, setSelected] = useState<string[]>([])
