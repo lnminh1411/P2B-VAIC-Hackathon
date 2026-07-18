@@ -26,16 +26,14 @@ export function Onboarding({ onSubmit, busy, error }: { onSubmit: (data: Company
   }
 
   return (
-    <div className="onboarding-shell">
-      <header className="onboarding-header"><div className="brand-mark"><Sparkles /></div><strong>P2B</strong><span>Policy to Business</span><div className="header-trust"><LockKeyhole />{onboardingLabels.data_protected}</div></header>
-      <main className="onboarding-grid">
-        <motion.section className="onboarding-copy" initial={{ opacity: 0, x: -18 }} animate={{ opacity: 1, x: 0 }}>
-          <span className="kicker">{onboardingLabels.kicker}</span>
-          <h1>{onboardingLabels.h1}</h1>
-          <p>{onboardingLabels.p}</p>
-          <div className="proof-row"><span><b>01</b>{onboardingLabels.proof_1}</span><span><b>02</b>{onboardingLabels.proof_2}</span><span><b>03</b>{onboardingLabels.proof_3}</span></div>
-          <blockquote><strong>51,3%</strong><span>{onboardingLabels.quote_text}</span><cite>{onboardingLabels.quote_author}</cite></blockquote>
-        </motion.section>
+    <div className="page-wrap onboarding-wrap">
+      <section className="page-heading text-center">
+        <span className="kicker">{onboardingLabels.kicker}</span>
+        <h1 className="onboarding-title">{onboardingLabels.h1}</h1>
+        <p className="onboarding-desc">{onboardingLabels.p}</p>
+      </section>
+
+      <div className="onboarding-content-container">
         <motion.form className="onboarding-form" onSubmit={submit} initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .08 }}>
           <div className="form-heading"><span>{onboardingLabels.form_title}</span><small>{onboardingLabels.form_subtitle}</small></div>
           <label>{onboardingLabels.company_name_label}<input value={company} onChange={event => setCompany(event.target.value)} maxLength={200} required /></label>
@@ -48,7 +46,10 @@ export function Onboarding({ onSubmit, busy, error }: { onSubmit: (data: Company
           <button className="button primary wide" disabled={!canSubmit || busy}>{busy ? onboardingLabels.busy_text : onboardingLabels.submit_text}<ArrowRight /></button>
           <p className="form-note">{onboardingLabels.form_note}</p>
         </motion.form>
-      </main>
+
+        <div className="proof-row"><span><b>01</b>{onboardingLabels.proof_1}</span><span><b>02</b>{onboardingLabels.proof_2}</span><span><b>03</b>{onboardingLabels.proof_3}</span></div>
+        <blockquote><strong>51,3%</strong><span>{onboardingLabels.quote_text}</span><cite>{onboardingLabels.quote_author}</cite></blockquote>
+      </div>
     </div>
   )
 }
