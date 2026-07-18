@@ -8,6 +8,14 @@ CREATE TABLE workspaces (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE workspace_members (
+    workspace_id uuid NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    subject text NOT NULL,
+    role text NOT NULL CHECK (role IN ('OWNER','ADMIN','MEMBER','REVIEWER')),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (workspace_id, subject)
+);
+
 CREATE TABLE companies (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     workspace_id uuid NOT NULL UNIQUE REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -241,9 +249,46 @@ CREATE TABLE audit_events (
     created_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE idempotency_keys (
+    workspace_id uuid NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    key text NOT NULL,
+    request_hash text NOT NULL,
+    response_status integer,
+    response_body jsonb,
+    expires_at timestamptz NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (workspace_id, key)
+);
+
 CREATE INDEX company_sources_workspace_idx ON company_sources(workspace_id, created_at DESC);
 CREATE INDEX field_candidates_workspace_idx ON field_candidates(workspace_id, created_at DESC);
 CREATE INDEX match_runs_workspace_idx ON match_runs(workspace_id, created_at DESC);
 CREATE INDEX applications_workspace_idx ON applications(workspace_id, updated_at DESC);
 CREATE INDEX alerts_workspace_idx ON alerts(workspace_id, created_at DESC);
 
+-- Business data is API-only. No anon/authenticated policies are created here;
+-- the Railway API uses the service role after it verifies membership itself.
+-- Enabling RLS prevents accidental exposure through Supabase's public REST API.
+ALTER TABLE workspaces ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workspace_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE company_sources ENABLE ROW LEVEL SECURITY;
+ALTER TABLE passports ENABLE ROW LEVEL SECURITY;
+ALTER TABLE passport_versions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE field_candidates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE legal_documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE document_versions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE document_chunks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE policy_versions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE match_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE enrichment_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE enrichment_candidates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE checklists ENABLE ROW LEVEL SECURITY;
+ALTER TABLE application_templates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE applications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE approval_snapshots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE exports ENABLE ROW LEVEL SECURITY;
+ALTER TABLE alerts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE jobs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE idempotency_keys ENABLE ROW LEVEL SECURITY;
