@@ -5,6 +5,7 @@ const WORKSPACE = 'p2b-local-development'
 const DEV_AUTH = import.meta.env.VITE_DEV_AUTH === 'true'
 let accessToken: string | undefined
 let activeWorkspaceId: string | undefined
+let unauthorizedHandler: (() => void) | undefined
 
 export function setApiAccessToken(token?: string) {
   accessToken = token
@@ -15,6 +16,10 @@ export function setApiWorkspaceId(workspaceId?: string) {
 }
 
 export function getApiWorkspaceId() { return activeWorkspaceId }
+
+export function setApiUnauthorizedHandler(handler?: () => void) {
+  unauthorizedHandler = handler
+}
 
 class ApiError extends Error {
   constructor(message: string, public status: number, public code?: string, public details?: string[]) { super(message) }
@@ -30,6 +35,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, { ...init, headers })
   if (!response.ok) {
     const payload = await response.json().catch(() => ({ error: { message: 'Không thể kết nối hệ thống' } }))
+    if (response.status === 401) unauthorizedHandler?.()
     throw new ApiError(payload.error?.message ?? 'Yêu cầu thất bại', response.status, payload.error?.code, payload.error?.details)
   }
   if (response.status === 204) return undefined as T

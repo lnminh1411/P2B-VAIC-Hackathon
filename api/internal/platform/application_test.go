@@ -54,3 +54,25 @@ func TestCreateChecklistRequiresEveryReferencedField(t *testing.T) {
 	}
 	t.Fatal("registration checklist item not found")
 }
+
+func TestCreateChecklistReturnsEmptyFieldKeysCollection(t *testing.T) {
+	service := NewService([]domain.Policy{{
+		ID: "document-policy", Version: 1, Title: "Document policy", Lifecycle: "ACTIVE",
+		Checklist: []domain.ChecklistTemplateItem{{Key: "manual-review", Title: "Manual review", Required: true}},
+	}})
+	workspaceID := "checklist-empty-fields"
+	if _, err := service.BuildPassport(workspaceID, BuildPassportInput{CompanyName: "Công ty kiểm thử"}); err != nil {
+		t.Fatalf("build passport: %v", err)
+	}
+
+	checklist, err := service.CreateChecklist(workspaceID, "document-policy")
+	if err != nil {
+		t.Fatalf("create checklist: %v", err)
+	}
+	if len(checklist.Items) != 1 {
+		t.Fatalf("expected one checklist item, got %d", len(checklist.Items))
+	}
+	if checklist.Items[0].FieldKeys == nil {
+		t.Fatal("field_keys must be an empty slice, not null")
+	}
+}

@@ -20,17 +20,18 @@ func (s *Service) CreateChecklist(workspaceID, policyID string) (Checklist, erro
 	}
 	checklist := Checklist{ID: uuid.NewString(), PolicyID: policy.ID, PolicyVersion: policy.Version, Version: 1, UpdatedAt: time.Now().UTC()}
 	for _, template := range policy.Checklist {
+		fieldKeys := append([]string{}, template.FieldKeys...)
 		status := "AVAILABLE"
-		if len(template.FieldKeys) == 0 {
+		if len(fieldKeys) == 0 {
 			status = "MISSING"
 		}
-		for _, fieldKey := range template.FieldKeys {
+		for _, fieldKey := range fieldKeys {
 			if field, exists := state.Passport.Fields[fieldKey]; !exists || field.Status != domain.FieldConfirmed {
 				status = "MISSING"
 				break
 			}
 		}
-		checklist.Items = append(checklist.Items, ChecklistItem{ID: uuid.NewString(), TemplateKey: template.Key, Title: template.Title, Description: template.Description, Required: template.Required, Status: status, FieldKeys: template.FieldKeys})
+		checklist.Items = append(checklist.Items, ChecklistItem{ID: uuid.NewString(), TemplateKey: template.Key, Title: template.Title, Description: template.Description, Required: template.Required, Status: status, FieldKeys: fieldKeys})
 	}
 	state.Checklists[checklist.ID] = checklist
 	return checklist, nil

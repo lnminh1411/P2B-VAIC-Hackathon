@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { ApplicationPage } from './ApplicationPage'
-import type { Application, MatchResult } from '../../lib/types'
+import type { Application, Checklist, MatchResult } from '../../lib/types'
 
 const policy = {
   title: 'Chương trình chuyển đổi xanh',
@@ -51,5 +51,31 @@ describe('ApplicationPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Nội dung hồ sơ' })).toBeInTheDocument()
     expect(screen.getByText('Passport').parentElement).toHaveTextContent('v8')
+  })
+
+  it('renders checklist items from legacy payloads whose field keys are null', () => {
+    const checklist = {
+      id: 'checklist-legacy',
+      policy_id: 'policy-1',
+      policy_version: 1,
+      version: 1,
+      items: [{ id: 'item-1', title: 'Đối chiếu văn bản', description: '', required: true, status: 'MISSING', field_keys: null }],
+      updated_at: new Date().toISOString(),
+    } as unknown as Checklist
+
+    render(<ApplicationPage
+      policy={policy}
+      checklist={checklist}
+      onCreateChecklist={vi.fn()}
+      onMarkAvailable={vi.fn()}
+      onCreateApplication={vi.fn()}
+      onSave={vi.fn()}
+      onAction={vi.fn()}
+      onDownload={vi.fn()}
+      busy={false}
+    />)
+
+    expect(screen.getByText('Đối chiếu văn bản')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Xác nhận đã có' })).toBeEnabled()
   })
 })

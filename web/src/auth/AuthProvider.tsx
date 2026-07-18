@@ -1,6 +1,6 @@
 import type { Session } from '@supabase/supabase-js'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { setApiAccessToken, setApiWorkspaceId } from '../lib/api'
+import { setApiAccessToken, setApiUnauthorizedHandler, setApiWorkspaceId } from '../lib/api'
 import { AuthBoundary } from './AuthBoundary'
 import { devAuthEnabled, supabaseConfigured } from './config'
 import { AuthContext } from './context'
@@ -45,6 +45,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       active = false
       listener.subscription.unsubscribe()
     }
+  }, [applySession])
+
+  useEffect(() => {
+    if (devAuthEnabled) return
+    setApiUnauthorizedHandler(() => {
+      setError('Phiên đăng nhập đã hết hạn hoặc không còn hợp lệ. Vui lòng đăng nhập lại.')
+      applySession(null)
+      void getSupabase()?.auth.signOut()
+    })
+    return () => setApiUnauthorizedHandler(undefined)
   }, [applySession])
 
   const googleSignIn = useCallback(async () => {
