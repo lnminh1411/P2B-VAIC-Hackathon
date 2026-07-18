@@ -354,6 +354,24 @@ func (s *Store) ConfirmField(ctx context.Context, workspaceID, actorSubject, fie
 			return domain.Passport{}, err
 		}
 	}
+	if fieldKey == "legal_name" {
+		if _, err = transaction.Exec(ctx, `
+			INSERT INTO companies (workspace_id, legal_name, support_needs)
+			VALUES ($1::uuid, $2, '{}')
+			ON CONFLICT (workspace_id) DO UPDATE SET legal_name = EXCLUDED.legal_name, updated_at = now()`, workspaceID, fmt.Sprint(value)); err != nil {
+			return domain.Passport{}, err
+		}
+		if _, err = transaction.Exec(ctx, `UPDATE workspaces SET display_name = $2, updated_at = now() WHERE id = $1::uuid`, workspaceID, fmt.Sprint(value)); err != nil {
+			return domain.Passport{}, err
+		}
+	} else if fieldKey == "website" {
+		if _, err = transaction.Exec(ctx, `
+			INSERT INTO companies (workspace_id, legal_name, website, support_needs)
+			VALUES ($1::uuid, 'Chưa có tên', NULLIF($2, ''), '{}')
+			ON CONFLICT (workspace_id) DO UPDATE SET website = EXCLUDED.website, updated_at = now()`, workspaceID, fmt.Sprint(value)); err != nil {
+			return domain.Passport{}, err
+		}
+	}
 	if err = transaction.Commit(ctx); err != nil {
 		return domain.Passport{}, err
 	}
