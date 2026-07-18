@@ -2,14 +2,13 @@ import os
 import sys
 import json
 import urllib.request
-import numpy as np
-
 # Ensure dependencies are available
 try:
+    import numpy as np
     import onnxruntime as ort
     from tokenizers import Tokenizer
 except ImportError:
-    print(json.dumps({"error": "Missing dependencies: run pip install onnxruntime tokenizers"}))
+    print(json.dumps({"error": "Missing dependencies: run pip install onnxruntime tokenizers numpy"}))
     sys.exit(1)
 
 CACHE_DIR = os.environ.get("P2B_MODEL_CACHE_DIR", os.path.expanduser("~/.cache/p2b-embeddings"))
