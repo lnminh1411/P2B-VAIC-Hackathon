@@ -25,7 +25,6 @@ describe('OpportunitiesPage', () => {
     render(<OpportunitiesPage {...props} run={run} />)
 
     expect(screen.getByText('Chưa tìm thấy kết quả phù hợp')).toBeInTheDocument()
-    expect(screen.getByText('NO PUBLISHED CORPUS')).toBeInTheDocument()
   })
 
   it('renders a retrieved legal document with a safe source link and no fake deadline', () => {

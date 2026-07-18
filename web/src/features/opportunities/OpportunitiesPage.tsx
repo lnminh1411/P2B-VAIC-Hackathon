@@ -22,9 +22,8 @@ export function OpportunitiesPage({ run, onMatch, matching, selected, onSelect, 
     <>
       <section className="page-heading split-heading">
         <div>
-          <span className="kicker">POLICY MATCHING · PASSPORT v{run.passport_version}</span>
+          <span className="kicker">POLICY MATCHING</span>
           <h1>{o.h1}<em>{o.h1_em}</em></h1>
-          <p>{o.desc}</p>
         </div>
         <button className="button secondary" onClick={onMatch} disabled={matching}><Sparkles />{o.rerun_btn}</button>
       </section>
@@ -37,7 +36,6 @@ export function OpportunitiesPage({ run, onMatch, matching, selected, onSelect, 
           <input value={query} onChange={event => setQuery(event.target.value)} placeholder={o.search_placeholder} aria-label="Tìm cơ hội" />
         </div>
         <span><b>{results.length}</b>{o.results_suffix}</span>
-        <span className="retrieval-mode">{retrievalMode.replaceAll('_', ' ')}</span>
       </div>
       
       <div className="opportunity-layout">

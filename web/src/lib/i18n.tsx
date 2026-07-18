@@ -31,7 +31,7 @@ const translations = {
       add_business: 'Thêm doanh nghiệp',
     },
     dashboard: {
-      kicker: 'GOOD MORNING · WORKSPACE OVERVIEW',
+      kicker: 'CHÀO BUỔI SÁNG · TỔNG QUAN WORKSPACE',
       h1: 'Cơ hội phù hợp bắt đầu từ ',
       h1_em: 'dữ liệu đáng tin.',
       p: 'Passport đang được theo dõi. P2B chỉ dùng dữ kiện đã xác nhận để kiểm tra điều kiện.',
@@ -695,6 +695,10 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     return saved === 'en' ? 'en' : 'vi'
   })
 
+  useEffect(() => {
+    document.documentElement.lang = lang
+  }, [lang])
+
   const setLang = (nextLang: Lang) => {
     setLangState(nextLang)
     localStorage.setItem('p2b_lang', nextLang)
@@ -714,7 +718,13 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 export function useTranslation() {
   const context = useContext(I18nContext)
   if (!context) {
-    throw new Error('useTranslation must be used within I18nProvider')
+    return {
+      lang: 'vi' as const,
+      setLang: () => {},
+      t: <T extends keyof Translations>(section: T): Translations[T] => {
+        return translations.vi[section]
+      }
+    }
   }
   return context
 }
