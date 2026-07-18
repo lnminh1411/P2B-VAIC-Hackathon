@@ -44,7 +44,7 @@ describe('OpportunitiesPage', () => {
 
 	render(<OpportunitiesPage {...props} run={run} selected={run.results[0]} />)
 
-	expect(screen.getByText('Không thời hạn')).toBeInTheDocument()
+	expect(screen.getByText('Chưa xác định hạn nộp')).toBeInTheDocument()
 	expect(screen.getByRole('link', { name: /Mở văn bản nguồn/ })).toHaveAttribute('href', 'https://vbpl.vn/van-ban/1')
 	expect(screen.getByRole('heading', { name: 'Tiêu chí cần xác minh' })).toBeInTheDocument()
 	expect(screen.getByText('Xác nhận doanh nghiệp thuộc phạm vi áp dụng')).toBeInTheDocument()

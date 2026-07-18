@@ -250,15 +250,10 @@ func (s *Service) LoadMatchRun(workspaceID string, run MatchRun) {
 	// Also register retrieved policies so checklist/document loading can find them
 	for _, result := range run.Results {
 		if result.RetrievalMode != "RULE_ENGINE_ONLY" && result.RetrievalMode != "" {
-			state.RetrievedPolicies[result.PolicyID] = domain.Policy{
-				ID:            result.PolicyID,
-				Version:       result.PolicyVersion,
-				Title:         result.Title,
-				Agency:        result.Agency,
-				Benefit:       result.Benefit,
-				TemplateReady: result.TemplateReady,
-				Lifecycle:     "ACTIVE",
-			}
+			state.RetrievedPolicies[result.PolicyID] = retrievedDocumentPolicy(domain.DocumentMatch{
+				ID: result.PolicyID, Version: result.PolicyVersion, Title: result.Title,
+				Agency: result.Agency, SourceURL: result.SourceURL,
+			}, result.Benefit)
 		}
 	}
 }

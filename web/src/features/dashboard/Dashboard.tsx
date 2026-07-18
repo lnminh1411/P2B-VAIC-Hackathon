@@ -1,11 +1,18 @@
 import { ArrowUpRight, BellRing, Building2, CheckCircle2, CircleDashed, FileText, SearchCheck, Sparkles } from 'lucide-react'
 import type { Page } from '../../components/Shell'
 import { StatusBadge } from '../../components/StatusBadge'
-import { displayValue } from '../../lib/format'
-import type { Passport } from '../../lib/types'
+import { displayValue, formatDate } from '../../lib/format'
+import type { Application, Checklist, MatchResult, MatchRun, Passport } from '../../lib/types'
 import { useTranslation } from '../../lib/i18n'
 
-export function Dashboard({ passport, onNavigate }: { passport: Passport; onNavigate: (page: Page) => void }) {
+export function Dashboard({ passport, matchRun, selectedPolicy, checklist, application, onNavigate }: {
+  passport: Passport
+  matchRun?: MatchRun
+  selectedPolicy?: MatchResult
+  checklist?: Checklist
+  application?: Application
+  onNavigate: (page: Page) => void
+}) {
   const { t } = useTranslation()
   const d = t('dashboard')
   const fieldsLabels = t('fields') as Record<string, string>
@@ -19,6 +26,12 @@ export function Dashboard({ passport, onNavigate }: { passport: Passport; onNavi
   const action1Desc = fields.length === 0
     ? d.action_1_desc_empty
     : d.action_1_desc_pending.replace('{count}', String(pendingCount))
+  const matchedCount = matchRun?.results?.length
+  const nearestDeadline = (matchRun?.results ?? [])
+    .map(result => ({ value: result.deadline, timestamp: Date.parse(result.deadline) }))
+    .filter(item => item.value && !item.value.startsWith('0001-') && Number.isFinite(item.timestamp) && item.timestamp >= Date.now())
+    .sort((left, right) => left.timestamp - right.timestamp)[0]?.value
+  const hasApplicationWork = Boolean(selectedPolicy || checklist || application)
 
   return (
     <>
@@ -39,18 +52,18 @@ export function Dashboard({ passport, onNavigate }: { passport: Passport; onNavi
         </div>
         <div>
           <span>{d.metric_opportunities}</span>
-          <strong>—</strong>
-          <small><CircleDashed />{d.metric_opportunities_desc}</small>
+          <strong>{matchedCount ?? '—'}</strong>
+          <small><CircleDashed />{matchedCount === undefined ? d.metric_opportunities_desc : d.metric_opportunities_matched}</small>
         </div>
         <div>
           <span>{d.metric_deadline}</span>
-          <strong>—</strong>
-          <small><BellRing />{d.metric_deadline_desc}</small>
+          <strong>{nearestDeadline ? formatDate(nearestDeadline) : matchRun ? d.metric_deadline_unknown_value : '—'}</strong>
+          <small><BellRing />{nearestDeadline ? d.metric_deadline_verified : matchRun ? d.metric_deadline_unverified : d.metric_deadline_desc}</small>
         </div>
         <div>
           <span>{d.metric_application}</span>
-          <strong>—</strong>
-          <small><FileText />{d.metric_application_desc}</small>
+          <strong>{hasApplicationWork ? 1 : '—'}</strong>
+          <small><FileText />{selectedPolicy?.title ?? (hasApplicationWork ? d.metric_application_active : d.metric_application_desc)}</small>
         </div>
       </section>
       

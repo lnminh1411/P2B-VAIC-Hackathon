@@ -90,11 +90,19 @@ func (s *Service) CreateApplication(workspaceID, checklistID string) (Applicatio
 	if !ok {
 		return Application{}, ErrNotFound
 	}
-	application := Application{ID: uuid.NewString(), ChecklistID: checklistID, PolicyID: policy.ID, PassportVersion: state.Passport.Version, PolicyVersion: policy.Version, TemplateVersion: 1, Version: 1, Status: "DRAFT_READY", UpdatedAt: time.Now().UTC(), Sections: map[string]string{
+	sections := map[string]string{
 		"company_overview": fmt.Sprintf("%s đề nghị tham gia %s.", state.Passport.CompanyName, policy.Title),
 		"support_need":     strings.Join(state.Passport.SupportNeeds, ", "),
 		"proposal":         "Doanh nghiệp sẽ sử dụng nguồn hỗ trợ để hoàn thiện sản phẩm, đo lường tác động và mở rộng thị trường.",
-	}}
+	}
+	if isRetrievedWorkingPolicy(policy) {
+		sections = map[string]string{
+			"company_overview": companyOverview(state.Passport),
+			"support_need":     fmt.Sprintf("Đối chiếu phạm vi áp dụng, điều kiện, ngoại lệ, hiệu lực và tài liệu bắt buộc của văn bản %s.", policy.Title),
+			"proposal":         fmt.Sprintf("Doanh nghiệp và người phụ trách pháp chế thực hiện đối chiếu văn bản %s; kết quả là cơ sở rà soát nội bộ, không phải kết luận đủ điều kiện hoặc mẫu hồ sơ chính thức.", policy.Title),
+		}
+	}
+	application := Application{ID: uuid.NewString(), ChecklistID: checklistID, PolicyID: policy.ID, PassportVersion: state.Passport.Version, PolicyVersion: policy.Version, TemplateVersion: 1, Version: 1, Status: "DRAFT_READY", UpdatedAt: time.Now().UTC(), Sections: sections}
 	application.BlockingReasons = applicationBlockers(checklist, policy.TemplateReady)
 	state.Applications[application.ID] = application
 	return application, nil
@@ -194,11 +202,15 @@ func (s *Service) ApplicationPDF(workspaceID, id string) ([]byte, string, error)
 	if !ok {
 		return nil, "", ErrNotFound
 	}
-	lines := []string{"P2B APPLICATION PACKAGE", "Company: " + state.Passport.CompanyName, "Policy: " + policy.Title, "Agency: " + policy.Agency, "Status: Human reviewed", ""}
-	for _, key := range []string{"company_overview", "support_need", "proposal"} {
-		lines = append(lines, key+": "+application.Sections[key])
+	checklist, ok := state.Checklists[application.ChecklistID]
+	if !ok {
+		return nil, "", ErrNotFound
 	}
-	return simplePDF(lines), "P2B-application-" + id + ".pdf", nil
+	pdf, err := renderApplicationMinutes(newApplicationMinutes(state.Passport, policy, application, checklist))
+	if err != nil {
+		return nil, "", err
+	}
+	return pdf, "P2B-bien-ban-" + id + ".pdf", nil
 }
 
 func (s *Service) Alerts(workspaceID string) []Alert {
@@ -233,42 +245,22 @@ func applicationBlockers(checklist Checklist, templateReady bool) []string {
 	return reasons
 }
 
-func simplePDF(lines []string) []byte {
-	content := "BT /F1 11 Tf 50 790 Td 14 TL "
-	for index, line := range lines {
-		if index > 0 {
-			content += "T* "
+func isRetrievedWorkingPolicy(policy domain.Policy) bool {
+	for _, item := range policy.Checklist {
+		if item.Key == "applicability_review" || item.Key == "required_documents_review" {
+			return true
 		}
-		content += "(" + pdfEscape(asciiFallback(line)) + ") Tj "
 	}
-	content += "ET"
-	objects := []string{
-		"<< /Type /Catalog /Pages 2 0 R >>",
-		"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-		"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
-		fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", len(content), content),
-		"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-	}
-	result := "%PDF-1.4\n"
-	offsets := make([]int, len(objects)+1)
-	for index, object := range objects {
-		offsets[index+1] = len(result)
-		result += fmt.Sprintf("%d 0 obj\n%s\nendobj\n", index+1, object)
-	}
-	xref := len(result)
-	result += fmt.Sprintf("xref\n0 %d\n0000000000 65535 f \n", len(objects)+1)
-	for index := 1; index <= len(objects); index++ {
-		result += fmt.Sprintf("%010d 00000 n \n", offsets[index])
-	}
-	result += fmt.Sprintf("trailer << /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF", len(objects)+1, xref)
-	return []byte(result)
+	return false
 }
 
-func pdfEscape(value string) string {
-	return strings.NewReplacer("\\", "\\\\", "(", "\\(", ")", "\\)").Replace(value)
-}
-
-func asciiFallback(value string) string {
-	replacer := strings.NewReplacer("Đ", "D", "đ", "d", "á", "a", "à", "a", "ả", "a", "ã", "a", "ạ", "a", "ă", "a", "â", "a", "é", "e", "è", "e", "ê", "e", "í", "i", "ì", "i", "ó", "o", "ò", "o", "ô", "o", "ơ", "o", "ú", "u", "ù", "u", "ư", "u", "ý", "y")
-	return replacer.Replace(value)
+func companyOverview(pass domain.Passport) string {
+	parts := []string{pass.CompanyName}
+	labels := map[string]string{"tax_code": "Mã số thuế", "legal_form": "Loại hình pháp lý", "registered_address": "Địa chỉ trụ sở", "province": "Tỉnh/thành"}
+	for _, key := range []string{"tax_code", "legal_form", "registered_address", "province"} {
+		if field, ok := pass.Fields[key]; ok && field.Value != nil && field.Status == domain.FieldConfirmed {
+			parts = append(parts, firstNonEmpty(field.Label, labels[key])+": "+fmt.Sprint(field.Value))
+		}
+	}
+	return strings.Join(parts, "; ") + "."
 }

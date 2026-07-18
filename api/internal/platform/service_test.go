@@ -173,3 +173,25 @@ func TestMatchPassportHybridCombinesRulePoliciesAndRetrievedDocuments(t *testing
 		t.Fatalf("application blockers = %v, want no missing-template dead end", application.BlockingReasons)
 	}
 }
+
+func TestLoadMatchRunRestoresRetrievedPolicyChecklistAndSource(t *testing.T) {
+	service := NewService(nil)
+	run := MatchRun{ID: "cached-run", Results: []MatchResult{{
+		PolicyID: "document-162", PolicyVersion: 2, Title: "162/2024/NĐ-CP", Agency: "Chính phủ",
+		Benefit: "Quy định điều kiện cấp giấy phép", RetrievalMode: "HYBRID_RULE_VECTOR",
+		SourceURL: "https://vbpl.vn/van-ban/162", TemplateReady: true,
+	}}}
+	service.LoadMatchRun("cached-workspace", run)
+
+	checklist, err := service.CreateChecklist("cached-workspace", "document-162")
+	if err != nil {
+		t.Fatalf("create checklist from cached match: %v", err)
+	}
+	if len(checklist.Items) != 3 {
+		t.Fatalf("cached retrieved policy checklist has %d items, want 3", len(checklist.Items))
+	}
+	policy, ok := service.workspace("cached-workspace").RetrievedPolicies["document-162"]
+	if !ok || policy.SourceURL != "https://vbpl.vn/van-ban/162" {
+		t.Fatalf("cached retrieved policy source = %q", policy.SourceURL)
+	}
+}
