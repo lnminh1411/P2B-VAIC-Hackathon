@@ -11,7 +11,7 @@
 # P2B - Workspace AI-native Hỗ trợ Đăng ký Chương trình Tài trợ Doanh nghiệp
 **P2B** là một không gian làm việc số (workspace) tích hợp trí tuệ nhân tạo (AI-native) toàn diện, giúp doanh nghiệp tự động hóa quy trình phân tích tài liệu pháp lý, đối chiếu tiêu chuẩn tài trợ và chuẩn bị hồ sơ ứng tuyển chất lượng cao.
 
-*(Catchy Description)*: Lập hồ sơ doanh nghiệp có trích dẫn nguồn, đối chiếu tự động với hàng trăm chính sách nhà nước và xuất đơn ứng tuyển chuẩn chỉ chỉ trong vài phút.
+Lập hồ sơ doanh nghiệp có trích dẫn nguồn, đối chiếu tự động với hàng trăm chính sách nhà nước và xuất đơn ứng tuyển chuẩn chỉ chỉ trong vài phút.
 
 ---
 
@@ -169,7 +169,7 @@ Chi tiết các biến môi trường cấu hình tại file `.env`:
 # P2B - AI-Native Grant Eligibility & Application Workspace
 **P2B** is an AI-native workspace designed to help companies streamline the grant application process by automating document extraction, checking eligibility criteria through a deterministic rule engine, and preparing application checklists.
 
-*(Catchy Description)*: Instantly build verified Company Passports, automatically evaluate matching grants, and generate audit-ready applications with clear evidence provenance in minutes.
+Instantly build verified Company Passports, automatically evaluate matching grants, and generate audit-ready applications with clear evidence provenance in minutes.
 
 ---
 
