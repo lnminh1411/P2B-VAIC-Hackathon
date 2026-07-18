@@ -8,7 +8,60 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	applicationdomain "github.com/p2b/p2b/internal/application"
 )
+
+func TestGeminiGeneratesStructuredApplicationSections(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			SystemInstruction struct {
+				Parts []struct {
+					Text string `json:"text"`
+				} `json:"parts"`
+			} `json:"systemInstruction"`
+			Contents []struct {
+				Parts []struct {
+					Text string `json:"text"`
+				} `json:"parts"`
+			} `json:"contents"`
+			GenerationConfig struct {
+				ResponseJSONSchema map[string]any `json:"responseJsonSchema"`
+			} `json:"generationConfig"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(body.SystemInstruction.Parts[0].Text, "untrusted template") {
+			t.Fatalf("system instruction must isolate template content: %#v", body.SystemInstruction)
+		}
+		if !strings.Contains(body.Contents[0].Parts[0].Text, "Công ty P2B") {
+			t.Fatalf("prompt lacks grounded variables: %#v", body.Contents)
+		}
+		properties := body.GenerationConfig.ResponseJSONSchema["properties"].(map[string]any)
+		if _, ok := properties["company_overview"]; !ok {
+			t.Fatal("schema lacks company_overview")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"{\"company_overview\":\"Công ty P2B\",\"support_need\":\"Đối chiếu điều kiện\",\"proposal\":\"Chuẩn bị hồ sơ\"}"}]}}]}`))
+	}))
+	defer server.Close()
+
+	extractor, err := NewGeminiExtractor("test-key", GeminiStableModel, server.URL, server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	sections, err := extractor.GenerateApplication(context.Background(), applicationdomain.GenerationRequest{
+		TemplateText: "Biên bản của {{company_name}}",
+		Variables:    map[string]string{"company_name": "Công ty P2B", "policy_title": "162/2024/NĐ-CP"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sections["company_overview"] != "Công ty P2B" || sections["proposal"] != "Chuẩn bị hồ sơ" {
+		t.Fatalf("sections = %#v", sections)
+	}
+}
 
 func TestGeminiExtractorUsesStableModelAndParsesStructuredCandidates(t *testing.T) {
 	var requestPath string

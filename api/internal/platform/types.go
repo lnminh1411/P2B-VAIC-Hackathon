@@ -87,17 +87,28 @@ type Checklist struct {
 }
 
 type Application struct {
-	ID              string            `json:"id"`
-	ChecklistID     string            `json:"checklist_id"`
-	PolicyID        string            `json:"policy_id"`
-	PassportVersion int               `json:"passport_version"`
-	PolicyVersion   int               `json:"policy_version"`
-	TemplateVersion int               `json:"template_version"`
-	Version         int               `json:"version"`
-	Status          string            `json:"status"`
-	Sections        map[string]string `json:"sections"`
-	BlockingReasons []string          `json:"blocking_reasons"`
-	UpdatedAt       time.Time         `json:"updated_at"`
+	ID                string            `json:"id"`
+	ChecklistID       string            `json:"checklist_id"`
+	PolicyID          string            `json:"policy_id"`
+	PolicyTitle       string            `json:"policy_title,omitempty"`
+	PolicyAgency      string            `json:"policy_agency,omitempty"`
+	PassportVersion   int               `json:"passport_version"`
+	PolicyVersion     int               `json:"policy_version"`
+	TemplateID        string            `json:"template_id,omitempty"`
+	TemplateName      string            `json:"template_name,omitempty"`
+	TemplateVersion   int               `json:"template_version"`
+	Version           int               `json:"version"`
+	Status            string            `json:"status"`
+	Sections          map[string]string `json:"sections"`
+	BlockingReasons   []string          `json:"blocking_reasons"`
+	GenerationWarning string            `json:"generation_warning,omitempty"`
+	UpdatedAt         time.Time         `json:"updated_at"`
+}
+
+type ApplicationDraftContext struct {
+	Checklist Checklist
+	Passport  domain.Passport
+	Policy    domain.Policy
 }
 
 type Alert struct {

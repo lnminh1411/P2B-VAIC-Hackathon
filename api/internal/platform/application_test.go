@@ -49,6 +49,39 @@ func TestCreateApplicationForRetrievedDocumentUsesReviewSpecificCopy(t *testing.
 	}
 }
 
+func TestCreateApplicationFromTemplatePinsGeneratedDraftMetadata(t *testing.T) {
+	service := NewService([]domain.Policy{{ID: "policy-template", Version: 3, Title: "Nghị định mẫu", Agency: "Chính phủ", Lifecycle: "ACTIVE", TemplateReady: true}})
+	workspaceID := "application-template"
+	if _, err := service.BuildPassport(workspaceID, BuildPassportInput{CompanyName: "Công ty P2B"}); err != nil {
+		t.Fatal(err)
+	}
+	checklist, err := service.CreateChecklist(workspaceID, "policy-template")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sections := map[string]string{"company_overview": "Bản sinh bởi Gemini", "support_need": "Đối chiếu", "proposal": "Chuẩn bị"}
+	application, err := service.CreateApplicationFromTemplate(workspaceID, checklist.ID, "11111111-1111-1111-1111-111111111111", "Mẫu hồ sơ 2025", sections, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if application.TemplateID == "" || application.TemplateName != "Mẫu hồ sơ 2025" || application.PolicyTitle != "Nghị định mẫu" {
+		t.Fatalf("application metadata = %#v", application)
+	}
+	if application.Sections["company_overview"] != "Bản sinh bởi Gemini" {
+		t.Fatalf("application sections = %#v", application.Sections)
+	}
+}
+
+func TestRestoreApplicationMakesCachedDraftAvailable(t *testing.T) {
+	service := NewService(nil)
+	draft := Application{ID: "cached", Version: 7, Status: "DRAFT_READY", Sections: map[string]string{"proposal": "Đã lưu"}}
+	service.RestoreApplication("workspace-cache", draft)
+	got, err := service.Application("workspace-cache", draft.ID)
+	if err != nil || got.Version != 7 || got.Sections["proposal"] != "Đã lưu" {
+		t.Fatalf("restored application = %#v, err = %v", got, err)
+	}
+}
+
 func TestApplicationPDFIsUnicodeAdministrativeMinutes(t *testing.T) {
 	service := NewService([]domain.Policy{{
 		ID: "decree-162", Version: 1, Title: "162/2024/NĐ-CP", Agency: "Chính phủ", Benefit: "Quy định điều kiện cấp giấy phép",

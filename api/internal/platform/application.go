@@ -79,6 +79,10 @@ func (s *Service) UpdateChecklistItem(workspaceID, checklistID, itemID, status, 
 }
 
 func (s *Service) CreateApplication(workspaceID, checklistID string) (Application, error) {
+	return s.CreateApplicationFromTemplate(workspaceID, checklistID, "", "Mẫu P2B mặc định", nil, "")
+}
+
+func (s *Service) CreateApplicationFromTemplate(workspaceID, checklistID, templateID, templateName string, generatedSections map[string]string, generationWarning string) (Application, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	state := s.workspace(workspaceID)
@@ -102,10 +106,61 @@ func (s *Service) CreateApplication(workspaceID, checklistID string) (Applicatio
 			"proposal":         fmt.Sprintf("Doanh nghiệp và người phụ trách pháp chế thực hiện đối chiếu văn bản %s; kết quả là cơ sở rà soát nội bộ, không phải kết luận đủ điều kiện hoặc mẫu hồ sơ chính thức.", policy.Title),
 		}
 	}
-	application := Application{ID: uuid.NewString(), ChecklistID: checklistID, PolicyID: policy.ID, PassportVersion: state.Passport.Version, PolicyVersion: policy.Version, TemplateVersion: 1, Version: 1, Status: "DRAFT_READY", UpdatedAt: time.Now().UTC(), Sections: sections}
+	if generatedSections != nil {
+		sections = map[string]string{}
+		for key, value := range generatedSections {
+			if len(key) > 80 || len(value) > 10_000 {
+				return Application{}, errors.New("application section exceeds allowed size")
+			}
+			sections[key] = strings.TrimSpace(value)
+		}
+	}
+	if strings.TrimSpace(templateName) == "" {
+		templateName = "Mẫu P2B mặc định"
+	}
+	application := Application{
+		ID: uuid.NewString(), ChecklistID: checklistID, PolicyID: policy.ID, PolicyTitle: policy.Title, PolicyAgency: policy.Agency,
+		PassportVersion: state.Passport.Version, PolicyVersion: policy.Version, TemplateID: templateID, TemplateName: templateName,
+		TemplateVersion: 1, Version: 1, Status: "DRAFT_READY", UpdatedAt: time.Now().UTC(), Sections: sections,
+		GenerationWarning: strings.TrimSpace(generationWarning),
+	}
 	application.BlockingReasons = applicationBlockers(checklist, policy.TemplateReady)
 	state.Applications[application.ID] = application
 	return application, nil
+}
+
+func (s *Service) ApplicationContext(workspaceID, checklistID string) (ApplicationDraftContext, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	state := s.workspace(workspaceID)
+	checklist, ok := state.Checklists[checklistID]
+	if !ok {
+		return ApplicationDraftContext{}, ErrNotFound
+	}
+	policy, ok := s.findWorkspacePolicy(state, checklist.PolicyID)
+	if !ok {
+		return ApplicationDraftContext{}, ErrNotFound
+	}
+	return ApplicationDraftContext{Checklist: checklist, Passport: state.Passport, Policy: policy}, nil
+}
+
+func (s *Service) RestoreApplication(workspaceID string, application Application) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	state := s.workspace(workspaceID)
+	if application.Sections == nil {
+		application.Sections = map[string]string{}
+	}
+	if application.BlockingReasons == nil {
+		application.BlockingReasons = []string{}
+	}
+	state.Applications[application.ID] = application
+}
+
+func (s *Service) RemoveApplication(workspaceID, applicationID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.workspace(workspaceID).Applications, applicationID)
 }
 
 func (s *Service) Application(workspaceID, id string) (Application, error) {

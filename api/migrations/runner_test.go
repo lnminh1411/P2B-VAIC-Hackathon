@@ -41,3 +41,16 @@ func TestEmbeddedMigrationVersionsAreStrictlyIncreasing(t *testing.T) {
 		}
 	}
 }
+
+func TestApplicationDraftCacheMigrationIsLoaded(t *testing.T) {
+	migrations, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, migration := range migrations {
+		if migration.Version == 6 && strings.Contains(migration.SQL, "application_draft_templates") && strings.Contains(migration.SQL, "application_draft_cache") {
+			return
+		}
+	}
+	t.Fatal("migration 6 must create application draft template and cache tables")
+}
