@@ -1,5 +1,12 @@
 export type FieldStatus = 'MISSING' | 'EXTRACTED' | 'NEEDS_REVIEW' | 'CONFIRMED' | 'CONFLICTED' | 'STALE'
 
+export interface Workspace {
+  id: string
+  display_name: string
+  role: string
+  created_at: string
+}
+
 export interface Evidence {
   source_id: string
   source_name: string
@@ -66,6 +73,7 @@ export interface MatchResult {
   ranking_reasons: string[]
   template_ready: boolean
   retrieval_mode: string
+	 source_url?: string
 }
 
 export interface MatchRun { id: string; passport_version: number; created_at: string; results: MatchResult[] }
@@ -99,13 +107,36 @@ export interface Application {
   id: string
   checklist_id: string
   policy_id: string
+  policy_title?: string
+  policy_agency?: string
   passport_version: number
   policy_version: number
+  template_id?: string
+  template_name?: string
   template_version: number
   version: number
   status: string
   sections: Record<string, string>
   blocking_reasons: string[] | null
+  generation_warning?: string
+  updated_at?: string
+}
+
+export interface ApplicationTemplate {
+  id: string
+  name: string
+  filename: string
+  content_type: string
+  placeholders: string[]
+  created_at: string
+  updated_at: string
 }
 
 export interface Alert { id: string; type: string; title: string; message: string; policy_id?: string; severity: string; read: boolean; occurred_at: string }
+
+export interface WatchlistSettings {
+  new_policies: boolean
+  deadline_changes: boolean
+  stale_evidence: boolean
+  upcoming_deadlines: boolean
+}

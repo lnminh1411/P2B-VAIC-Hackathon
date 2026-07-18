@@ -18,7 +18,7 @@ func (s *Store) Claim(ctx context.Context) (Job, error) {
 	err := s.database.QueryRow(ctx, `
 		WITH candidate AS (
 			SELECT id FROM jobs
-			WHERE type = 'PASSPORT_BUILD' AND ((status = 'QUEUED' AND available_at <= now())
+		WHERE type IN ('PASSPORT_BUILD', 'PASSPORT_REFRESH') AND ((status = 'QUEUED' AND available_at <= now())
 			   OR (status = 'LEASED' AND lease_expires_at < now()))
 			ORDER BY available_at, created_at
 			FOR UPDATE SKIP LOCKED LIMIT 1

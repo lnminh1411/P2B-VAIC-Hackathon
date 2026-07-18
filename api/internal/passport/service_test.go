@@ -1,6 +1,7 @@
 package passport
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -43,5 +44,39 @@ func TestConfirmFieldCreatesNewVersion(t *testing.T) {
 	}
 	if updated.Version != 4 || updated.Fields["legal_name"].Status != domain.FieldConfirmed {
 		t.Fatalf("unexpected passport: %#v", updated)
+	}
+}
+
+func TestConfirmFieldCreatesMissingCanonicalFieldFromUserInput(t *testing.T) {
+	pass := domain.Passport{Version: 3, Fields: map[string]domain.PassportField{}}
+
+	updated, err := ConfirmField(pass, "employee_count", 25, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	field := updated.Fields["employee_count"]
+	if field.Value != 25 || field.DataType != "integer" || field.Status != domain.FieldConfirmed {
+		t.Fatalf("field = %#v, want confirmed integer", field)
+	}
+	if len(field.Evidence) == 0 || field.Evidence[len(field.Evidence)-1].SourceID != "user-input" {
+		t.Fatalf("evidence = %#v, want user-input provenance", field.Evidence)
+	}
+}
+
+func TestConfirmFieldRejectsInvalidUserValues(t *testing.T) {
+	pass := domain.Passport{Version: 1, Fields: map[string]domain.PassportField{}}
+	for name, test := range map[string]struct {
+		key   string
+		value any
+	}{
+		"wrong type":           {key: "employee_count", value: "25"},
+		"oversized legal name": {key: "legal_name", value: strings.Repeat("x", 201)},
+		"negative money":       {key: "funding_need", value: -1},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := ConfirmField(pass, test.key, test.value, 1); err == nil {
+				t.Fatal("expected invalid value error")
+			}
+		})
 	}
 }

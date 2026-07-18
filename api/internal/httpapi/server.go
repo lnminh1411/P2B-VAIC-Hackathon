@@ -4,17 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	applicationdomain "github.com/p2b/p2b/internal/application"
 	"github.com/p2b/p2b/internal/authn"
 	"github.com/p2b/p2b/internal/domain"
 	passportdomain "github.com/p2b/p2b/internal/passport"
@@ -23,30 +24,67 @@ import (
 )
 
 const maxBodyBytes = 1 << 20
+const maxTemplateFileBytes = 10 << 20
+const maxTemplateBodyBytes = maxTemplateFileBytes + (1 << 20)
 
 type contextKey string
 
 const workspaceKey contextKey = "workspace"
 const principalKey contextKey = "principal"
 
+type Workspace = domain.Workspace
+
+type WorkspaceManager interface {
+	Ensure(context.Context, authn.Principal) error
+	Resolve(context.Context, authn.Principal, string) (string, error)
+	List(context.Context, authn.Principal) ([]Workspace, error)
+	Create(context.Context, authn.Principal, string) (Workspace, error)
+}
+
 type Config struct {
-	DevAuth               bool
-	WebOrigin             string
-	Verifier              authn.Verifier
-	WorkspaceBootstrapper interface {
-		Ensure(context.Context, authn.Principal) error
-	}
-	UploadSigner interface {
+	DevAuth          bool
+	WebOrigin        string
+	Verifier         authn.Verifier
+	WorkspaceManager WorkspaceManager
+	UploadSigner     interface {
 		CreateUploadURL(context.Context, string) (string, error)
 	}
 	ExtractionStore interface {
 		RegisterSource(context.Context, pipeline.Source) error
 		MarkUploaded(context.Context, string, string) error
 		EnqueueBuild(context.Context, string, pipeline.BuildRequest) (pipeline.Job, error)
+		EnqueueRefresh(context.Context, string, []string, string, string) (pipeline.Job, error)
 		Job(context.Context, string, string) (pipeline.Job, error)
 		Passport(context.Context, string) (domain.Passport, error)
 		Candidates(context.Context, string) ([]passportdomain.Candidate, error)
 		ConfirmField(context.Context, string, string, string, any, int) (domain.Passport, error)
+		SaveMatchRun(ctx context.Context, matchID string, workspaceID string, passportID string, passportVersion int, retrievalMode string, resultsJSON []byte) error
+		LatestMatchRun(ctx context.Context, workspaceID string) (string, int, []byte, time.Time, error)
+		WatchlistSettings(ctx context.Context, workspaceID string) (domain.WatchlistSettings, error)
+		SaveWatchlistSettings(ctx context.Context, workspaceID string, settings domain.WatchlistSettings) error
+		Alerts(ctx context.Context, workspaceID string) ([]domain.Alert, error)
+		SaveAlert(ctx context.Context, workspaceID string, alert domain.Alert) error
+		MarkAlertRead(ctx context.Context, workspaceID string, alertID string) error
+	}
+	PolicyStore interface {
+		Policies(context.Context, bool) ([]domain.Policy, error)
+	}
+	DocumentSearcher interface {
+		SearchDocuments(context.Context, domain.Passport) ([]domain.DocumentMatch, string, error)
+	}
+	ApplicationStore interface {
+		CreateTemplate(context.Context, string, string, string, string, string) (applicationdomain.Template, error)
+		Templates(context.Context, string) ([]applicationdomain.Template, error)
+		Template(context.Context, string, string) (applicationdomain.Template, error)
+		SaveDraft(context.Context, string, platform.Application) error
+		Draft(context.Context, string, string) (platform.Application, error)
+		LatestDraft(context.Context, string) (platform.Application, error)
+	}
+	ApplicationGenerator interface {
+		GenerateApplication(context.Context, applicationdomain.GenerationRequest) (map[string]string, error)
+	}
+	TemplateConverter interface {
+		Convert(context.Context, string) (string, error)
 	}
 	ReadinessChecker interface {
 		Ping(context.Context) error
@@ -54,9 +92,11 @@ type Config struct {
 }
 
 type Server struct {
-	service     *platform.Service
-	config      Config
-	idempotency *idempotencyStore
+	service       *platform.Service
+	config        Config
+	idempotency   *idempotencyStore
+	devMu         sync.Mutex
+	devWorkspaces map[string][]Workspace
 }
 
 func NewServer(service *platform.Service) http.Handler {
@@ -64,7 +104,7 @@ func NewServer(service *platform.Service) http.Handler {
 }
 
 func NewServerWithConfig(service *platform.Service, config Config) http.Handler {
-	server := &Server{service: service, config: config, idempotency: newIdempotencyStore()}
+	server := &Server{service: service, config: config, idempotency: newIdempotencyStore(), devWorkspaces: map[string][]Workspace{}}
 	router := chi.NewRouter()
 	router.Use(server.recoverer, server.securityHeaders, server.cors, server.limitBody)
 	router.Get("/health/live", func(w http.ResponseWriter, _ *http.Request) {
@@ -91,15 +131,19 @@ func NewServerWithConfig(service *platform.Service, config Config) http.Handler 
 		r.Use(server.authenticate)
 		r.Use(server.idempotencyMiddleware)
 		r.Get("/auth/me", server.authMe)
+		r.Get("/workspaces", server.listWorkspaces)
+		r.Post("/workspaces", server.createWorkspace)
 		r.Post("/uploads/presign", server.presignUpload)
 		r.Post("/uploads/{sourceID}/complete", server.completeUpload)
 		r.Post("/passports/build", server.buildPassport)
+		r.Post("/passports/refresh", server.refreshPassport)
 		r.Get("/jobs/{jobID}", server.getJob)
 		r.Get("/passport", server.getPassport)
 		r.Get("/passport/versions", server.getPassportVersions)
 		r.Get("/passport/candidates", server.getCandidates)
 		r.Put("/passport/fields/{fieldKey}", server.confirmField)
 		r.Post("/matches", server.createMatch)
+		r.Get("/matches", server.getLatestMatch)
 		r.Get("/matches/{matchID}", server.getMatch)
 		r.Get("/policies", server.listPolicies)
 		r.Get("/policies/{policyID}/versions/{version}", server.getPolicy)
@@ -111,12 +155,16 @@ func NewServerWithConfig(service *platform.Service, config Config) http.Handler 
 		r.Get("/checklists/{checklistID}", server.getChecklist)
 		r.Put("/checklists/{checklistID}/items/{itemID}", server.updateChecklistItem)
 		r.Post("/applications", server.createApplication)
+		r.Get("/applications/latest", server.latestApplication)
 		r.Get("/applications/{applicationID}", server.getApplication)
 		r.Put("/applications/{applicationID}", server.updateApplication)
 		r.Post("/applications/{applicationID}/{action}", server.applicationAction)
 		r.Get("/applications/{applicationID}/download", server.downloadApplication)
+		r.Get("/application-templates", server.listApplicationTemplates)
+		r.Post("/application-templates", server.uploadApplicationTemplate)
 		r.Get("/alerts", server.listAlerts)
 		r.Post("/alerts/{alertID}/read", server.readAlert)
+		r.Put("/watchlist/settings", server.updateWatchlistSettings)
 		r.With(server.requireAdmin).Get("/admin/policies", server.adminPolicies)
 	})
 	return router
@@ -131,7 +179,7 @@ func (s *Server) authenticate(next http.Handler) http.Handler {
 			if workspaceID == "" {
 				workspaceID = "local-development-workspace"
 			}
-			principal = authn.Principal{Subject: workspaceID, Email: "founder@p2b.local", Name: "P2B Founder", Roles: []string{"admin"}}
+			principal = authn.Principal{Subject: "local-development-account", Email: "founder@p2b.local", Name: "P2B Founder", Roles: []string{"admin"}}
 		} else {
 			token, ok := bearerToken(r.Header.Get("Authorization"))
 			if !ok || s.config.Verifier == nil {
@@ -154,17 +202,81 @@ func (s *Server) authenticate(next http.Handler) http.Handler {
 			writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "Valid Supabase bearer token required")
 			return
 		}
-		if !s.config.DevAuth && s.config.WorkspaceBootstrapper != nil {
-			if err := s.config.WorkspaceBootstrapper.Ensure(r.Context(), principal); err != nil {
+		if !s.config.DevAuth && s.config.WorkspaceManager != nil {
+			if err := s.config.WorkspaceManager.Ensure(r.Context(), principal); err != nil {
 				slog.ErrorContext(r.Context(), "workspace bootstrap failed", "error", err)
 				writeError(w, http.StatusServiceUnavailable, "WORKSPACE_UNAVAILABLE", "Workspace is temporarily unavailable")
 				return
 			}
+			selected, err := s.config.WorkspaceManager.Resolve(r.Context(), principal, r.Header.Get("X-Workspace-ID"))
+			if err != nil {
+				writeError(w, http.StatusForbidden, "WORKSPACE_FORBIDDEN", "You do not have access to this business workspace")
+				return
+			}
+			workspaceID = selected
 		}
 		ctx := context.WithValue(r.Context(), workspaceKey, workspaceID)
 		ctx = context.WithValue(ctx, principalKey, principal)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func (s *Server) listWorkspaces(w http.ResponseWriter, r *http.Request) {
+	currentPrincipal := principal(r)
+	if s.config.WorkspaceManager != nil && !s.config.DevAuth {
+		workspaces, err := s.config.WorkspaceManager.List(r.Context(), currentPrincipal)
+		if err != nil {
+			writeError(w, http.StatusServiceUnavailable, "WORKSPACES_UNAVAILABLE", "Business workspaces are temporarily unavailable")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"workspaces": workspaces, "active_workspace_id": workspace(r)})
+		return
+	}
+	workspaces := s.devWorkspaceList(currentPrincipal.Subject, workspace(r))
+	writeJSON(w, http.StatusOK, map[string]any{"workspaces": workspaces, "active_workspace_id": workspace(r)})
+}
+
+func (s *Server) createWorkspace(w http.ResponseWriter, r *http.Request) {
+	if !requireIdempotency(w, r) {
+		return
+	}
+	var input struct {
+		DisplayName string `json:"display_name"`
+	}
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	input.DisplayName = strings.TrimSpace(input.DisplayName)
+	if input.DisplayName == "" || len([]rune(input.DisplayName)) > 200 {
+		writeError(w, http.StatusUnprocessableEntity, "INVALID_INPUT", "display_name is required and limited to 200 characters")
+		return
+	}
+	if s.config.WorkspaceManager != nil && !s.config.DevAuth {
+		created, err := s.config.WorkspaceManager.Create(r.Context(), principal(r), input.DisplayName)
+		if err != nil {
+			writeError(w, http.StatusServiceUnavailable, "WORKSPACE_UNAVAILABLE", "Business workspace could not be created")
+			return
+		}
+		writeJSON(w, http.StatusCreated, created)
+		return
+	}
+	created := Workspace{ID: uuid.NewString(), DisplayName: input.DisplayName, Role: "OWNER", CreatedAt: time.Now().UTC()}
+	currentPrincipal := principal(r)
+	s.devMu.Lock()
+	s.devWorkspaces[currentPrincipal.Subject] = append(s.devWorkspaces[currentPrincipal.Subject], created)
+	s.devMu.Unlock()
+	writeJSON(w, http.StatusCreated, created)
+}
+
+func (s *Server) devWorkspaceList(principalID, activeID string) []Workspace {
+	s.devMu.Lock()
+	defer s.devMu.Unlock()
+	workspaces := append([]Workspace(nil), s.devWorkspaces[principalID]...)
+	if len(workspaces) == 0 {
+		workspaces = []Workspace{{ID: activeID, DisplayName: activeID, Role: "OWNER", CreatedAt: time.Now().UTC()}}
+		s.devWorkspaces[principalID] = append([]Workspace(nil), workspaces...)
+	}
+	return workspaces
 }
 
 func (s *Server) requireAdmin(next http.Handler) http.Handler {
@@ -222,12 +334,16 @@ func (s *Server) cors(next http.Handler) http.Handler {
 
 func (s *Server) limitBody(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.ContentLength > maxBodyBytes {
-			writeError(w, http.StatusRequestEntityTooLarge, "BODY_TOO_LARGE", "Request body exceeds 1 MB")
+		limit := int64(maxBodyBytes)
+		if r.URL.Path == "/v1/application-templates" {
+			limit = maxTemplateBodyBytes
+		}
+		if r.ContentLength > limit {
+			writeError(w, http.StatusRequestEntityTooLarge, "BODY_TOO_LARGE", "Request body exceeds allowed size")
 			return
 		}
 		if r.Body != nil {
-			r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+			r.Body = http.MaxBytesReader(w, r.Body, limit)
 		}
 		next.ServeHTTP(w, r)
 	})
@@ -335,6 +451,33 @@ func (s *Server) buildPassport(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusAccepted, job)
 }
 
+func (s *Server) refreshPassport(w http.ResponseWriter, r *http.Request) {
+	if !requireIdempotency(w, r) {
+		return
+	}
+	var input struct {
+		SourceIDs []string `json:"source_ids"`
+	}
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	request := pipeline.BuildRequest{SourceIDs: input.SourceIDs}
+	if err := pipeline.ValidateRefreshRequest(request); err != nil {
+		writeError(w, http.StatusUnprocessableEntity, "INVALID_INPUT", err.Error())
+		return
+	}
+	if s.config.ExtractionStore == nil {
+		writeError(w, http.StatusServiceUnavailable, "EXTRACTION_UNAVAILABLE", "Extraction pipeline is not configured")
+		return
+	}
+	job, err := s.config.ExtractionStore.EnqueueRefresh(r.Context(), workspace(r), input.SourceIDs, r.Header.Get("Idempotency-Key"), principal(r).Subject)
+	if err != nil {
+		writeError(w, http.StatusUnprocessableEntity, "INVALID_INPUT", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusAccepted, job)
+}
+
 func (s *Server) getJob(w http.ResponseWriter, r *http.Request) {
 	if s.config.ExtractionStore != nil {
 		job, err := s.config.ExtractionStore.Job(r.Context(), workspace(r), chi.URLParam(r, "jobID"))
@@ -422,7 +565,77 @@ func (s *Server) createMatch(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSONAllowEmpty(w, r, &input) {
 		return
 	}
-	writeJSON(w, http.StatusCreated, s.service.Match(workspace(r)))
+	if err := s.refreshPolicies(r.Context(), true); err != nil {
+		slog.Error("refresh policies for matching", "error", err)
+		writeError(w, http.StatusServiceUnavailable, "POLICY_STORE_UNAVAILABLE", "Policy corpus is temporarily unavailable")
+		return
+	}
+	pass := s.service.Passport(workspace(r))
+	if s.config.ExtractionStore != nil {
+		persisted, err := s.config.ExtractionStore.Passport(r.Context(), workspace(r))
+		if err != nil {
+			slog.Error("load passport for matching", "error", err)
+			writeError(w, http.StatusServiceUnavailable, "PASSPORT_STORE_UNAVAILABLE", "Company passport is temporarily unavailable")
+			return
+		}
+		pass = persisted
+	}
+	if s.config.DocumentSearcher != nil {
+		documents, mode, err := s.config.DocumentSearcher.SearchDocuments(r.Context(), pass)
+		if err != nil {
+			slog.ErrorContext(r.Context(), "hybrid policy search failed", "error", err)
+			writeError(w, http.StatusServiceUnavailable, "POLICY_SEARCH_UNAVAILABLE", "Policy search is temporarily unavailable")
+			return
+		}
+		matchRun := s.service.MatchPassportHybrid(workspace(r), pass, documents, mode)
+		if s.config.ExtractionStore != nil {
+			resultsJSON, _ := json.Marshal(matchRun.Results)
+			if err := s.config.ExtractionStore.SaveMatchRun(r.Context(), matchRun.ID, workspace(r), pass.ID, pass.Version, mode, resultsJSON); err != nil {
+				slog.Error("failed to save match run cache", "error", err)
+			}
+		}
+		writeJSON(w, http.StatusCreated, matchRun)
+		return
+	}
+	matchRun := s.service.MatchPassport(workspace(r), pass)
+	if s.config.ExtractionStore != nil {
+		resultsJSON, _ := json.Marshal(matchRun.Results)
+		if err := s.config.ExtractionStore.SaveMatchRun(r.Context(), matchRun.ID, workspace(r), pass.ID, pass.Version, "RULE_ENGINE_ONLY", resultsJSON); err != nil {
+			slog.Error("failed to save match run cache", "error", err)
+		}
+	}
+	writeJSON(w, http.StatusCreated, matchRun)
+}
+
+func (s *Server) getLatestMatch(w http.ResponseWriter, r *http.Request) {
+	if s.config.ExtractionStore == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"results": []any{}})
+		return
+	}
+	matchID, passportVersion, resultsJSON, createdAt, err := s.config.ExtractionStore.LatestMatchRun(r.Context(), workspace(r))
+	if err != nil {
+		if errors.Is(err, pipeline.ErrNotFound) {
+			writeJSON(w, http.StatusOK, map[string]any{"results": []any{}})
+			return
+		}
+		slog.Error("failed to load latest match run", "error", err)
+		respondServiceError(w, err)
+		return
+	}
+	var results []platform.MatchResult
+	if err := json.Unmarshal(resultsJSON, &results); err != nil {
+		slog.Error("failed to unmarshal match results", "error", err)
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to decode cached match run")
+		return
+	}
+	matchRun := platform.MatchRun{
+		ID:              matchID,
+		PassportVersion: passportVersion,
+		CreatedAt:       createdAt,
+		Results:         results,
+	}
+	s.service.LoadMatchRun(workspace(r), matchRun)
+	writeJSON(w, http.StatusOK, matchRun)
 }
 
 func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
@@ -434,11 +647,19 @@ func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, match)
 }
 
-func (s *Server) listPolicies(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) listPolicies(w http.ResponseWriter, r *http.Request) {
+	if err := s.refreshPolicies(r.Context(), true); err != nil {
+		writeError(w, http.StatusServiceUnavailable, "POLICY_STORE_UNAVAILABLE", "Policy corpus is temporarily unavailable")
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"policies": s.service.Policies(true)})
 }
 
 func (s *Server) getPolicy(w http.ResponseWriter, r *http.Request) {
+	if err := s.refreshPolicies(r.Context(), true); err != nil {
+		writeError(w, http.StatusServiceUnavailable, "POLICY_STORE_UNAVAILABLE", "Policy corpus is temporarily unavailable")
+		return
+	}
 	version, err := strconv.Atoi(chi.URLParam(r, "version"))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "INVALID_VERSION", "Policy version must be an integer")
@@ -549,95 +770,76 @@ func (s *Server) updateChecklistItem(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, checklist)
 }
 
-func (s *Server) createApplication(w http.ResponseWriter, r *http.Request) {
-	if !requireIdempotency(w, r) {
-		return
-	}
-	var input struct {
-		ChecklistID string `json:"checklist_id"`
-	}
-	if !decodeJSON(w, r, &input) {
-		return
-	}
-	application, err := s.service.CreateApplication(workspace(r), input.ChecklistID)
-	if err != nil {
-		respondServiceError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusCreated, application)
-}
-func (s *Server) getApplication(w http.ResponseWriter, r *http.Request) {
-	application, err := s.service.Application(workspace(r), chi.URLParam(r, "applicationID"))
-	if err != nil {
-		respondServiceError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, application)
-}
-
-func (s *Server) updateApplication(w http.ResponseWriter, r *http.Request) {
-	var input struct {
-		Sections        map[string]string `json:"sections"`
-		ExpectedVersion int               `json:"expected_version"`
-	}
-	if !decodeJSON(w, r, &input) {
-		return
-	}
-	application, err := s.service.UpdateApplication(workspace(r), chi.URLParam(r, "applicationID"), input.Sections, input.ExpectedVersion)
-	if err != nil {
-		respondServiceError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, application)
-}
-
-func (s *Server) applicationAction(w http.ResponseWriter, r *http.Request) {
-	if !requireIdempotency(w, r) {
-		return
-	}
-	action := chi.URLParam(r, "action")
-	if action != "submit" && action != "approve" && action != "generate" {
-		writeError(w, http.StatusNotFound, "NOT_FOUND", "Action not found")
-		return
-	}
-	application, err := s.service.TransitionApplication(workspace(r), chi.URLParam(r, "applicationID"), action)
-	if err != nil {
-		if errors.Is(err, platform.ErrBlocked) {
-			writeJSON(w, http.StatusConflict, map[string]any{"error": map[string]any{"code": "APPROVAL_BLOCKED", "message": "Required evidence is missing", "details": application.BlockingReasons}})
-			return
-		}
-		respondServiceError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, application)
-}
-
-func (s *Server) downloadApplication(w http.ResponseWriter, r *http.Request) {
-	data, filename, err := s.service.ApplicationPDF(workspace(r), chi.URLParam(r, "applicationID"))
-	if err != nil {
-		respondServiceError(w, err)
-		return
-	}
-	w.Header().Set("Content-Type", "application/pdf")
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
-	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(data)
-}
-
 func (s *Server) listAlerts(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"alerts": s.service.Alerts(workspace(r))})
-}
-func (s *Server) readAlert(w http.ResponseWriter, r *http.Request) {
-	alert, err := s.service.ReadAlert(workspace(r), chi.URLParam(r, "alertID"))
+	if s.config.ExtractionStore == nil {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"alerts":             []any{},
+			"watchlist_settings": domain.WatchlistSettings{NewPolicies: false, DeadlineChanges: false, StaleEvidence: false, UpcomingDeadlines: false},
+		})
+		return
+	}
+	dbAlerts, err := s.config.ExtractionStore.Alerts(r.Context(), workspace(r))
 	if err != nil {
 		respondServiceError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, alert)
+	settings, err := s.config.ExtractionStore.WatchlistSettings(r.Context(), workspace(r))
+	if err != nil {
+		respondServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"alerts":             dbAlerts,
+		"watchlist_settings": settings,
+	})
 }
-func (s *Server) adminPolicies(w http.ResponseWriter, _ *http.Request) {
+
+func (s *Server) readAlert(w http.ResponseWriter, r *http.Request) {
+	if s.config.ExtractionStore == nil {
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "Alert store not available")
+		return
+	}
+	alertID := chi.URLParam(r, "alertID")
+	if err := s.config.ExtractionStore.MarkAlertRead(r.Context(), workspace(r), alertID); err != nil {
+		respondServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"id": alertID, "read": true})
+}
+
+func (s *Server) updateWatchlistSettings(w http.ResponseWriter, r *http.Request) {
+	if s.config.ExtractionStore == nil {
+		writeError(w, http.StatusServiceUnavailable, "STORE_UNAVAILABLE", "Settings store is temporarily unavailable")
+		return
+	}
+	var input domain.WatchlistSettings
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	if err := s.config.ExtractionStore.SaveWatchlistSettings(r.Context(), workspace(r), input); err != nil {
+		respondServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, input)
+}
+func (s *Server) adminPolicies(w http.ResponseWriter, r *http.Request) {
+	if err := s.refreshPolicies(r.Context(), false); err != nil {
+		writeError(w, http.StatusServiceUnavailable, "POLICY_STORE_UNAVAILABLE", "Policy corpus is temporarily unavailable")
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"policies": s.service.Policies(false)})
+}
+
+func (s *Server) refreshPolicies(ctx context.Context, activeOnly bool) error {
+	if s.config.PolicyStore == nil {
+		return nil
+	}
+	policies, err := s.config.PolicyStore.Policies(ctx, activeOnly)
+	if err != nil {
+		return err
+	}
+	s.service.ReplacePolicies(policies)
+	return nil
 }
 
 func workspace(r *http.Request) string {

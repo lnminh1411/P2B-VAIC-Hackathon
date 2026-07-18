@@ -24,6 +24,45 @@ type readinessStub struct {
 	err error
 }
 
+type workspaceManagerStub struct {
+	resolved string
+	created  bool
+}
+
+func (stub workspaceManagerStub) Ensure(context.Context, authn.Principal) error { return nil }
+func (stub workspaceManagerStub) Resolve(_ context.Context, _ authn.Principal, requested string) (string, error) {
+	if stub.resolved != "" {
+		return stub.resolved, nil
+	}
+	return requested, nil
+}
+func (stub workspaceManagerStub) List(context.Context, authn.Principal) ([]Workspace, error) {
+	return []Workspace{{ID: "business-1", DisplayName: "Công ty Một", Role: "OWNER"}}, nil
+}
+func (stub *workspaceManagerStub) Create(context.Context, authn.Principal, string) (Workspace, error) {
+	stub.created = true
+	return Workspace{ID: "business-2", DisplayName: "Công ty Hai", Role: "OWNER"}, nil
+}
+
+type policyStoreStub struct {
+	policies []domain.Policy
+	err      error
+}
+
+type documentSearcherStub struct {
+	documents []domain.DocumentMatch
+	mode      string
+	err       error
+}
+
+func (s documentSearcherStub) SearchDocuments(_ context.Context, _ domain.Passport) ([]domain.DocumentMatch, string, error) {
+	return s.documents, s.mode, s.err
+}
+
+func (s policyStoreStub) Policies(_ context.Context, _ bool) ([]domain.Policy, error) {
+	return s.policies, s.err
+}
+
 func (r readinessStub) Ping(_ context.Context) error {
 	return r.err
 }
@@ -64,6 +103,42 @@ func TestProductionAuthDerivesWorkspaceFromVerifiedPrincipal(t *testing.T) {
 	decode(t, passportResponse, &passport)
 	if passport.WorkspaceID != principal.Subject {
 		t.Fatalf("workspace = %q, want verified subject %q", passport.WorkspaceID, principal.Subject)
+	}
+}
+
+func TestProductionAuthResolvesSelectedWorkspaceThroughMembership(t *testing.T) {
+	principal := authn.Principal{Subject: "0f34fe4f-37dc-43c0-9277-67e49b7b06b5"}
+	manager := &workspaceManagerStub{resolved: "business-2"}
+	server := NewServerWithConfig(newTestService(), Config{
+		Verifier:         verifierStub{principal: principal},
+		WorkspaceManager: manager,
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/passport", nil)
+	req.Header.Set("Authorization", "Bearer verified-token")
+	req.Header.Set("X-Workspace-ID", "business-2")
+	response := httptest.NewRecorder()
+	server.ServeHTTP(response, req)
+
+	var passport struct {
+		WorkspaceID string `json:"workspace_id"`
+	}
+	decode(t, response, &passport)
+	if passport.WorkspaceID != "business-2" {
+		t.Fatalf("workspace = %q, want selected business", passport.WorkspaceID)
+	}
+}
+
+func TestDevAuthCanListAndCreateBusinesses(t *testing.T) {
+	server := NewServer(newTestService())
+	list := request(t, server, http.MethodGet, "/v1/workspaces", nil)
+	if list.Code != http.StatusOK || !bytes.Contains(list.Body.Bytes(), []byte("workspace-test")) {
+		t.Fatalf("list status/body = %d/%s", list.Code, list.Body.String())
+	}
+
+	created := request(t, server, http.MethodPost, "/v1/workspaces", map[string]any{"display_name": "Công ty Hai"})
+	if created.Code != http.StatusCreated || !bytes.Contains(created.Body.Bytes(), []byte("Công ty Hai")) {
+		t.Fatalf("create status/body = %d/%s", created.Code, created.Body.String())
 	}
 }
 
@@ -224,6 +299,65 @@ func TestGoldenPathBuildConfirmMatchAndGenerate(t *testing.T) {
 	pdf := request(t, server, http.MethodGet, "/v1/applications/"+applicationResponse.ID+"/download", nil)
 	if pdf.Code != http.StatusOK || pdf.Header().Get("Content-Type") != "application/pdf" || !bytes.HasPrefix(pdf.Body.Bytes(), []byte("%PDF-")) {
 		t.Fatalf("invalid generated PDF: status=%d content-type=%s body=%q", pdf.Code, pdf.Header().Get("Content-Type"), pdf.Body.Bytes())
+	}
+}
+
+func TestMatchLoadsPublishedPoliciesFromConfiguredStore(t *testing.T) {
+	policy := domain.Policy{ID: "db-policy", Version: 3, Title: "Policy từ DB", Lifecycle: "ACTIVE"}
+	server := NewServerWithConfig(platform.NewService(nil), Config{
+		DevAuth: true, WebOrigin: "http://localhost:5173",
+		PolicyStore: policyStoreStub{policies: []domain.Policy{policy}},
+	})
+
+	response := request(t, server, http.MethodPost, "/v1/matches", map[string]any{})
+
+	if response.Code != http.StatusCreated {
+		t.Fatalf("status = %d: %s", response.Code, response.Body.String())
+	}
+	var run struct {
+		Results []struct {
+			PolicyID string `json:"policy_id"`
+		} `json:"results"`
+	}
+	decode(t, response, &run)
+	if len(run.Results) != 1 || run.Results[0].PolicyID != "db-policy" {
+		t.Fatalf("results = %#v, want configured DB policy", run.Results)
+	}
+}
+
+func TestMatchReturnsRetrievedDocumentsWhenNoStructuredPoliciesExist(t *testing.T) {
+	service := platform.NewService(nil)
+	if _, err := service.BuildPassport("local-development-workspace", platform.BuildPassportInput{
+		CompanyName: "Công ty Xanh", SupportNeeds: []string{"đổi mới công nghệ"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	server := NewServerWithConfig(service, Config{
+		DevAuth: true, WebOrigin: "http://localhost:5173",
+		PolicyStore: policyStoreStub{},
+		DocumentSearcher: documentSearcherStub{
+			mode: "HYBRID_RULE_VECTOR",
+			documents: []domain.DocumentMatch{{
+				ID: "document-1", Version: 1, Title: "Chính sách đổi mới công nghệ", Agency: "Bộ KH&CN",
+				Excerpt: "Hỗ trợ doanh nghiệp đổi mới công nghệ.", VectorScore: 0.9, HybridScore: 0.03,
+			}},
+		},
+	})
+
+	response := request(t, server, http.MethodPost, "/v1/matches", map[string]any{})
+
+	if response.Code != http.StatusCreated {
+		t.Fatalf("status = %d: %s", response.Code, response.Body.String())
+	}
+	var run struct {
+		Results []struct {
+			PolicyID      string `json:"policy_id"`
+			RetrievalMode string `json:"retrieval_mode"`
+		} `json:"results"`
+	}
+	decode(t, response, &run)
+	if len(run.Results) != 1 || run.Results[0].PolicyID != "document-1" || run.Results[0].RetrievalMode != "HYBRID_RULE_VECTOR" {
+		t.Fatalf("results = %#v, want retrieved production document", run.Results)
 	}
 }
 

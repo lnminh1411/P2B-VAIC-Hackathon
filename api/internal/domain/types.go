@@ -2,6 +2,13 @@ package domain
 
 import "time"
 
+type Workspace struct {
+	ID          string    `json:"id"`
+	DisplayName string    `json:"display_name"`
+	Role        string    `json:"role"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
 type FieldStatus string
 
 const (
@@ -88,10 +95,43 @@ type Policy struct {
 	TemplateReady bool                    `json:"template_ready"`
 }
 
+// DocumentMatch is an unstructured legal document retrieved from the production
+// corpus. It is intentionally separate from Policy: a retrieved document has
+// relevance evidence, but no reviewed eligibility rules yet.
+type DocumentMatch struct {
+	ID           string
+	Version      int
+	Title        string
+	Agency       string
+	Excerpt      string
+	SourceURL    string
+	LexicalScore float64
+	VectorScore  float64
+	HybridScore  float64
+}
+
 type ChecklistTemplateItem struct {
 	Key         string   `json:"key"`
 	Title       string   `json:"title"`
 	Description string   `json:"description"`
 	Required    bool     `json:"required"`
 	FieldKeys   []string `json:"field_keys"`
+}
+
+type WatchlistSettings struct {
+	NewPolicies       bool `json:"new_policies"`
+	DeadlineChanges   bool `json:"deadline_changes"`
+	StaleEvidence     bool `json:"stale_evidence"`
+	UpcomingDeadlines bool `json:"upcoming_deadlines"`
+}
+
+type Alert struct {
+	ID         string    `json:"id"`
+	Type       string    `json:"type"`
+	Title      string    `json:"title"`
+	Message    string    `json:"message"`
+	PolicyID   string    `json:"policy_id,omitempty"`
+	Severity   string    `json:"severity"`
+	Read       bool      `json:"read"`
+	OccurredAt time.Time `json:"occurred_at"`
 }

@@ -37,6 +37,7 @@ type MatchResult struct {
 	RankingReasons []string           `json:"ranking_reasons"`
 	TemplateReady  bool               `json:"template_ready"`
 	RetrievalMode  string             `json:"retrieval_mode"`
+	SourceURL      string             `json:"source_url,omitempty"`
 }
 
 type MatchRun struct {
@@ -86,37 +87,40 @@ type Checklist struct {
 }
 
 type Application struct {
-	ID              string            `json:"id"`
-	ChecklistID     string            `json:"checklist_id"`
-	PolicyID        string            `json:"policy_id"`
-	PassportVersion int               `json:"passport_version"`
-	PolicyVersion   int               `json:"policy_version"`
-	TemplateVersion int               `json:"template_version"`
-	Version         int               `json:"version"`
-	Status          string            `json:"status"`
-	Sections        map[string]string `json:"sections"`
-	BlockingReasons []string          `json:"blocking_reasons"`
-	UpdatedAt       time.Time         `json:"updated_at"`
+	ID                string            `json:"id"`
+	ChecklistID       string            `json:"checklist_id"`
+	PolicyID          string            `json:"policy_id"`
+	PolicyTitle       string            `json:"policy_title,omitempty"`
+	PolicyAgency      string            `json:"policy_agency,omitempty"`
+	PassportVersion   int               `json:"passport_version"`
+	PolicyVersion     int               `json:"policy_version"`
+	TemplateID        string            `json:"template_id,omitempty"`
+	TemplateName      string            `json:"template_name,omitempty"`
+	TemplateVersion   int               `json:"template_version"`
+	Version           int               `json:"version"`
+	Status            string            `json:"status"`
+	Sections          map[string]string `json:"sections"`
+	BlockingReasons   []string          `json:"blocking_reasons"`
+	GenerationWarning string            `json:"generation_warning,omitempty"`
+	UpdatedAt         time.Time         `json:"updated_at"`
 }
 
-type Alert struct {
-	ID         string    `json:"id"`
-	Type       string    `json:"type"`
-	Title      string    `json:"title"`
-	Message    string    `json:"message"`
-	PolicyID   string    `json:"policy_id,omitempty"`
-	Severity   string    `json:"severity"`
-	Read       bool      `json:"read"`
-	OccurredAt time.Time `json:"occurred_at"`
+type ApplicationDraftContext struct {
+	Checklist Checklist
+	Passport  domain.Passport
+	Policy    domain.Policy
 }
+
+type Alert = domain.Alert
 
 type workspaceState struct {
-	Passport     domain.Passport
-	Candidates   []passport.Candidate
-	Jobs         map[string]Job
-	Matches      map[string]MatchRun
-	Enrichment   map[string]EnrichmentRun
-	Checklists   map[string]Checklist
-	Applications map[string]Application
-	Alerts       []Alert
+	Passport          domain.Passport
+	Candidates        []passport.Candidate
+	Jobs              map[string]Job
+	Matches           map[string]MatchRun
+	RetrievedPolicies map[string]domain.Policy
+	Enrichment        map[string]EnrichmentRun
+	Checklists        map[string]Checklist
+	Applications      map[string]Application
+	Alerts            []Alert
 }

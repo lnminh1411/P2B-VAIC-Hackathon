@@ -2,10 +2,13 @@ import { ArrowRight, FileText, Link2, LockKeyhole, Sparkles, UploadCloud } from 
 import { motion } from 'motion/react'
 import { useMemo, useState, type FormEvent } from 'react'
 import type { CompanyOnboardingInput } from './buildPassportPayload'
-
-const needs = ['Vốn ưu đãi', 'Thuế', 'R&D', 'Chuyển đổi số', 'Đào tạo', 'Công nghệ xanh', 'Đổi mới sáng tạo']
+import { useTranslation } from '../../lib/i18n'
 
 export function Onboarding({ onSubmit, busy, error }: { onSubmit: (data: CompanyOnboardingInput) => void; busy: boolean; error?: string }) {
+  const { t } = useTranslation()
+  const onboardingLabels = t('onboarding')
+  const needs = onboardingLabels.needs
+
   const [company, setCompany] = useState('')
   const [website, setWebsite] = useState('')
   const [selected, setSelected] = useState<string[]>([])
@@ -16,36 +19,37 @@ export function Onboarding({ onSubmit, busy, error }: { onSubmit: (data: Company
   const submit = (event: FormEvent) => { event.preventDefault(); if (canSubmit) onSubmit({ company_name: company.trim(), website: website.trim(), support_needs: selected, files }) }
   const selectFiles = (next: File[]) => {
     setFileError(undefined)
-    if (next.length > 10) { setFileError('Tối đa 10 file PDF.'); return }
-    if (next.some(file => file.size > 20 * 1024 * 1024)) { setFileError('Mỗi file PDF phải nhỏ hơn hoặc bằng 20 MB.'); return }
-    if (next.some(file => file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf'))) { setFileError('Chỉ chấp nhận file PDF.'); return }
+    if (next.length > 10) { setFileError(onboardingLabels.err_max_files); return }
+    if (next.some(file => file.size > 20 * 1024 * 1024)) { setFileError(onboardingLabels.err_file_size); return }
+    if (next.some(file => file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf'))) { setFileError(onboardingLabels.err_file_type); return }
     setFiles(next)
   }
 
   return (
-    <div className="onboarding-shell">
-      <header className="onboarding-header"><div className="brand-mark"><Sparkles /></div><strong>P2B</strong><span>Policy to Business</span><div className="header-trust"><LockKeyhole />Dữ liệu được bảo vệ</div></header>
-      <main className="onboarding-grid">
-        <motion.section className="onboarding-copy" initial={{ opacity: 0, x: -18 }} animate={{ opacity: 1, x: 0 }}>
-          <span className="kicker">COMPANY PROFILING · BƯỚC 1/4</span>
-          <h1>Biến hồ sơ doanh nghiệp thành <em>cơ hội hỗ trợ.</em></h1>
-          <p>P2B tạo Company Passport từ dữ liệu bạn cung cấp. Dữ kiện tự động chỉ xuất hiện khi có nguồn và evidence kiểm chứng được.</p>
-          <div className="proof-row"><span><b>01</b>Thông tin có dẫn nguồn</span><span><b>02</b>AI không tự quyết định</span><span><b>03</b>Review trước khi xuất</span></div>
-          <blockquote><strong>51,3%</strong><span>doanh nghiệp khảo sát chưa biết đến Luật Hỗ trợ DNNVV.</span><cite>PCI 2021 · VCCI</cite></blockquote>
-        </motion.section>
+    <div className="page-wrap onboarding-wrap">
+      <section className="page-heading text-center">
+        <span className="kicker">{onboardingLabels.kicker}</span>
+        <h1 className="onboarding-title">{onboardingLabels.h1}</h1>
+        <p className="onboarding-desc">{onboardingLabels.p}</p>
+      </section>
+
+      <div className="onboarding-content-container">
         <motion.form className="onboarding-form" onSubmit={submit} initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .08 }}>
-          <div className="form-heading"><span>Khởi tạo Company Passport</span><small>Bước thiết lập ban đầu</small></div>
-          <label>Tên doanh nghiệp<input value={company} onChange={event => setCompany(event.target.value)} maxLength={200} required /></label>
-          <label>Website doanh nghiệp<div className="input-icon"><Link2 /><input value={website} onChange={event => setWebsite(event.target.value)} type="url" placeholder="https://" /></div></label>
-          <fieldset><legend>Bạn đang tìm hỗ trợ gì?</legend><div className="choice-cloud">{needs.map(need => <button type="button" key={need} data-selected={selected.includes(need)} onClick={() => toggle(need)}>{need}</button>)}</div></fieldset>
-          <label className="upload-zone"><UploadCloud /><strong>Thêm tài liệu PDF</strong><span>Đăng ký doanh nghiệp, pitch deck, hồ sơ năng lực · tối đa 10 file, 20 MB/file</span><input type="file" accept="application/pdf,.pdf" multiple onChange={event => selectFiles(Array.from(event.target.files ?? []))} /></label>
+          <div className="form-heading"><span>{onboardingLabels.form_title}</span><small>{onboardingLabels.form_subtitle}</small></div>
+          <label>{onboardingLabels.company_name_label}<input value={company} onChange={event => setCompany(event.target.value)} maxLength={200} required /></label>
+          <label>{onboardingLabels.website_label}<div className="input-icon"><Link2 /><input value={website} onChange={event => setWebsite(event.target.value)} type="url" placeholder={onboardingLabels.website_placeholder} /></div></label>
+          <fieldset><legend>{onboardingLabels.legend}</legend><div className="choice-cloud">{needs.map(need => <button type="button" key={need} data-selected={selected.includes(need)} onClick={() => toggle(need)}>{need}</button>)}</div></fieldset>
+          <label className="upload-zone"><UploadCloud /><strong>{onboardingLabels.upload_title}</strong><span>{onboardingLabels.upload_desc}</span><input type="file" accept="application/pdf,.pdf" multiple onChange={event => selectFiles(Array.from(event.target.files ?? []))} /></label>
           {files.length > 0 && <div className="file-list">{files.map(file => <span key={`${file.name}-${file.size}`}><FileText />{file.name}</span>)}</div>}
           {fileError && <p className="inline-error" role="alert">{fileError}</p>}
           {error && <p className="inline-error" role="alert">{error}</p>}
-          <button className="button primary wide" disabled={!canSubmit || busy}>{busy ? 'AI đang đọc và kiểm chứng tài liệu…' : 'Xây Company Passport'}<ArrowRight /></button>
-          <p className="form-note">PDF được lưu riêng tư, chuyển thành Markdown bằng MarkItDown rồi Gemini trích xuất dữ kiện có dẫn nguồn. Website chưa được crawl tự động.</p>
+          <button className="button primary wide" disabled={!canSubmit || busy}>{busy ? onboardingLabels.busy_text : onboardingLabels.submit_text}<ArrowRight /></button>
+          <p className="form-note">{onboardingLabels.form_note}</p>
         </motion.form>
-      </main>
+
+        <div className="proof-row"><span><b>01</b>{onboardingLabels.proof_1}</span><span><b>02</b>{onboardingLabels.proof_2}</span><span><b>03</b>{onboardingLabels.proof_3}</span></div>
+        <blockquote><strong>51,3%</strong><span>{onboardingLabels.quote_text}</span><cite>{onboardingLabels.quote_author}</cite></blockquote>
+      </div>
     </div>
   )
 }

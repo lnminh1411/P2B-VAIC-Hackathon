@@ -1,5 +1,14 @@
 # P2B MVP tasks
 
+## Cached application drafts and LLM templates
+
+- [x] Persist workspace-scoped templates and versioned drafts
+- [x] Upload/list/select PDF, DOCX and TXT templates
+- [x] Generate grounded draft sections with configured Gemini 3.1 Flash-Lite
+- [x] Autosave edits and restore latest application draft
+- [x] Cover API, generation and UI behavior with regression tests
+- [x] Run Go tests, web tests, focused lint and build
+
 - [x] Foundation, OpenAPI contract, migrations and deploy configuration
 - [x] Passport domain, evidence provenance and human review workflow
 - [x] Deterministic eligibility rule engine
@@ -19,3 +28,21 @@ Production wiring after credentials and official source allowlists are supplied:
 - [ ] Configure VBPL and official-program crawler seeds, legal access review and schedules
 - [ ] Connect the trusted-source fetcher to SSRF/DNS-rebinding and prompt-injection test suites
 - [ ] Upload and approve real DOCX templates; replace minimal PDF writer with LibreOffice merge worker
+
+## Multi-business passport refresh
+
+- [x] Allow one account to own multiple business workspaces
+- [x] Add authenticated workspace list/create/switch API
+- [x] Add workspace switcher to the shell
+- [x] Add incremental PDF refresh jobs for the selected business
+- [x] Preserve existing passport facts during refresh
+- [x] Add field-specific semantic evidence validation
+- [x] Add extraction quality gates and regression coverage for charter capital and employee concepts
+
+## Production extraction recall repair
+
+- [x] Add layout-preserving PDF text supplementation
+- [x] Add canonical field catalog to Gemini structured extraction
+- [x] Add targeted completeness pass for missing fields
+- [x] Add privacy-safe rejection diagnostics
+- [x] Run full quality gates and deploy Railway backend/worker

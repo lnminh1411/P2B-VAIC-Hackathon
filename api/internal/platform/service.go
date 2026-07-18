@@ -2,6 +2,8 @@ package platform
 
 import (
 	"errors"
+	"fmt"
+	"math"
 	"slices"
 	"sort"
 	"strings"
@@ -30,6 +32,12 @@ func NewService(policies []domain.Policy) *Service {
 	return &Service{workspaces: map[string]*workspaceState{}, policies: slices.Clone(policies)}
 }
 
+func (s *Service) ReplacePolicies(policies []domain.Policy) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.policies = slices.Clone(policies)
+}
+
 func (s *Service) workspace(id string) *workspaceState {
 	state, ok := s.workspaces[id]
 	if ok {
@@ -39,7 +47,8 @@ func (s *Service) workspace(id string) *workspaceState {
 	state = &workspaceState{
 		Passport: domain.Passport{ID: uuid.NewString(), WorkspaceID: id, Version: 1, Fields: map[string]domain.PassportField{}, UpdatedAt: now},
 		Jobs:     map[string]Job{}, Matches: map[string]MatchRun{}, Enrichment: map[string]EnrichmentRun{},
-		Checklists: map[string]Checklist{}, Applications: map[string]Application{}, Alerts: []Alert{},
+		RetrievedPolicies: map[string]domain.Policy{},
+		Checklists:        map[string]Checklist{}, Applications: map[string]Application{}, Alerts: []Alert{},
 	}
 	s.workspaces[id] = state
 	return state
@@ -91,7 +100,7 @@ func ValidateBuildPassportInput(input *BuildPassportInput) error {
 func (s *Service) Passport(workspaceID string) domain.Passport {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return clonePassport(s.workspace(workspaceID).Passport)
+	return passportservice.EnsureCanonicalFields(clonePassport(s.workspace(workspaceID).Passport))
 }
 
 func (s *Service) Candidates(workspaceID string) []passportservice.Candidate {
@@ -117,7 +126,7 @@ func (s *Service) ConfirmField(workspaceID, key string, value any, expectedVersi
 			state.Candidates[index].Status = "ACCEPTED"
 		}
 	}
-	return clonePassport(updated), nil
+	return passportservice.EnsureCanonicalFields(clonePassport(updated)), nil
 }
 
 func (s *Service) Job(workspaceID, id string) (Job, error) {
@@ -157,18 +166,158 @@ func (s *Service) Match(workspaceID string) MatchRun {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	state := s.workspace(workspaceID)
-	run := MatchRun{ID: uuid.NewString(), PassportVersion: state.Passport.Version, CreatedAt: time.Now().UTC()}
+	return s.matchLocked(state, state.Passport, nil, "RULE_ENGINE_ONLY")
+}
+
+// MatchPassport matches using the persisted passport supplied by the API layer.
+// Production passport writes live in PostgreSQL, while Service keeps only transient
+// match/application state.
+func (s *Service) MatchPassport(workspaceID string, pass domain.Passport) MatchRun {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	state := s.workspace(workspaceID)
+	state.Passport = clonePassport(pass)
+	return s.matchLocked(state, pass, nil, "RULE_ENGINE_ONLY")
+}
+
+// MatchPassportHybrid combines deterministic eligibility evaluation for reviewed
+// policies with semantic retrieval from the legal-document corpus.
+func (s *Service) MatchPassportHybrid(workspaceID string, pass domain.Passport, documents []domain.DocumentMatch, retrievalMode string) MatchRun {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	state := s.workspace(workspaceID)
+	state.Passport = clonePassport(pass)
+	if strings.TrimSpace(retrievalMode) == "" {
+		retrievalMode = "HYBRID_RULE_VECTOR"
+	}
+	return s.matchLocked(state, pass, documents, retrievalMode)
+}
+
+func (s *Service) matchLocked(state *workspaceState, pass domain.Passport, documents []domain.DocumentMatch, retrievalMode string) MatchRun {
+	run := MatchRun{ID: uuid.NewString(), PassportVersion: pass.Version, CreatedAt: time.Now().UTC(), Results: make([]MatchResult, 0)}
+	knownSources := make(map[string]struct{}, len(s.policies))
 	for _, policy := range s.policies {
 		if policy.Lifecycle != "ACTIVE" {
 			continue
 		}
-		evaluation := eligibility.Evaluate(state.Passport, policy.Rules)
-		score, reasons := rank(policy, state.Passport, evaluation)
-		run.Results = append(run.Results, MatchResult{PolicyID: policy.ID, PolicyVersion: policy.Version, Title: policy.Title, Agency: policy.Agency, Benefit: policy.Benefit, BenefitAmount: policy.BenefitAmount, Deadline: policy.Deadline, Score: score, Eligibility: evaluation, RankingReasons: reasons, TemplateReady: policy.TemplateReady, RetrievalMode: "RULE_ENGINE_ONLY"})
+		evaluation := eligibility.Evaluate(pass, policy.Rules)
+		score, reasons := rank(policy, pass, evaluation)
+		mode := "RULE_ENGINE_ONLY"
+		if len(documents) > 0 {
+			mode = retrievalMode
+		}
+		run.Results = append(run.Results, MatchResult{PolicyID: policy.ID, PolicyVersion: policy.Version, Title: policy.Title, Agency: policy.Agency, Benefit: policy.Benefit, BenefitAmount: policy.BenefitAmount, Deadline: policy.Deadline, Score: score, Eligibility: evaluation, RankingReasons: reasons, TemplateReady: policy.TemplateReady, RetrievalMode: mode, SourceURL: policy.SourceURL})
+		if policy.SourceURL != "" {
+			knownSources[policy.SourceURL] = struct{}{}
+		}
+	}
+	for _, document := range documents {
+		if document.ID == "" {
+			continue
+		}
+		if _, duplicate := knownSources[document.SourceURL]; document.SourceURL != "" && duplicate {
+			continue
+		}
+		score := documentMatchScore(document)
+		reasons := []string{"Văn bản được tìm thấy trong kho dữ liệu pháp luật"}
+		if document.VectorScore > 0 {
+			reasons = append(reasons, fmt.Sprintf("Độ tương đồng ngữ nghĩa %.0f%%", math.Min(document.VectorScore, 1)*100))
+		}
+		if document.LexicalScore > 0 {
+			reasons = append(reasons, "Có từ khóa phù hợp với Company Passport")
+		}
+		benefit := compactLegalExcerpt(document.Excerpt)
+		evaluation := retrievedDocumentCriteria(document, benefit)
+		workingPolicy := retrievedDocumentPolicy(document, benefit)
+		state.RetrievedPolicies[document.ID] = workingPolicy
+		run.Results = append(run.Results, MatchResult{
+			PolicyID: document.ID, PolicyVersion: document.Version, Title: document.Title,
+			Agency: document.Agency, Benefit: benefit, Score: score,
+			Eligibility: evaluation, RankingReasons: reasons, RetrievalMode: retrievalMode,
+			SourceURL: document.SourceURL, TemplateReady: workingPolicy.TemplateReady,
+		})
 	}
 	sort.SliceStable(run.Results, func(i, j int) bool { return run.Results[i].Score > run.Results[j].Score })
 	state.Matches[run.ID] = run
 	return run
+}
+
+func (s *Service) LoadMatchRun(workspaceID string, run MatchRun) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	state := s.workspace(workspaceID)
+	state.Matches[run.ID] = run
+	// Also register retrieved policies so checklist/document loading can find them
+	for _, result := range run.Results {
+		if result.RetrievalMode != "RULE_ENGINE_ONLY" && result.RetrievalMode != "" {
+			state.RetrievedPolicies[result.PolicyID] = retrievedDocumentPolicy(domain.DocumentMatch{
+				ID: result.PolicyID, Version: result.PolicyVersion, Title: result.Title,
+				Agency: result.Agency, SourceURL: result.SourceURL,
+			}, result.Benefit)
+		}
+	}
+}
+
+func compactLegalExcerpt(value string) string {
+	value = strings.Join(strings.Fields(value), " ")
+	for strings.HasPrefix(value, "Giới thiệu Giới thiệu ") {
+		value = strings.TrimPrefix(value, "Giới thiệu ")
+	}
+	const maxRunes = 320
+	runes := []rune(value)
+	if len(runes) <= maxRunes {
+		return value
+	}
+	cut := maxRunes - 1
+	for cut > 220 && runes[cut] != ' ' {
+		cut--
+	}
+	return strings.TrimSpace(string(runes[:cut])) + "…"
+}
+
+func retrievedDocumentCriteria(document domain.DocumentMatch, excerpt string) eligibility.Result {
+	citation := domain.Evidence{
+		SourceID: "legal-document:" + document.ID, SourceName: document.Title,
+		URL: document.SourceURL, Quote: excerpt, ContentHash: document.ID, ObservedAt: time.Now().UTC(),
+	}
+	descriptions := []string{
+		"Xác nhận doanh nghiệp thuộc đối tượng và phạm vi áp dụng của văn bản",
+		"Đối chiếu điều kiện, ngoại lệ và thời hạn tại văn bản nguồn",
+		"Xác nhận bộ hồ sơ và tài liệu bắt buộc với cơ quan ban hành",
+	}
+	criteria := make([]eligibility.CriterionResult, 0, len(descriptions))
+	for index, description := range descriptions {
+		criteria = append(criteria, eligibility.CriterionResult{
+			RuleID: fmt.Sprintf("document-review-%d", index+1), Description: description,
+			Status: eligibility.StatusMissingInfo, Expected: "Được người phụ trách xác nhận",
+			Operator: domain.OpExists, Citation: citation, Required: true,
+		})
+	}
+	return eligibility.Result{Status: eligibility.StatusMissingInfo, Criteria: criteria}
+}
+
+func retrievedDocumentPolicy(document domain.DocumentMatch, benefit string) domain.Policy {
+	return domain.Policy{
+		ID: document.ID, Version: document.Version, Title: document.Title, Agency: document.Agency,
+		Benefit: benefit, Lifecycle: "ACTIVE", VerifiedAt: time.Now().UTC(), SourceURL: document.SourceURL,
+		// This is P2B's working PDF package, not an official agency form.
+		TemplateReady: true,
+		Checklist: []domain.ChecklistTemplateItem{
+			{Key: "company_profile", Title: "Thông tin pháp lý doanh nghiệp", Description: "Dữ liệu pháp lý đã xác nhận trong Company Passport", Required: true, FieldKeys: []string{"legal_name"}},
+			{Key: "applicability_review", Title: "Biên bản đối chiếu phạm vi áp dụng", Description: "Người phụ trách xác nhận đối tượng, điều kiện, ngoại lệ và thời hạn theo văn bản nguồn", Required: true},
+			{Key: "required_documents_review", Title: "Danh mục tài liệu theo văn bản nguồn", Description: "Đối chiếu bộ hồ sơ bắt buộc và mẫu chính thức với cơ quan ban hành", Required: true},
+		},
+	}
+}
+
+func documentMatchScore(document domain.DocumentMatch) int {
+	vector := math.Max(0, math.Min(document.VectorScore, 1))
+	lexical := math.Max(0, math.Min(document.LexicalScore, 1))
+	score := 25 + int(math.Round(vector*60)) + int(math.Round(lexical*14))
+	if score > 99 {
+		return 99
+	}
+	return score
 }
 
 func (s *Service) MatchRun(workspaceID, id string) (MatchRun, error) {
@@ -185,13 +334,21 @@ func (s *Service) StartEnrichment(workspaceID, policyID string) (EnrichmentRun, 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	state := s.workspace(workspaceID)
-	policy, ok := findPolicy(s.policies, policyID)
+	policy, ok := s.findWorkspacePolicy(state, policyID)
 	if !ok || policy.Lifecycle != "ACTIVE" {
 		return EnrichmentRun{}, ErrNotFound
 	}
 	run := EnrichmentRun{ID: uuid.NewString(), PolicyID: policyID, Status: "NO_RESULTS", Candidates: []EnrichmentCandidate{}, CreatedAt: time.Now().UTC()}
 	state.Enrichment[run.ID] = run
 	return run, nil
+}
+
+func (s *Service) findWorkspacePolicy(state *workspaceState, policyID string) (domain.Policy, bool) {
+	if policy, ok := findPolicy(s.policies, policyID); ok {
+		return policy, true
+	}
+	policy, ok := state.RetrievedPolicies[policyID]
+	return policy, ok
 }
 
 func (s *Service) EnrichmentRun(workspaceID, id string) (EnrichmentRun, error) {

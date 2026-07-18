@@ -40,6 +40,7 @@ type BuildRequest struct {
 	SourceIDs      []string
 	IdempotencyKey string
 	ActorSubject   string
+	Refresh        bool
 }
 
 type Job struct {
@@ -60,6 +61,7 @@ type JobPayload struct {
 	Website      string   `json:"website"`
 	SupportNeeds []string `json:"support_needs"`
 	SourceIDs    []string `json:"source_ids"`
+	Refresh      bool     `json:"refresh"`
 }
 
 type Store struct{ database *pgxpool.Pool }
@@ -107,12 +109,23 @@ func (s *Store) EnqueueBuild(ctx context.Context, workspaceID string, request Bu
 		}
 		sourceUUIDs = append(sourceUUIDs, parsed)
 	}
+	if request.Refresh {
+		if err := ValidateRefreshRequest(request); err != nil {
+			return Job{}, err
+		}
+	}
 	transaction, err := s.database.Begin(ctx)
 	if err != nil {
 		return Job{}, fmt.Errorf("begin passport build: %w", err)
 	}
 	defer transaction.Rollback(ctx)
-	idempotency := workspaceID + ":passport-build:" + request.IdempotencyKey
+	jobType := "PASSPORT_BUILD"
+	idempotencyScope := "passport-build"
+	if request.Refresh {
+		jobType = "PASSPORT_REFRESH"
+		idempotencyScope = "passport-refresh"
+	}
+	idempotency := workspaceID + ":" + idempotencyScope + ":" + request.IdempotencyKey
 	var existing Job
 	err = transaction.QueryRow(ctx, `
 		SELECT id, type, status, progress, created_at, attempts, max_attempts, COALESCE(last_error, ''), payload
@@ -133,28 +146,37 @@ func (s *Store) EnqueueBuild(ctx context.Context, workspaceID string, request Bu
 			return Job{}, errors.New("one or more PDF uploads are missing or incomplete")
 		}
 	}
-	if _, err = transaction.Exec(ctx, `
-		INSERT INTO companies (workspace_id, legal_name, website, support_needs)
-		VALUES ($1, $2, NULLIF($3, ''), $4)
-		ON CONFLICT (workspace_id) DO UPDATE SET legal_name = EXCLUDED.legal_name, website = EXCLUDED.website,
-			support_needs = EXCLUDED.support_needs, updated_at = now()`, workspaceUUID, request.CompanyName, request.Website, request.SupportNeeds); err != nil {
-		return Job{}, fmt.Errorf("save company: %w", err)
-	}
 	var passportID uuid.UUID
-	var version int
-	if err = transaction.QueryRow(ctx, `
-		INSERT INTO passports (workspace_id, current_version) VALUES ($1, 1)
-		ON CONFLICT (workspace_id) DO UPDATE SET current_version = passports.current_version + 1, updated_at = now()
-		RETURNING id, current_version`, workspaceUUID).Scan(&passportID, &version); err != nil {
-		return Job{}, fmt.Errorf("save passport: %w", err)
+	if request.Refresh {
+		if err = transaction.QueryRow(ctx, `SELECT id FROM passports WHERE workspace_id = $1`, workspaceUUID).Scan(&passportID); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return Job{}, errors.New("cannot refresh a business without a passport")
+			}
+			return Job{}, fmt.Errorf("load passport for refresh: %w", err)
+		}
+	} else {
+		if _, err = transaction.Exec(ctx, `
+			INSERT INTO companies (workspace_id, legal_name, website, support_needs)
+			VALUES ($1, $2, NULLIF($3, ''), $4)
+			ON CONFLICT (workspace_id) DO UPDATE SET legal_name = EXCLUDED.legal_name, website = EXCLUDED.website,
+				support_needs = EXCLUDED.support_needs, updated_at = now()`, workspaceUUID, request.CompanyName, request.Website, request.SupportNeeds); err != nil {
+			return Job{}, fmt.Errorf("save company: %w", err)
+		}
+		var version int
+		if err = transaction.QueryRow(ctx, `
+			INSERT INTO passports (workspace_id, current_version) VALUES ($1, 1)
+			ON CONFLICT (workspace_id) DO UPDATE SET current_version = passports.current_version + 1, updated_at = now()
+			RETURNING id, current_version`, workspaceUUID).Scan(&passportID, &version); err != nil {
+			return Job{}, fmt.Errorf("save passport: %w", err)
+		}
+		now := time.Now().UTC()
+		fields := initialFields(workspaceID, request.CompanyName, request.Website, now)
+		encodedFields, _ := json.Marshal(fields)
+		if _, err = transaction.Exec(ctx, `INSERT INTO passport_versions (passport_id, version, fields, support_needs, created_by) VALUES ($1, $2, $3, $4, $5)`, passportID, version, encodedFields, request.SupportNeeds, actorUUID); err != nil {
+			return Job{}, fmt.Errorf("save passport version: %w", err)
+		}
 	}
-	now := time.Now().UTC()
-	fields := initialFields(workspaceID, request.CompanyName, request.Website, now)
-	encodedFields, _ := json.Marshal(fields)
-	if _, err = transaction.Exec(ctx, `INSERT INTO passport_versions (passport_id, version, fields, support_needs, created_by) VALUES ($1, $2, $3, $4, $5)`, passportID, version, encodedFields, request.SupportNeeds, actorUUID); err != nil {
-		return Job{}, fmt.Errorf("save passport version: %w", err)
-	}
-	payload := JobPayload{CompanyName: request.CompanyName, Website: request.Website, SupportNeeds: request.SupportNeeds, SourceIDs: request.SourceIDs}
+	payload := JobPayload{CompanyName: request.CompanyName, Website: request.Website, SupportNeeds: request.SupportNeeds, SourceIDs: request.SourceIDs, Refresh: request.Refresh}
 	encodedPayload, _ := json.Marshal(payload)
 	status, progress := "QUEUED", 0
 	if len(sourceUUIDs) == 0 {
@@ -164,16 +186,30 @@ func (s *Store) EnqueueBuild(ctx context.Context, workspaceID string, request Bu
 	var job Job
 	if err = transaction.QueryRow(ctx, `
 		INSERT INTO jobs (id, workspace_id, type, payload, idempotency_key, status, progress, completed_at)
-		VALUES ($1, $2, 'PASSPORT_BUILD', $3, $4, $5, $6, CASE WHEN $5 = 'SUCCEEDED' THEN now() END)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, CASE WHEN $6 = 'SUCCEEDED' THEN now() END)
 		ON CONFLICT (idempotency_key) DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key
 		RETURNING id, type, status, progress, created_at, attempts, max_attempts, COALESCE(last_error, ''), payload`,
-		jobID, workspaceUUID, encodedPayload, idempotency, status, progress).Scan(&job.ID, &job.Type, &job.Status, &job.Progress, &job.CreatedAt, &job.Attempts, &job.MaxAttempts, &job.LastError, &job.Payload); err != nil {
+		jobID, workspaceUUID, jobType, encodedPayload, idempotency, status, progress).Scan(&job.ID, &job.Type, &job.Status, &job.Progress, &job.CreatedAt, &job.Attempts, &job.MaxAttempts, &job.LastError, &job.Payload); err != nil {
 		return Job{}, fmt.Errorf("enqueue passport build: %w", err)
 	}
 	if err = transaction.Commit(ctx); err != nil {
 		return Job{}, fmt.Errorf("commit passport build: %w", err)
 	}
 	return job, nil
+}
+
+func (s *Store) EnqueueRefresh(ctx context.Context, workspaceID string, sourceIDs []string, idempotencyKey, actorSubject string) (Job, error) {
+	return s.EnqueueBuild(ctx, workspaceID, BuildRequest{SourceIDs: sourceIDs, IdempotencyKey: idempotencyKey, ActorSubject: actorSubject, Refresh: true})
+}
+
+func ValidateRefreshRequest(request BuildRequest) error {
+	if len(request.SourceIDs) == 0 {
+		return errors.New("at least one new PDF source is required")
+	}
+	if len(request.SourceIDs) > 10 {
+		return errors.New("at most 10 PDF sources are allowed")
+	}
+	return nil
 }
 
 func (s *Store) Job(ctx context.Context, workspaceID, jobID string) (Job, error) {
@@ -204,7 +240,7 @@ func (s *Store) Passport(ctx context.Context, workspaceID string) (domain.Passpo
 	if err = json.Unmarshal(encodedFields, &result.Fields); err != nil {
 		return domain.Passport{}, fmt.Errorf("decode passport fields: %w", err)
 	}
-	return result, nil
+	return passportdomain.EnsureCanonicalFields(result), nil
 }
 
 func (s *Store) Candidates(ctx context.Context, workspaceID string) ([]passportdomain.Candidate, error) {
@@ -271,23 +307,40 @@ func (s *Store) ConfirmField(ctx context.Context, workspaceID, actorSubject, fie
 		SELECT id, data_type, evidence FROM field_candidates
 		WHERE workspace_id = $1::uuid AND field_key = $2 AND status IN ('EXTRACTED','NEEDS_REVIEW','CONFLICTED')
 		ORDER BY created_at DESC LIMIT 1`, workspaceID, fieldKey).Scan(&candidateID, &dataType, &encodedEvidence); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return domain.Passport{}, errors.New("reviewable candidate not found")
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return domain.Passport{}, err
 		}
-		return domain.Passport{}, err
-	}
-	var evidence domain.Evidence
-	if err = json.Unmarshal(encodedEvidence, &evidence); err != nil {
-		return domain.Passport{}, err
 	}
 	fields := map[string]domain.PassportField{}
 	if err = json.Unmarshal(encodedFields, &fields); err != nil {
 		return domain.Passport{}, err
 	}
+	pass := passportdomain.EnsureCanonicalFields(domain.Passport{Fields: fields})
+	fields = pass.Fields
+	definition, known := passportdomain.LookupField(fieldKey)
+	if !known {
+		return domain.Passport{}, fmt.Errorf("unknown passport field %q", fieldKey)
+	}
 	if value == nil || fmt.Sprint(value) == "" {
 		return domain.Passport{}, errors.New("confirmed value is required")
 	}
-	fields[fieldKey] = domain.PassportField{Key: fieldKey, Label: fieldLabel(fieldKey), Value: value, DataType: dataType, Status: domain.FieldConfirmed, Confidence: 1, Evidence: []domain.Evidence{evidence}}
+	if err = passportdomain.ValidateFieldValue(fieldKey, value); err != nil {
+		return domain.Passport{}, err
+	}
+	field := fields[fieldKey]
+	evidence := field.Evidence
+	if len(encodedEvidence) > 0 {
+		var candidateEvidence domain.Evidence
+		if err = json.Unmarshal(encodedEvidence, &candidateEvidence); err != nil {
+			return domain.Passport{}, err
+		}
+		evidence = append(evidence, candidateEvidence)
+	}
+	evidence = append(evidence, domain.Evidence{
+		SourceID: "user-input", SourceName: "Người dùng xác nhận", Quote: fmt.Sprint(value),
+		ContentHash: fmt.Sprintf("user-confirmation:%s:v%d", actorSubject, currentVersion+1), ObservedAt: time.Now().UTC(),
+	})
+	fields[fieldKey] = domain.PassportField{Key: fieldKey, Label: definition.Label, Value: value, DataType: definition.DataType, Status: domain.FieldConfirmed, Confidence: 1, Evidence: evidence}
 	encodedFields, _ = json.Marshal(fields)
 	newVersion := currentVersion + 1
 	if _, err = transaction.Exec(ctx, `INSERT INTO passport_versions (passport_id, version, fields, support_needs, created_by) VALUES ($1, $2, $3, $4, $5)`, passportID, newVersion, encodedFields, supportNeeds, actorID); err != nil {
@@ -296,8 +349,28 @@ func (s *Store) ConfirmField(ctx context.Context, workspaceID, actorSubject, fie
 	if _, err = transaction.Exec(ctx, `UPDATE passports SET current_version = $2, updated_at = now() WHERE id = $1`, passportID, newVersion); err != nil {
 		return domain.Passport{}, err
 	}
-	if _, err = transaction.Exec(ctx, `UPDATE field_candidates SET status = 'ACCEPTED' WHERE id = $1`, candidateID); err != nil {
-		return domain.Passport{}, err
+	if candidateID != uuid.Nil {
+		if _, err = transaction.Exec(ctx, `UPDATE field_candidates SET status = 'ACCEPTED' WHERE id = $1`, candidateID); err != nil {
+			return domain.Passport{}, err
+		}
+	}
+	if fieldKey == "legal_name" {
+		if _, err = transaction.Exec(ctx, `
+			INSERT INTO companies (workspace_id, legal_name, support_needs)
+			VALUES ($1::uuid, $2, '{}')
+			ON CONFLICT (workspace_id) DO UPDATE SET legal_name = EXCLUDED.legal_name, updated_at = now()`, workspaceID, fmt.Sprint(value)); err != nil {
+			return domain.Passport{}, err
+		}
+		if _, err = transaction.Exec(ctx, `UPDATE workspaces SET display_name = $2, updated_at = now() WHERE id = $1::uuid`, workspaceID, fmt.Sprint(value)); err != nil {
+			return domain.Passport{}, err
+		}
+	} else if fieldKey == "website" {
+		if _, err = transaction.Exec(ctx, `
+			INSERT INTO companies (workspace_id, legal_name, website, support_needs)
+			VALUES ($1::uuid, 'Chưa có tên', NULLIF($2, ''), '{}')
+			ON CONFLICT (workspace_id) DO UPDATE SET website = EXCLUDED.website, updated_at = now()`, workspaceID, fmt.Sprint(value)); err != nil {
+			return domain.Passport{}, err
+		}
 	}
 	if err = transaction.Commit(ctx); err != nil {
 		return domain.Passport{}, err
@@ -317,19 +390,132 @@ func initialFields(workspaceID, companyName, website string, now time.Time) map[
 }
 
 func fieldLabel(key string) string {
-	labels := map[string]string{
-		"tax_code": "Mã số thuế", "company_type": "Loại hình", "founded_date": "Ngày thành lập",
-		"operating_status": "Trạng thái hoạt động", "charter_capital": "Vốn điều lệ", "revenue": "Doanh thu",
-		"assets": "Tổng tài sản", "employee_count": "Số nhân viên", "address": "Địa chỉ", "province": "Tỉnh/thành",
-		"industrial_zone": "Khu công nghiệp", "business_sectors": "Ngành nghề", "products": "Sản phẩm",
-		"technologies": "Công nghệ", "markets": "Thị trường", "fdi_status": "Doanh nghiệp FDI",
-		"foreign_ownership_rate": "Tỷ lệ sở hữu nước ngoài", "women_owned": "Doanh nghiệp nữ làm chủ",
-		"rd_capability": "Năng lực R&D", "intellectual_property": "Sở hữu trí tuệ", "certifications": "Chứng nhận",
-		"innovation_projects": "Dự án đổi mới", "green_projects": "Dự án công nghệ xanh", "funding_need": "Nhu cầu vốn",
-		"funding_use_plan": "Kế hoạch sử dụng vốn",
-	}
-	if label := labels[key]; label != "" {
-		return label
+	if definition, exists := passportdomain.LookupField(key); exists {
+		return definition.Label
 	}
 	return key
+}
+
+func (s *Store) SaveMatchRun(ctx context.Context, matchID string, workspaceID string, passportID string, passportVersion int, retrievalMode string, resultsJSON []byte) error {
+	_, err := s.database.Exec(ctx, `
+		INSERT INTO match_runs (id, workspace_id, passport_id, passport_version, retrieval_mode, results, created_at)
+		VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, now())`,
+		matchID, workspaceID, passportID, passportVersion, retrievalMode, resultsJSON)
+	return err
+}
+
+func (s *Store) LatestMatchRun(ctx context.Context, workspaceID string) (id string, passportVersion int, resultsJSON []byte, createdAt time.Time, err error) {
+	err = s.database.QueryRow(ctx, `
+		SELECT id, passport_version, results, created_at
+		FROM match_runs
+		WHERE workspace_id = $1::uuid
+		ORDER BY created_at DESC
+		LIMIT 1`, workspaceID).Scan(&id, &passportVersion, &resultsJSON, &createdAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", 0, nil, time.Time{}, ErrNotFound
+		}
+		return "", 0, nil, time.Time{}, err
+	}
+	return id, passportVersion, resultsJSON, createdAt, nil
+}
+
+func (s *Store) WatchlistSettings(ctx context.Context, workspaceID string) (domain.WatchlistSettings, error) {
+	var settings domain.WatchlistSettings
+	var encodedSettings []byte
+	err := s.database.QueryRow(ctx, `SELECT watchlist_settings FROM companies WHERE workspace_id = $1::uuid`, workspaceID).Scan(&encodedSettings)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.WatchlistSettings{NewPolicies: false, DeadlineChanges: false, StaleEvidence: false, UpcomingDeadlines: false}, nil
+	}
+	if err != nil {
+		return domain.WatchlistSettings{NewPolicies: false, DeadlineChanges: false, StaleEvidence: false, UpcomingDeadlines: false}, err
+	}
+	if err = json.Unmarshal(encodedSettings, &settings); err != nil {
+		return domain.WatchlistSettings{NewPolicies: false, DeadlineChanges: false, StaleEvidence: false, UpcomingDeadlines: false}, err
+	}
+	return settings, nil
+}
+
+func (s *Store) SaveWatchlistSettings(ctx context.Context, workspaceID string, settings domain.WatchlistSettings) error {
+	encodedSettings, err := json.Marshal(settings)
+	if err != nil {
+		return err
+	}
+	_, err = s.database.Exec(ctx, `
+		INSERT INTO companies (workspace_id, legal_name, support_needs, watchlist_settings)
+		VALUES ($1::uuid, 'Chưa có tên', '{}', $2)
+		ON CONFLICT (workspace_id) DO UPDATE SET watchlist_settings = EXCLUDED.watchlist_settings, updated_at = now()`,
+		workspaceID, encodedSettings)
+	return err
+}
+
+func (s *Store) SaveAlert(ctx context.Context, workspaceID string, alert domain.Alert) error {
+	payloadMap := map[string]any{
+		"title":     alert.Title,
+		"message":   alert.Message,
+		"policy_id": alert.PolicyID,
+	}
+	encodedPayload, err := json.Marshal(payloadMap)
+	if err != nil {
+		return err
+	}
+	var readAt *time.Time
+	if alert.Read {
+		now := time.Now().UTC()
+		readAt = &now
+	}
+	_, err = s.database.Exec(ctx, `
+		INSERT INTO alerts (id, workspace_id, type, severity, payload, read_at, created_at)
+		VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7)`,
+		alert.ID, workspaceID, alert.Type, alert.Severity, encodedPayload, readAt, alert.OccurredAt)
+	return err
+}
+
+func (s *Store) Alerts(ctx context.Context, workspaceID string) ([]domain.Alert, error) {
+	rows, err := s.database.Query(ctx, `
+		SELECT id, type, severity, payload, read_at, created_at
+		FROM alerts
+		WHERE workspace_id = $1::uuid
+		ORDER BY created_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	alerts := make([]domain.Alert, 0)
+	for rows.Next() {
+		var idStr, alertType, severity string
+		var encodedPayload []byte
+		var readAt *time.Time
+		var createdAt time.Time
+		if err := rows.Scan(&idStr, &alertType, &severity, &encodedPayload, &readAt, &createdAt); err != nil {
+			return nil, err
+		}
+		var payloadMap map[string]any
+		if err := json.Unmarshal(encodedPayload, &payloadMap); err != nil {
+			return nil, err
+		}
+		title, _ := payloadMap["title"].(string)
+		message, _ := payloadMap["message"].(string)
+		policyID, _ := payloadMap["policy_id"].(string)
+
+		alerts = append(alerts, domain.Alert{
+			ID:         idStr,
+			Type:       alertType,
+			Severity:   severity,
+			Title:      title,
+			Message:    message,
+			PolicyID:   policyID,
+			Read:       readAt != nil,
+			OccurredAt: createdAt.UTC(),
+		})
+	}
+	return alerts, nil
+}
+
+func (s *Store) MarkAlertRead(ctx context.Context, workspaceID string, alertID string) error {
+	_, err := s.database.Exec(ctx, `
+		UPDATE alerts SET read_at = now() WHERE workspace_id = $1::uuid AND id = $2::uuid`,
+		workspaceID, alertID)
+	return err
 }
