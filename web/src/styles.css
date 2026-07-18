@@ -93,6 +93,9 @@ a { color: inherit; }
 .topbar-actions { display: flex; align-items: center; gap: 1rem; }
 .system-state { color: var(--muted); font-size: .7rem; display: flex; gap: .45rem; align-items: center; }
 .system-state span { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+.lang-switcher { display: flex; align-items: center; }
+.lang-select { background: #141119; border: 1px solid var(--line-strong); color: var(--muted); font-size: .72rem; padding: .35rem .65rem; border-radius: 8px; cursor: pointer; outline: none; transition: all .2s ease; }
+.lang-select:hover, .lang-select:focus { border-color: var(--violet); color: white; }
 .account-menu { position: relative; }
 .avatar { border: 1px solid var(--line-strong); background: #1d1826; width: 36px; height: 36px; border-radius: 50%; font-size: .7rem; font-weight: 700; cursor: pointer; overflow: hidden; padding: 0; }
 .avatar:hover, .avatar[aria-expanded="true"] { border-color: var(--violet); box-shadow: 0 0 0 3px rgba(139,92,246,.12); }
