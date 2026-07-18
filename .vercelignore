@@ -7,3 +7,7 @@ tasks/
 templates/
 Makefile
 railway.json
+backend/
+web/node_modules/
+.graphify/
+frontend/
