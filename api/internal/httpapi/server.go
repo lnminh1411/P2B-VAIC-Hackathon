@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
@@ -142,6 +143,7 @@ func (s *Server) authenticate(next http.Handler) http.Handler {
 		}
 		if !s.config.DevAuth && s.config.WorkspaceBootstrapper != nil {
 			if err := s.config.WorkspaceBootstrapper.Ensure(r.Context(), principal); err != nil {
+				slog.ErrorContext(r.Context(), "workspace bootstrap failed", "error", err)
 				writeError(w, http.StatusServiceUnavailable, "WORKSPACE_UNAVAILABLE", "Workspace is temporarily unavailable")
 				return
 			}
