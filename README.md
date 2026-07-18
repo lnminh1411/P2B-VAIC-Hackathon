@@ -37,6 +37,18 @@ Trải nghiệm phiên bản thử nghiệm trực tuyến tại: [https://p2b-z
 2.  **Layout-preserving PDF extraction:** Văn bản PDF chứa bảng biểu được bổ sung công cụ `pdftotext -layout` giữ quan hệ nhãn-giá trị; PDF scan/ít text chạy OCR fallback bằng `pdftoppm` + `tesseract` (`OCR_LANGUAGES` mặc định `vie+eng`).
 3.  **Completeness Pass & Quality Gates:** Chạy completeness pass có mục tiêu cho các field còn thiếu và ghi nhận logs chất lượng (raw/valid/rejected candidates) thay vì logs các trường dữ liệu nhạy cảm.
 
+### 2.2. Bộ nhớ đệm Đối chiếu & Giám sát Chính sách tự động (Cache & Policy Watchlist)
+1. **Opportunity Matching Cache:** Kết quả phân tích đối chiếu tiêu chuẩn tài trợ được lưu trữ lưu động trong bảng `match_runs` của PostgreSQL. Cache tự động xóa và tính toán lại khi người dùng thay đổi dữ liệu trong Passport, giúp giảm thiểu thời gian chờ đợi.
+2. **Watchlist Toggles:** Cho phép doanh nghiệp tùy biến bộ lọc cảnh báo cho từng workspace với 4 danh mục: *Chính sách mới*, *Thay đổi thời hạn*, *Chứng cứ hết hạn (Stale)*, và *Hồ sơ cận hạn*. Trạng thái cấu hình được lưu trực tiếp dưới dạng JSONB.
+3. **Automated Crawler Scheduler:** Bộ quét chạy ngầm định kỳ mỗi 1 giờ (và chạy ngay khi khởi động hệ thống) để đối chiếu thay đổi của văn bản pháp luật:
+   - Phát hiện chính sách mới phù hợp hồ sơ doanh nghiệp.
+   - Phát hiện các cập nhật thay đổi ngày hạn chót của chính sách hiện tại.
+   - Đối chiếu ngày hết hiệu lực của các văn bản pháp luật với mã băm nội dung (`content_hash`) của tài liệu minh chứng trong Passport để tự động cảnh báo chứng cứ cũ/hết hiệu lực.
+
+### 2.3. Bản nháp Đơn ứng tuyển & Quản lý Mẫu đơn (Application Draft Caching)
+1. **Mẫu đơn tùy biến:** Hỗ trợ tải lên và phân tích các mẫu đơn PDF/Docx của chính phủ, tự động trích xuất các trường thông tin cần điền bằng Gemini.
+2. **Application Draft Cache:** Toàn bộ bản nháp và tiến trình chuẩn bị đơn được lưu trữ động trong bảng `application_draft_cache` của PostgreSQL, đảm bảo dữ liệu không bị mất khi tải lại trang hoặc đổi workspace.
+
 ### 3. Danh sách kiểm tra & Chuẩn bị Hồ sơ Ứng tuyển (Evidence-Gated Checklist)
 *   **Sinh Checklist tự động:** Dựa trên các điều kiện luật của chính sách, hệ thống tạo checklist các văn bản bắt buộc cần nộp.
 *   **Khóa hồ sơ theo bằng chứng:** Chỉ khi toàn bộ các trường thông tin quan trọng được xác minh nguồn dẫn, đơn ứng tuyển mới cho phép hoàn tất và phê duyệt.
@@ -182,6 +194,18 @@ Experience the live application at: [https://p2b-zeta.vercel.app/](https://p2b-z
 1.  **Multi-business Tenants:** Owners can manage and switch between multiple business workspaces with strict tenant isolation. Document update triggers incremental PDF refresh jobs without destroying existing facts.
 2.  **Layout-preserving PDF extraction:** Combines layout text output for tables (`pdftotext -layout`) with custom OCR fallback using `pdftoppm` + `tesseract` (`OCR_LANGUAGES` defaults to `vie+eng`).
 3.  **Completeness Pass & Quality Gates:** Target checks resolve missing facts and audit quality (raw/valid/rejected counts) without logging sensitive quotes.
+
+### 2.2. Persistent Matching Cache & Automated Watchlist Monitoring
+1. **Opportunity Matching Cache:** Matching scores and criteria results are cached persistently inside PostgreSQL `match_runs` table, avoiding redundant runs. The cache automatically invalidates and refreshes whenever the Company Passport is updated.
+2. **Interactive Watchlist:** Strict workspace preferences for alerts can be toggled interactively for four distinct categories (*New Policies*, *Deadline Changes*, *Stale Evidence*, and *Upcoming Deadlines*), stored directly as a JSONB preferences column.
+3. **Scheduled Crawler Worker:** A background scheduler process executes a rules pass on startup and every 1 hour to:
+   - Identify new policies matching the workspace's support profile.
+   - Detect deadline alterations on active policies.
+   - Cross-reference expired legal document versions with active Passport evidence content hashes to flag stale evidence.
+
+### 2.3. Application Drafts & Form Template Caching
+1. **Custom Form Templates:** Users can upload custom government PDF/Docx form templates, automatically parsing and extracting template placeholders using Gemini structure extraction.
+2. **Application Draft Cache:** Draft sections and progress state are persisted dynamically inside `application_draft_cache` in PostgreSQL to protect progress across browser reloads or workspace swaps.
 
 ### 3. Evidence-Gated Checklists & Applications
 *   **Automated Checklist:** Generates document and info check-items mapped to policy requirements.
