@@ -67,6 +67,7 @@ export const api = {
 	job: (id: string) => request<{ id: string; status: string; progress: number; last_error?: string }>(`/v1/jobs/${id}`),
   confirmField: (fieldKey: string, value: unknown, version: number) => request<Passport>(`/v1/passport/fields/${fieldKey}`, { method: 'PUT', body: JSON.stringify({ value, expected_version: version }) }),
   match: () => request<MatchRun>('/v1/matches', { method: 'POST', body: '{}' }),
+  getMatch: () => request<MatchRun>('/v1/matches'),
   startEnrichment: (policyId: string) => request<EnrichmentRun>('/v1/enrichment-runs', { method: 'POST', body: JSON.stringify({ policy_id: policyId }) }),
   acceptEnrichment: (candidateId: string, version: number) => request<Passport>(`/v1/enrichment-candidates/${candidateId}/accept`, { method: 'POST', body: JSON.stringify({ expected_version: version }) }),
   rejectEnrichment: (candidateId: string) => request<void>(`/v1/enrichment-candidates/${candidateId}/reject`, { method: 'POST' }),

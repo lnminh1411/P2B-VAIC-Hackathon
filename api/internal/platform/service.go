@@ -242,6 +242,27 @@ func (s *Service) matchLocked(state *workspaceState, pass domain.Passport, docum
 	return run
 }
 
+func (s *Service) LoadMatchRun(workspaceID string, run MatchRun) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	state := s.workspace(workspaceID)
+	state.Matches[run.ID] = run
+	// Also register retrieved policies so checklist/document loading can find them
+	for _, result := range run.Results {
+		if result.RetrievalMode != "RULE_ENGINE_ONLY" && result.RetrievalMode != "" {
+			state.RetrievedPolicies[result.PolicyID] = domain.Policy{
+				ID:            result.PolicyID,
+				Version:       result.PolicyVersion,
+				Title:         result.Title,
+				Agency:        result.Agency,
+				Benefit:       result.Benefit,
+				TemplateReady: result.TemplateReady,
+				Lifecycle:     "ACTIVE",
+			}
+		}
+	}
+}
+
 func compactLegalExcerpt(value string) string {
 	value = strings.Join(strings.Fields(value), " ")
 	for strings.HasPrefix(value, "Giới thiệu Giới thiệu ") {

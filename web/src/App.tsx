@@ -21,7 +21,6 @@ export default function App() {
   const shellLabels = t('shell')
   
   const [page, setPage] = useState<Page>('overview')
-  const [matchRun, setMatchRun] = useState<MatchRun>()
   const [selectedPolicy, setSelectedPolicy] = useState<MatchResult>()
   const [enrichment, setEnrichment] = useState<EnrichmentRun>()
   const [checklist, setChecklist] = useState<Checklist>()
@@ -38,6 +37,8 @@ export default function App() {
   const adminQuery = useQuery({ queryKey: ['admin-policies'], queryFn: api.adminPolicies, enabled: page === 'admin' })
   const workspaces = workspacesQuery.data?.workspaces ?? []
   const selectedWorkspaceId = workspaceScope ?? workspaces[0]?.id
+  const matchQuery = useQuery({ queryKey: ['match', workspaceScope], queryFn: api.getMatch, enabled: Boolean(workspaceScope && passportQuery.data?.company_name) })
+  const matchRun = matchQuery.data?.results && matchQuery.data.results.length > 0 ? matchQuery.data : undefined
 
   const buildMutation = useMutation({
     mutationFn: async (input: CompanyOnboardingInput) => {
@@ -52,7 +53,7 @@ export default function App() {
       }
       throw new Error(pageStateLabels.timeout)
     },
-    onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['passport', workspaceScope] }), queryClient.invalidateQueries({ queryKey: ['candidates', workspaceScope] })]); setPage('passport') },
+    onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['passport', workspaceScope] }), queryClient.invalidateQueries({ queryKey: ['candidates', workspaceScope] }), queryClient.invalidateQueries({ queryKey: ['match', workspaceScope] })]); setPage('passport') },
   })
   const refreshMutation = useMutation({
     mutationFn: async (files: File[]) => {
@@ -67,10 +68,10 @@ export default function App() {
       }
       throw new Error(pageStateLabels.timeout)
     },
-    onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['passport', workspaceScope] }), queryClient.invalidateQueries({ queryKey: ['candidates', workspaceScope] })]) },
+    onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['passport', workspaceScope] }), queryClient.invalidateQueries({ queryKey: ['candidates', workspaceScope] }), queryClient.invalidateQueries({ queryKey: ['match', workspaceScope] })]) },
   })
   const createWorkspaceMutation = useMutation({ mutationFn: api.createWorkspace, onSuccess: async workspace => { await queryClient.invalidateQueries({ queryKey: ['workspaces'] }); setApiWorkspaceId(workspace.id); setActiveWorkspaceId(workspace.id); setPage('overview') } })
-  const matchMutation = useMutation({ mutationFn: api.match, onSuccess: data => setMatchRun(data) })
+  const matchMutation = useMutation({ mutationFn: api.match, onSuccess: data => { queryClient.setQueryData(['match', workspaceScope], data) } })
   const enrichMutation = useMutation({ mutationFn: api.startEnrichment, onSuccess: setEnrichment })
   const checklistMutation = useMutation({ mutationFn: (policyId: string) => api.createChecklist(policyId), onSuccess: setChecklist })
   const applicationMutation = useMutation({ mutationFn: (checklistId: string) => api.createApplication(checklistId), onSuccess: setApplication })
@@ -86,6 +87,7 @@ export default function App() {
     const current = queryClient.getQueryData<typeof passport>(['passport', workspaceScope]) ?? passportQuery.data!
     const updated = await api.confirmField(fieldKey, value, current.version)
     queryClient.setQueryData(['passport', workspaceScope], updated)
+    await queryClient.invalidateQueries({ queryKey: ['match', workspaceScope] })
   }
   const confirmCandidate = async (candidate: NonNullable<typeof candidatesQuery.data>['candidates'][number]) => {
     await saveField(candidate.field_key, candidate.value)
@@ -96,6 +98,7 @@ export default function App() {
     const updated = await api.acceptEnrichment(candidateId, current.version)
     queryClient.setQueryData(['passport', workspaceScope], updated)
     setEnrichment(currentRun => currentRun ? { ...currentRun, candidates: currentRun.candidates.map(candidate => candidate.id === candidateId ? { ...candidate, status: 'ACCEPTED' } : candidate) } : currentRun)
+    await queryClient.invalidateQueries({ queryKey: ['match', workspaceScope] })
   }
   const markAvailable = async (itemId: string) => { if (!checklist) return; const updated = await api.updateChecklist(checklist.id, itemId, checklist.version, 'AVAILABLE', 'Người dùng xác nhận tài liệu trong workspace'); setChecklist(updated) }
   const applicationAction = async (action: 'submit' | 'approve' | 'generate') => {

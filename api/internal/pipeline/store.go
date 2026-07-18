@@ -395,3 +395,23 @@ func fieldLabel(key string) string {
 	}
 	return key
 }
+
+func (s *Store) SaveMatchRun(ctx context.Context, workspaceID string, runJSON []byte) error {
+	_, err := s.database.Exec(ctx, `
+		INSERT INTO match_runs (workspace_id, run_data, updated_at)
+		VALUES ($1::uuid, $2, now())
+		ON CONFLICT (workspace_id) DO UPDATE SET run_data = EXCLUDED.run_data, updated_at = now()`, workspaceID, runJSON)
+	return err
+}
+
+func (s *Store) LatestMatchRun(ctx context.Context, workspaceID string) ([]byte, error) {
+	var runJSON []byte
+	err := s.database.QueryRow(ctx, `SELECT run_data FROM match_runs WHERE workspace_id = $1::uuid`, workspaceID).Scan(&runJSON)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	return runJSON, nil
+}
