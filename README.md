@@ -49,7 +49,7 @@ Company profiling, source metadata, jobs, Markdown và field candidates đã dù
 
 ## Deploy
 
-- Railway: build bằng [`infra/Dockerfile`](infra/Dockerfile) và [`railway.json`](railway.json); pre-deploy tự chạy migration, healthcheck `/health/ready` kiểm DB thật.
+- Railway: build bằng [`infra/Dockerfile`](infra/Dockerfile) và [`railway.json`](railway.json); pre-deploy tự chạy migration. Cấu hình service riêng: API chạy `/usr/local/bin/p2b-service` với healthcheck `/health/ready`; worker chạy `/usr/local/bin/p2b-worker` không mở HTTP port.
 - Vercel: import repo, dùng cấu hình [`vercel.json`](vercel.json), đặt bốn biến `VITE_*` theo `.env.example`.
 - Secrets chỉ đặt ở Railway/Vercel environment; không đưa Supabase secret key hoặc `DATABASE_URL` xuống browser.
 - Extraction worker bắt buộc có `GEMINI_API_KEY`; model mặc định `GEMINI_MODEL=gemini-3.1-flash-lite`.
