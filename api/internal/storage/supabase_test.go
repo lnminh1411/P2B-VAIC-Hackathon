@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -29,6 +30,31 @@ func TestSupabaseSignerCreatesPrivateUploadURL(t *testing.T) {
 	}
 	if url != server.URL+"/storage/v1/object/upload/sign/p2b-private/workspace/source.pdf?token=signed-token" {
 		t.Fatalf("url = %q", url)
+	}
+}
+
+func TestSupabaseSignerDownloadsPrivateObjectWithLimit(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/storage/v1/object/authenticated/private/workspace/sources/source.pdf" {
+			t.Fatalf("path = %q", r.URL.Path)
+		}
+		if r.Header.Get("Authorization") != "Bearer secret" {
+			t.Fatal("missing service authorization")
+		}
+		_, _ = w.Write([]byte("%PDF-1.7\ncontent"))
+	}))
+	defer server.Close()
+
+	signer, err := NewSupabaseSigner(server.URL, "secret", "private", server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	content, err := signer.Download(context.Background(), "workspace/sources/source.pdf", 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(content[:5]) != "%PDF-" {
+		t.Fatalf("content = %q", content)
 	}
 }
 

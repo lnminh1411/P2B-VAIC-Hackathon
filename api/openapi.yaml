@@ -21,6 +21,13 @@ paths:
       operationId: presignUpload
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/UploadRequest" } } } }
       responses: { "201": { description: Signed upload operation }, "422": { $ref: "#/components/responses/Error" } }
+  /v1/uploads/{source_id}/complete:
+    post:
+      operationId: completeUpload
+      parameters:
+        - { name: source_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      responses: { "204": { description: Upload finalized and ready for extraction }, "404": { $ref: "#/components/responses/Error" } }
   /v1/passports/build:
     post:
       operationId: buildPassport
@@ -181,10 +188,11 @@ components:
       type: object
       required: [company_name]
       properties:
-        company_name: { type: string, maxLength: 300 }
+        company_name: { type: string, maxLength: 200 }
         website: { type: string, format: uri }
         support_needs: { type: array, items: { type: string } }
         source_names: { type: array, maxItems: 10, items: { type: string } }
+        source_ids: { type: array, maxItems: 10, items: { type: string, format: uuid } }
     ResolveFieldRequest:
       type: object
       required: [value, expected_version]
@@ -221,4 +229,3 @@ components:
         version: { type: integer }
         fields: { type: object, additionalProperties: { $ref: "#/components/schemas/PassportField" } }
         updated_at: { type: string, format: date-time }
-

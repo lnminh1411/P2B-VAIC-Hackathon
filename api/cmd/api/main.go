@@ -10,6 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/p2b/p2b/internal/httpapi"
+	"github.com/p2b/p2b/internal/pipeline"
 	"github.com/p2b/p2b/internal/platform"
 	storageadapter "github.com/p2b/p2b/internal/storage"
 	"github.com/p2b/p2b/internal/tenancy"
@@ -66,10 +67,11 @@ func main() {
 			os.Exit(1)
 		}
 		config.UploadSigner = uploadSigner
+		config.ExtractionStore = pipeline.NewStore(database)
 	}
 	server := &http.Server{
 		Addr:              address,
-		Handler:           httpapi.NewServerWithConfig(platform.NewDemoService(), config),
+		Handler:           httpapi.NewServerWithConfig(platform.NewService(nil), config),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,

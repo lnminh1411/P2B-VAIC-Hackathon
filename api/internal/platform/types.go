@@ -21,6 +21,7 @@ type BuildPassportInput struct {
 	Website      string   `json:"website"`
 	SupportNeeds []string `json:"support_needs"`
 	SourceNames  []string `json:"source_names"`
+	SourceIDs    []string `json:"source_ids"`
 }
 
 type MatchResult struct {
