@@ -91,45 +91,67 @@ func (p Processor) processSource(ctx context.Context, jobID, workspaceID string,
 	if err != nil {
 		return fmt.Errorf("download %s: %w", source.Filename, err)
 	}
+	path, contentHash, err := createIsolatedSourceFile(content)
+	if err != nil {
+		return err
+	}
+	defer os.Remove(path)
+
+	markdown, err := p.Converter.Convert(ctx, path)
+	if err != nil {
+		return fmt.Errorf("convert %s: %w", source.Filename, err)
+	}
+	allCandidates, err := p.extractCandidates(ctx, jobID, source, markdown, leaseProgress)
+	if err != nil {
+		return err
+	}
+	if err = p.Store.SaveCandidates(ctx, workspaceID, source.ID, source.Filename, contentHash, allCandidates); err != nil {
+		return err
+	}
+	return p.Store.CompleteSource(ctx, source.ID, contentHash, markdown, p.Model)
+}
+
+func createIsolatedSourceFile(content []byte) (string, string, error) {
 	prefixLength := min(len(content), 1024)
 	if prefixLength < 5 || !bytes.Contains(content[:prefixLength], []byte("%PDF-")) {
-		return ErrInvalidPDF
+		return "", "", ErrInvalidPDF
 	}
 	hash := sha256.Sum256(content)
 	contentHash := hex.EncodeToString(hash[:])
 	file, err := os.CreateTemp("", "p2b-source-*.pdf")
 	if err != nil {
-		return fmt.Errorf("create isolated source file: %w", err)
+		return "", "", fmt.Errorf("create isolated source file: %w", err)
 	}
 	path := file.Name()
-	defer os.Remove(path)
 	if err = file.Chmod(0o600); err == nil {
 		_, err = file.Write(content)
 	}
 	closeErr := file.Close()
 	if err != nil {
-		return fmt.Errorf("write isolated source file: %w", err)
+		_ = os.Remove(path)
+		return "", "", fmt.Errorf("write isolated source file: %w", err)
 	}
 	if closeErr != nil {
-		return fmt.Errorf("close isolated source file: %w", closeErr)
+		_ = os.Remove(path)
+		return "", "", fmt.Errorf("close isolated source file: %w", closeErr)
 	}
-	markdown, err := p.Converter.Convert(ctx, path)
-	if err != nil {
-		return fmt.Errorf("convert %s: %w", source.Filename, err)
-	}
+	return path, contentHash, nil
+}
+
+func (p Processor) extractCandidates(ctx context.Context, jobID string, source pipeline.SourceRecord, markdown string, leaseProgress int) ([]extraction.Candidate, error) {
 	markdownChunks := chunks(markdown, maxGeminiChunkBytes)
 	slog.Info("source text extracted", "source_id", source.ID, "markdown_bytes", len(markdown), "chunks", len(markdownChunks))
 	allCandidates := make([]extraction.Candidate, 0)
 	for chunkIndex, chunk := range markdownChunks {
 		candidates, extractErr := p.Extractor.Extract(ctx, chunk)
 		if extractErr != nil {
-			return fmt.Errorf("extract %s with Gemini: %w", source.Filename, extractErr)
+			return nil, fmt.Errorf("extract %s with Gemini: %w", source.Filename, extractErr)
 		}
 		valid, rejected := extraction.ValidateCandidates(chunk, candidates)
 		logExtractionDiagnostics(source.ID, chunkIndex, "initial", candidates, valid, rejected)
 		allCandidates = append(allCandidates, valid...)
-		if err = p.Store.SetJobProgress(ctx, jobID, leaseProgress); err != nil {
-			return fmt.Errorf("renew extraction job lease: %w", err)
+		if err := p.Store.SetJobProgress(ctx, jobID, leaseProgress); err != nil {
+			return nil, fmt.Errorf("renew extraction job lease: %w", err)
 		}
 
 		targetedExtractor, supportsTargetedExtraction := p.Extractor.(TargetedExtractor)
@@ -142,24 +164,17 @@ func (p Processor) processSource(ctx context.Context, jobID, workspaceID string,
 		}
 		targetedCandidates, targetedErr := targetedExtractor.ExtractFields(ctx, chunk, missingFields)
 		if targetedErr != nil {
-			return fmt.Errorf("complete %s with Gemini: %w", source.Filename, targetedErr)
+			return nil, fmt.Errorf("complete %s with Gemini: %w", source.Filename, targetedErr)
 		}
 		targetedCandidates = candidatesForFields(targetedCandidates, missingFields)
 		targetedValid, targetedRejected := extraction.ValidateCandidates(chunk, targetedCandidates)
 		logExtractionDiagnostics(source.ID, chunkIndex, "targeted", targetedCandidates, targetedValid, targetedRejected)
 		allCandidates = append(allCandidates, targetedValid...)
-		if err = p.Store.SetJobProgress(ctx, jobID, leaseProgress); err != nil {
-			return fmt.Errorf("renew extraction job lease: %w", err)
+		if err := p.Store.SetJobProgress(ctx, jobID, leaseProgress); err != nil {
+			return nil, fmt.Errorf("renew extraction job lease: %w", err)
 		}
 	}
-	allCandidates = deduplicate(allCandidates)
-	if err = p.Store.SaveCandidates(ctx, workspaceID, source.ID, source.Filename, contentHash, allCandidates); err != nil {
-		return err
-	}
-	if err = p.Store.CompleteSource(ctx, source.ID, contentHash, markdown, p.Model); err != nil {
-		return err
-	}
-	return nil
+	return deduplicate(allCandidates), nil
 }
 
 func missingCanonicalFields(candidates []extraction.Candidate) []string {

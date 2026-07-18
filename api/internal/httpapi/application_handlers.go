@@ -290,48 +290,62 @@ func (s *Server) uploadApplicationTemplate(w http.ResponseWriter, r *http.Reques
 func validateApplicationTemplateFile(path, extension string) error {
 	switch extension {
 	case ".pdf":
-		file, err := os.Open(path)
-		if err != nil {
-			return err
-		}
-		defer file.Close()
-		header := make([]byte, 5)
-		if _, err = io.ReadFull(file, header); err != nil || !bytes.Equal(header, []byte("%PDF-")) {
-			return errors.New("invalid PDF signature")
-		}
-		return nil
+		return validatePDFFile(path)
 	case ".docx":
-		archive, err := zip.OpenReader(path)
-		if err != nil {
-			return err
-		}
-		defer archive.Close()
-		var total uint64
-		hasContentTypes, hasDocument := false, false
-		for _, file := range archive.File {
-			total += file.UncompressedSize64
-			if total > 50<<20 {
-				return errors.New("DOCX expanded content exceeds limit")
-			}
-			hasContentTypes = hasContentTypes || file.Name == "[Content_Types].xml"
-			hasDocument = hasDocument || file.Name == "word/document.xml"
-		}
-		if !hasContentTypes || !hasDocument {
-			return errors.New("invalid DOCX structure")
-		}
-		return nil
+		return validateDOCXFile(path)
 	case ".txt":
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		if !utf8.Valid(content) || bytes.IndexByte(content, 0) >= 0 {
-			return errors.New("TXT must be UTF-8 text")
-		}
-		return nil
+		return validateTextFile(path)
 	default:
 		return errors.New("unsupported template type")
 	}
+}
+
+func validatePDFFile(path string) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	header := make([]byte, 5)
+	if _, err = io.ReadFull(file, header); err != nil || !bytes.Equal(header, []byte("%PDF-")) {
+		return errors.New("invalid PDF signature")
+	}
+	return nil
+}
+
+func validateDOCXFile(path string) error {
+	archive, err := zip.OpenReader(path)
+	if err != nil {
+		return err
+	}
+	defer archive.Close()
+
+	var totalSize uint64
+	hasContentTypes, hasDocument := false, false
+	for _, file := range archive.File {
+		totalSize += file.UncompressedSize64
+		if totalSize > 50<<20 {
+			return errors.New("DOCX expanded content exceeds limit")
+		}
+		hasContentTypes = hasContentTypes || file.Name == "[Content_Types].xml"
+		hasDocument = hasDocument || file.Name == "word/document.xml"
+	}
+	if !hasContentTypes || !hasDocument {
+		return errors.New("invalid DOCX structure")
+	}
+	return nil
+}
+
+func validateTextFile(path string) error {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	if !utf8.Valid(content) || bytes.IndexByte(content, 0) >= 0 {
+		return errors.New("TXT must be UTF-8 text")
+	}
+	return nil
 }
 
 func (s *Server) downloadApplication(w http.ResponseWriter, r *http.Request) {

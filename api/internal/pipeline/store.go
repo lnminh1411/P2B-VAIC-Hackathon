@@ -64,6 +64,12 @@ type JobPayload struct {
 	Refresh      bool     `json:"refresh"`
 }
 
+type buildIdentifiers struct {
+	workspace uuid.UUID
+	actor     uuid.UUID
+	sources   []uuid.UUID
+}
+
 type Store struct{ database *pgxpool.Pool }
 
 func NewStore(database *pgxpool.Pool) *Store { return &Store{database: database} }
@@ -93,26 +99,9 @@ func (s *Store) MarkUploaded(ctx context.Context, workspaceID, sourceID string) 
 }
 
 func (s *Store) EnqueueBuild(ctx context.Context, workspaceID string, request BuildRequest) (Job, error) {
-	workspaceUUID, err := uuid.Parse(workspaceID)
+	identifiers, err := validateBuildRequest(workspaceID, request)
 	if err != nil {
-		return Job{}, errors.New("invalid workspace")
-	}
-	actorUUID, err := uuid.Parse(request.ActorSubject)
-	if err != nil {
-		return Job{}, errors.New("invalid actor")
-	}
-	sourceUUIDs := make([]uuid.UUID, 0, len(request.SourceIDs))
-	for _, sourceID := range request.SourceIDs {
-		parsed, parseErr := uuid.Parse(sourceID)
-		if parseErr != nil {
-			return Job{}, errors.New("invalid source id")
-		}
-		sourceUUIDs = append(sourceUUIDs, parsed)
-	}
-	if request.Refresh {
-		if err := ValidateRefreshRequest(request); err != nil {
-			return Job{}, err
-		}
+		return Job{}, err
 	}
 	transaction, err := s.database.Begin(ctx)
 	if err != nil {
@@ -137,18 +126,18 @@ func (s *Store) EnqueueBuild(ctx context.Context, workspaceID string, request Bu
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return Job{}, fmt.Errorf("check passport build idempotency: %w", err)
 	}
-	if len(sourceUUIDs) > 0 {
+	if len(identifiers.sources) > 0 {
 		var count int
-		if err = transaction.QueryRow(ctx, `SELECT count(*) FROM company_sources WHERE workspace_id = $1 AND id = ANY($2::uuid[]) AND status = 'UPLOADED'`, workspaceUUID, sourceUUIDs).Scan(&count); err != nil {
+		if err = transaction.QueryRow(ctx, `SELECT count(*) FROM company_sources WHERE workspace_id = $1 AND id = ANY($2::uuid[]) AND status = 'UPLOADED'`, identifiers.workspace, identifiers.sources).Scan(&count); err != nil {
 			return Job{}, fmt.Errorf("validate sources: %w", err)
 		}
-		if count != len(sourceUUIDs) {
+		if count != len(identifiers.sources) {
 			return Job{}, errors.New("one or more PDF uploads are missing or incomplete")
 		}
 	}
 	var passportID uuid.UUID
 	if request.Refresh {
-		if err = transaction.QueryRow(ctx, `SELECT id FROM passports WHERE workspace_id = $1`, workspaceUUID).Scan(&passportID); err != nil {
+		if err = transaction.QueryRow(ctx, `SELECT id FROM passports WHERE workspace_id = $1`, identifiers.workspace).Scan(&passportID); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return Job{}, errors.New("cannot refresh a business without a passport")
 			}
@@ -159,27 +148,27 @@ func (s *Store) EnqueueBuild(ctx context.Context, workspaceID string, request Bu
 			INSERT INTO companies (workspace_id, legal_name, website, support_needs)
 			VALUES ($1, $2, NULLIF($3, ''), $4)
 			ON CONFLICT (workspace_id) DO UPDATE SET legal_name = EXCLUDED.legal_name, website = EXCLUDED.website,
-				support_needs = EXCLUDED.support_needs, updated_at = now()`, workspaceUUID, request.CompanyName, request.Website, request.SupportNeeds); err != nil {
+				support_needs = EXCLUDED.support_needs, updated_at = now()`, identifiers.workspace, request.CompanyName, request.Website, request.SupportNeeds); err != nil {
 			return Job{}, fmt.Errorf("save company: %w", err)
 		}
 		var version int
 		if err = transaction.QueryRow(ctx, `
 			INSERT INTO passports (workspace_id, current_version) VALUES ($1, 1)
 			ON CONFLICT (workspace_id) DO UPDATE SET current_version = passports.current_version + 1, updated_at = now()
-			RETURNING id, current_version`, workspaceUUID).Scan(&passportID, &version); err != nil {
+			RETURNING id, current_version`, identifiers.workspace).Scan(&passportID, &version); err != nil {
 			return Job{}, fmt.Errorf("save passport: %w", err)
 		}
 		now := time.Now().UTC()
 		fields := initialFields(workspaceID, request.CompanyName, request.Website, now)
 		encodedFields, _ := json.Marshal(fields)
-		if _, err = transaction.Exec(ctx, `INSERT INTO passport_versions (passport_id, version, fields, support_needs, created_by) VALUES ($1, $2, $3, $4, $5)`, passportID, version, encodedFields, request.SupportNeeds, actorUUID); err != nil {
+		if _, err = transaction.Exec(ctx, `INSERT INTO passport_versions (passport_id, version, fields, support_needs, created_by) VALUES ($1, $2, $3, $4, $5)`, passportID, version, encodedFields, request.SupportNeeds, identifiers.actor); err != nil {
 			return Job{}, fmt.Errorf("save passport version: %w", err)
 		}
 	}
 	payload := JobPayload{CompanyName: request.CompanyName, Website: request.Website, SupportNeeds: request.SupportNeeds, SourceIDs: request.SourceIDs, Refresh: request.Refresh}
 	encodedPayload, _ := json.Marshal(payload)
 	status, progress := "QUEUED", 0
-	if len(sourceUUIDs) == 0 {
+	if len(identifiers.sources) == 0 {
 		status, progress = "SUCCEEDED", 100
 	}
 	jobID := uuid.New()
@@ -189,13 +178,38 @@ func (s *Store) EnqueueBuild(ctx context.Context, workspaceID string, request Bu
 		VALUES ($1, $2, $3, $4, $5, $6, $7, CASE WHEN $6 = 'SUCCEEDED' THEN now() END)
 		ON CONFLICT (idempotency_key) DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key
 		RETURNING id, type, status, progress, created_at, attempts, max_attempts, COALESCE(last_error, ''), payload`,
-		jobID, workspaceUUID, jobType, encodedPayload, idempotency, status, progress).Scan(&job.ID, &job.Type, &job.Status, &job.Progress, &job.CreatedAt, &job.Attempts, &job.MaxAttempts, &job.LastError, &job.Payload); err != nil {
+		jobID, identifiers.workspace, jobType, encodedPayload, idempotency, status, progress).Scan(&job.ID, &job.Type, &job.Status, &job.Progress, &job.CreatedAt, &job.Attempts, &job.MaxAttempts, &job.LastError, &job.Payload); err != nil {
 		return Job{}, fmt.Errorf("enqueue passport build: %w", err)
 	}
 	if err = transaction.Commit(ctx); err != nil {
 		return Job{}, fmt.Errorf("commit passport build: %w", err)
 	}
 	return job, nil
+}
+
+func validateBuildRequest(workspaceID string, request BuildRequest) (buildIdentifiers, error) {
+	workspaceUUID, err := uuid.Parse(workspaceID)
+	if err != nil {
+		return buildIdentifiers{}, errors.New("invalid workspace")
+	}
+	actorUUID, err := uuid.Parse(request.ActorSubject)
+	if err != nil {
+		return buildIdentifiers{}, errors.New("invalid actor")
+	}
+	sourceUUIDs := make([]uuid.UUID, 0, len(request.SourceIDs))
+	for _, sourceID := range request.SourceIDs {
+		parsed, parseErr := uuid.Parse(sourceID)
+		if parseErr != nil {
+			return buildIdentifiers{}, errors.New("invalid source id")
+		}
+		sourceUUIDs = append(sourceUUIDs, parsed)
+	}
+	if request.Refresh {
+		if err := ValidateRefreshRequest(request); err != nil {
+			return buildIdentifiers{}, err
+		}
+	}
+	return buildIdentifiers{workspace: workspaceUUID, actor: actorUUID, sources: sourceUUIDs}, nil
 }
 
 func (s *Store) EnqueueRefresh(ctx context.Context, workspaceID string, sourceIDs []string, idempotencyKey, actorSubject string) (Job, error) {

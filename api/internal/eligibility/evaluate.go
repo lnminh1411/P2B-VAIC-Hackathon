@@ -88,46 +88,56 @@ func compare(actual any, operator domain.RuleOperator, expected any) (bool, erro
 		if !ok {
 			return false, fmt.Errorf("IN expects []string")
 		}
+		actualText := strings.TrimSpace(fmt.Sprint(actual))
 		return slices.ContainsFunc(values, func(value string) bool {
-			return strings.EqualFold(strings.TrimSpace(value), strings.TrimSpace(fmt.Sprint(actual)))
+			return strings.EqualFold(strings.TrimSpace(value), actualText)
 		}), nil
 	case domain.OpContains:
 		return strings.Contains(strings.ToLower(fmt.Sprint(actual)), strings.ToLower(fmt.Sprint(expected))), nil
 	case domain.OpGT, domain.OpGTE, domain.OpLT, domain.OpLTE:
-		a, err := number(actual)
-		if err != nil {
-			return false, err
-		}
-		b, err := number(expected)
-		if err != nil {
-			return false, err
-		}
-		switch operator {
-		case domain.OpGT:
-			return a > b, nil
-		case domain.OpGTE:
-			return a >= b, nil
-		case domain.OpLT:
-			return a < b, nil
-		default:
-			return a <= b, nil
-		}
+		return compareNumbers(actual, expected, operator)
 	case domain.OpDateBefore, domain.OpDateAfter:
-		a, err := time.Parse(time.DateOnly, fmt.Sprint(actual))
-		if err != nil {
-			return false, err
-		}
-		b, err := time.Parse(time.DateOnly, fmt.Sprint(expected))
-		if err != nil {
-			return false, err
-		}
-		if operator == domain.OpDateBefore {
-			return a.Before(b), nil
-		}
-		return a.After(b), nil
+		return compareDates(actual, expected, operator)
 	default:
 		return reflect.DeepEqual(actual, expected), fmt.Errorf("unsupported operator %q", operator)
 	}
+}
+
+func compareNumbers(actual, expected any, operator domain.RuleOperator) (bool, error) {
+	actualNumber, err := number(actual)
+	if err != nil {
+		return false, err
+	}
+	expectedNumber, err := number(expected)
+	if err != nil {
+		return false, err
+	}
+
+	switch operator {
+	case domain.OpGT:
+		return actualNumber > expectedNumber, nil
+	case domain.OpGTE:
+		return actualNumber >= expectedNumber, nil
+	case domain.OpLT:
+		return actualNumber < expectedNumber, nil
+	default:
+		return actualNumber <= expectedNumber, nil
+	}
+}
+
+func compareDates(actual, expected any, operator domain.RuleOperator) (bool, error) {
+	actualDate, err := time.Parse(time.DateOnly, fmt.Sprint(actual))
+	if err != nil {
+		return false, err
+	}
+	expectedDate, err := time.Parse(time.DateOnly, fmt.Sprint(expected))
+	if err != nil {
+		return false, err
+	}
+	if operator == domain.OpDateBefore {
+		return actualDate.Before(expectedDate), nil
+	}
+	return actualDate.After(expectedDate), nil
 }
 
 func number(value any) (float64, error) {
