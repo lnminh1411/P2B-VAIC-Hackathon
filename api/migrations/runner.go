@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"bytes"
 )
 
 //go:embed sql/*.sql
@@ -53,13 +54,15 @@ func Load() ([]Migration, error) {
 		if readErr != nil {
 			return nil, fmt.Errorf("read migration %q: %w", base, readErr)
 		}
-		hash := sha256.Sum256(body)
+		// Normalize newlines to Unix style (LF) for cross-platform checksum stability
+		normalizedBody := bytes.ReplaceAll(body, []byte("\r\n"), []byte("\n"))
+		hash := sha256.Sum256(normalizedBody)
 		versions[version] = base
 		migrations = append(migrations, Migration{
 			Version:  version,
 			Name:     base,
 			Checksum: hex.EncodeToString(hash[:]),
-			SQL:      string(body),
+			SQL:      string(normalizedBody),
 		})
 	}
 	sort.Slice(migrations, func(i, j int) bool { return migrations[i].Version < migrations[j].Version })
