@@ -12,9 +12,10 @@ Trải nghiệm phiên bản thử nghiệm trực tuyến tại: [https://p2b-z
 
 ## Mục lục
 1. [Tính năng cốt lõi & Quy trình Người dùng](#tính-năng-cốt-lõi--quy-trình-người-dùng)
-2. [Tổng quan Công nghệ (Tech Stack)](#tổng-quan-công-nghệ-tech-stack)
-3. [Hướng dẫn Thiết lập Local (Full-Stack)](#hướng-dẫn-thiết-lập-local-full-stack)
-4. [Cấu hình Biến môi trường](#cấu-hình-biến-môi-trường)
+2. [Chi tiết Kiến trúc Hệ thống Vector (Vector Engine Architecture)](#chi-tiết-kiến-trúc-hệ-thống-vector-vector-engine-architecture)
+3. [Tổng quan Công nghệ (Tech Stack)](#tổng-quan-công-nghệ-tech-stack)
+4. [Hướng dẫn Thiết lập Local (Full-Stack)](#hướng-dẫn-thiết-lập-local-full-stack)
+5. [Cấu hình Biến môi trường](#cấu-hình-biến-môi-trường)
 
 ---
 
@@ -31,25 +32,37 @@ Trải nghiệm phiên bản thử nghiệm trực tuyến tại: [https://p2b-z
 *   **Phân loại trạng thái:** Kết quả trả về gồm `MET` (Đạt), `NOT_MET` (Không đạt) hoặc `MISSING_INFO` (Thiếu thông tin chứng minh).
 *   **Xếp hạng tự động:** Gợi ý các chính sách hỗ trợ/tài trợ có tỷ lệ khớp cao nhất cho doanh nghiệp.
 
-### 2.1. Runtime & dữ liệu
-1. Supabase Auth xác thực Google; Railway PostgreSQL bootstrap workspace.
-2. Frontend upload PDF trực tiếp vào private Supabase Storage qua signed URL.
-3. API ghi nguồn upload vào Railway PostgreSQL, xác nhận upload hoàn tất và enqueue job bền vững.
-4. Worker tải PDF bằng server credential, kiểm kích thước/PDF signature/SHA-256, dùng MarkItDown chuyển PDF thành Markdown rồi gọi `gemini-3.1-flash-lite` với structured output.
-5. Chỉ candidate có quote khớp nguồn mới được lưu `NEEDS_REVIEW`; người dùng xác nhận mới tạo Passport version mới.
-6. Một tài khoản có thể sở hữu nhiều business workspace; mỗi request production phải qua membership check. Nút `Cập nhật tài liệu` tạo refresh job chỉ phân tích PDF mới, không reset Passport hiện tại.
-7. MarkItDown output có quality gate; PDF scanned/ít text sẽ chạy OCR fallback bằng `pdftoppm` + `tesseract` (`OCR_LANGUAGES` mặc định `vie+eng`).
-8. Job queue dùng lease, `FOR UPDATE SKIP LOCKED`, retry/backoff và dead-letter. Worker xử lý tuần tự để giới hạn RAM.
-9. Production policy corpus, website crawler, enrichment candidates và alerts mặc định trống cho đến khi adapter thật được kết nối.
+### 2.1. Multi-business & Ingestion Pipeline Dữ liệu
+1.  **Multi-business Tenants:** Một tài khoản có thể sở hữu nhiều business workspace; mỗi request production phải qua membership check để bảo mật dữ liệu. Nút `Cập nhật tài liệu` tạo refresh job chỉ phân tích PDF mới, bảo toàn Passport hiện tại.
+2.  **Layout-preserving PDF extraction:** Văn bản PDF chứa bảng biểu được bổ sung công cụ `pdftotext -layout` giữ quan hệ nhãn-giá trị; PDF scan/ít text chạy OCR fallback bằng `pdftoppm` + `tesseract` (`OCR_LANGUAGES` mặc định `vie+eng`).
+3.  **Completeness Pass & Quality Gates:** Chạy completeness pass có mục tiêu cho các field còn thiếu và ghi nhận logs chất lượng (raw/valid/rejected candidates) thay vì logs các trường dữ liệu nhạy cảm.
 
 ### 3. Danh sách kiểm tra & Chuẩn bị Hồ sơ Ứng tuyển (Evidence-Gated Checklist)
 *   **Sinh Checklist tự động:** Dựa trên các điều kiện luật của chính sách, hệ thống tạo checklist các văn bản bắt buộc cần nộp.
 *   **Khóa hồ sơ theo bằng chứng:** Chỉ khi toàn bộ các trường thông tin quan trọng được xác minh nguồn dẫn, đơn ứng tuyển mới cho phép hoàn tất và phê duyệt.
 *   **Xuất đơn PDF:** Tự động tạo và điền các mẫu đơn ứng tuyển dạng PDF/Docx chứa đầy đủ chữ ký số và bằng chứng đi kèm để nộp lên cơ quan quản lý.
 
-### 4. Kênh Quản trị & Cảnh báo Chính sách (Admin Queue & Policy Alerts)
-*   **Phát hành chính sách:** Admin có thể cập nhật các phiên bản quy định, chương trình tài trợ mới nhất.
-*   **Cảnh báo thông minh:** Hệ thống tự động gửi thông báo đến các doanh nghiệp khi có sự thay đổi chính sách ảnh hưởng trực tiếp đến trạng thái điều kiện của họ.
+---
+
+## Chi tiết Kiến trúc Hệ thống Vector (Vector Engine Architecture)
+
+Hệ thống Vector của P2B được thiết kế chuyên biệt để xử lý dữ liệu lớn luật pháp Việt Nam (VBPL) với hiệu năng cao nhất trên GPU local và tài nguyên tiết kiệm nhất trên CPU production.
+
+### 1. Ingestion Pipeline & Chunking (GPU Local)
+*   **Bộ lọc Whitelist:** Tự động lọc bộ dữ liệu `tmquan/vbpl-vn` trên Hugging Face theo cơ quan ban hành liên quan đến kinh tế/doanh nghiệp (Bộ Tài chính, Bộ Kế hoạch và Đầu tư, Ngân hàng Nhà nước...) kết hợp keyword pháp lý hỗ trợ.
+*   **Phục hồi văn bản bị thiếu:** Với các văn bản thiếu body text, pipeline tự động kết nối qua MoJ API gateway (`https://vbpl-bientap-gateway.moj.gov.vn`) để tải bản thảo XML đầy đủ.
+*   **Article-level Chunking:** Tách văn bản luật chính xác theo từng **Điều** (`Điều X`), tự động xử lý inline headings lỗi không xuống dòng. Trích xuất được **19,488 chunks** từ 682 văn bản luật cốt lõi, chiều dài trung bình **1,769 ký tự/chunk**.
+*   **Mã hóa đa luồng:** Chạy SentenceTransformer `intfloat/multilingual-e5-base` song song thông qua `ThreadPoolExecutor` và `ThreadedConnectionPool` trên **GPU NVIDIA RTX 3050** tại local với khóa GPU lock an toàn.
+
+### 2. Low-Resource Embedding Engine (CPU Production)
+Khi chạy thực tế trên môi trường CPU của Railway (không có GPU và giới hạn RAM):
+*   **Kiến trúc CGO-free:** Go backend giao tiếp với script trợ lý Python (`calculate_embeddings.py`) thông qua luồng Standard Input (`stdin`) để tránh quá giới hạn ký tự dòng lệnh.
+*   **ONNX Runtime & Tokenizers:** Thay thế toàn bộ PyTorch và Transformers bằng `onnxruntime` và Rust-based `tokenizers` để tối ưu hóa bộ nhớ: giảm thiểu tài nguyên tiêu thụ từ **1.5GB RAM xuống <60MB RAM**.
+*   **8-bit Quantization:** Sử dụng phiên bản mô hình E5 đã lượng hóa 8-bit (`model_quantized.onnx`) giúp giảm dung lượng ổ đĩa từ **278MB xuống 141MB** và tăng gấp đôi tốc độ suy luận CPU với độ tương quan chính xác đạt 99.9%.
+*   **Tự động tải & Cache model:** Khi container khởi động lần đầu, hệ thống sẽ tự động tải file model & tokenizer trực tiếp từ Hugging Face và lưu trữ trên ổ đĩa cache persistent.
+
+### 3. PostgreSQL HNSW Indexing
+*   Chỉ mục vector HNSW (`vector_cosine_ops`) được tối ưu hóa bằng cách tắt song song hóa bảo trì (`SET max_parallel_maintenance_workers = 0`) để xây dựng chỉ mục tuần tự, bypass thành công giới hạn bộ nhớ chia sẻ (`/dev/shm`) của các container ảo hóa trên Railway.
 
 ---
 
@@ -63,22 +76,15 @@ Trải nghiệm phiên bản thử nghiệm trực tuyến tại: [https://p2b-z
 
 ---
 
-## Nguồn dữ liệu
-Dự án sử dụng cơ sở dữ liệu văn bản pháp quy Việt Nam từ các nguồn chính thức và bộ dữ liệu cộng đồng:
-*   [Cổng thông tin điện tử Pháp điển / VBPL](https://vbpl.vn)
-*   Bộ dữ liệu văn bản pháp luật VBPL trên Hugging Face: [tmquan/vbpl-vn Dataset](https://huggingface.co/datasets/tmquan/vbpl-vn)
-
----
-
 ## Hướng dẫn Thiết lập Local (Full-Stack)
 
 ### 1. Yêu cầu hệ thống
 *   **Go** 1.24+ (hoặc 1.26)
 *   **Node.js** 22+ & **npm**
 *   **Python** 3.10+ (cần thiết cho local extraction worker chạy thư viện `markitdown`)
-*   Cài đặt công cụ CLI `markitdown`:
+*   Cài đặt công cụ CLI và các thư viện cần thiết:
     ```bash
-    pip install markitdown[pdf]==0.1.6
+    pip install markitdown[pdf]==0.1.6 onnxruntime tokenizers numpy
     ```
 
 ### 2. Khởi động nhanh chế độ Phát triển (Dev Mode)
@@ -132,6 +138,7 @@ Chi tiết các biến môi trường cấu hình tại file `.env`:
 *   `DATABASE_URL`: Đường dẫn kết nối PostgreSQL của Railway (chỉ dùng khi `DEV_AUTH=false`).
 *   `SUPABASE_URL` / `SUPABASE_SECRET_KEY`: Dùng cấu hình xác thực và vùng chứa Storage.
 *   `GEMINI_API_KEY`: API Key kết nối dịch vụ Google Gemini.
+*   `P2B_MODEL_CACHE_DIR`: Thư mục lưu trữ cache model ONNX (mặc định sẽ lưu tại `~/.cache/p2b-embeddings`).
 
 ---
 ---
@@ -150,9 +157,10 @@ Experience the live application at: [https://p2b-zeta.vercel.app/](https://p2b-z
 
 ## Table of Contents
 1. [Core Features & User Flows](#core-features--user-flows)
-2. [Tech Stack Overview](#tech-stack-overview)
-3. [Full-Stack Local Development Setup](#full-stack-local-development-setup)
-4. [Environment Configuration](#environment-configuration)
+2. [Vector Engine Architecture](#vector-engine-architecture)
+3. [Tech Stack Overview](#tech-stack-overview)
+4. [Full-Stack Local Development Setup](#full-stack-local-development-setup)
+5. [Environment Configuration](#environment-configuration)
 
 ---
 
@@ -169,14 +177,36 @@ Experience the live application at: [https://p2b-zeta.vercel.app/](https://p2b-z
 *   **Evaluation Statuses:** Tracks status as `MET`, `NOT_MET`, or `MISSING_INFO` (if a field is unconfirmed).
 *   **Smart Ranking:** Grants are sorted dynamically based on matching criteria scores.
 
+### 2.1. Multi-business & Ingestion Pipeline
+1.  **Multi-business Tenants:** Owners can manage and switch between multiple business workspaces with strict tenant isolation. Document update triggers incremental PDF refresh jobs without destroying existing facts.
+2.  **Layout-preserving PDF extraction:** Combines layout text output for tables (`pdftotext -layout`) with custom OCR fallback using `pdftoppm` + `tesseract` (`OCR_LANGUAGES` defaults to `vie+eng`).
+3.  **Completeness Pass & Quality Gates:** Target checks resolve missing facts and audit quality (raw/valid/rejected counts) without logging sensitive quotes.
+
 ### 3. Evidence-Gated Checklists & Applications
 *   **Automated Checklist:** Generates document and info check-items mapped to policy requirements.
 *   **Gated Actions:** Ensures application submission is locked until necessary evidence has been reviewed and confirmed.
 *   **PDF Package Export:** Compiles confirmed fields and checklists to export a structured PDF ready for submission.
 
-### 4. Admin Queue & Policy Change Alerts
-*   **Policy Publishing:** Admins manage active policy versions in the database.
-*   **Real-time Alerts:** Automatically monitors changes to active policies and notifies tenants when a policy update changes their eligibility status.
+---
+
+## Vector Engine Architecture
+
+The P2B Vector Engine is engineered to parse the Vietnamese legal document corpus (VBPL) efficiently using local GPU for population and resource-restricted CPU runtime for production.
+
+### 1. Ingestion Pipeline & Chunking (Local GPU)
+*   **Whitelist Filtering:** Filters `tmquan/vbpl-vn` Hugging Face dataset by economic ministries and support keywords.
+*   **Empty Text Resolution:** Connects to the official MoJ gateway (`https://vbpl-bientap-gateway.moj.gov.vn`) to scrape full XML drafts for empty records.
+*   **Article-level Chunking:** Splits documents on semantic article levels (`Điều X`), cleaning up inline headings. Produced **19,488 chunks** from 682 documents with a mean length of **1,769 characters**.
+*   **Multithreaded Encoding:** Concurrently embeds chunks using `ThreadPoolExecutor`, `ThreadedConnectionPool` and `intfloat/multilingual-e5-base` on local **NVIDIA RTX 3050 GPU** with thread-safe locking.
+
+### 2. Low-Resource Embedding Engine (Production CPU)
+*   **CGO-Free Subprocess Wrapper:** Go executes `calculate_embeddings.py` using standard inputs (`stdin`) to bypass command-line size boundaries.
+*   **ONNX Runtime & Tokenizers:** Swaps PyTorch/Transformers with optimized C++/Rust implementations, slashing RAM consumption from **1.5GB to <60MB**.
+*   **8-bit Quantized Model:** Loads `model_quantized.onnx` to cut storage footprint in half (141MB vs 278MB) and double inference speed on CPU with 99.9% cosine similarity preservation.
+*   **Cache on Startup:** Downloads model files from Hugging Face on demand and caches them in a persistent cache folder.
+
+### 3. PostgreSQL HNSW Indexing
+*   The pgvector HNSW cosine index was successfully generated by forcing sequential builds (`SET max_parallel_maintenance_workers = 0`), preventing shared memory segment allocation failures under Railway container constraints.
 
 ---
 
@@ -190,22 +220,15 @@ Experience the live application at: [https://p2b-zeta.vercel.app/](https://p2b-z
 
 ---
 
-## Data Sources
-The system utilizes Vietnamese official legal document datasets sourced from:
-*   [Vietnam Official Legal Documents Portal / VBPL](https://vbpl.vn)
-*   Hugging Face Vietnamese VBPL Dataset: [tmquan/vbpl-vn Dataset](https://huggingface.co/datasets/tmquan/vbpl-vn)
-
----
-
 ## Full-Stack Local Development Setup
 
 ### 1. Prerequisites
 *   **Go** 1.24+ (or 1.26)
 *   **Node.js** 22+ & **npm**
 *   **Python** 3.10+ (required for local extraction worker running `markitdown`)
-*   Install the `markitdown` CLI tool:
+*   Install python libraries:
     ```bash
-    pip install markitdown[pdf]==0.1.6
+    pip install markitdown[pdf]==0.1.6 onnxruntime tokenizers numpy
     ```
 
 ### 2. Fast Dev Mode Start
@@ -259,3 +282,4 @@ Key environment configurations inside `.env`:
 *   `DATABASE_URL`: Connection string for Railway PostgreSQL instance (used when `DEV_AUTH=false`).
 *   `SUPABASE_URL` / `SUPABASE_SECRET_KEY`: Used for authentication and bucket signing operations.
 *   `GEMINI_API_KEY`: API Key for Google Gemini services.
+*   `P2B_MODEL_CACHE_DIR`: Local persistent cache folder path for model files (defaults to `~/.cache/p2b-embeddings`).
