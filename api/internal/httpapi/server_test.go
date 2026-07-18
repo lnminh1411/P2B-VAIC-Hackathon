@@ -24,6 +24,15 @@ type readinessStub struct {
 	err error
 }
 
+type policyStoreStub struct {
+	policies []domain.Policy
+	err      error
+}
+
+func (s policyStoreStub) Policies(_ context.Context, _ bool) ([]domain.Policy, error) {
+	return s.policies, s.err
+}
+
 func (r readinessStub) Ping(_ context.Context) error {
 	return r.err
 }
@@ -224,6 +233,29 @@ func TestGoldenPathBuildConfirmMatchAndGenerate(t *testing.T) {
 	pdf := request(t, server, http.MethodGet, "/v1/applications/"+applicationResponse.ID+"/download", nil)
 	if pdf.Code != http.StatusOK || pdf.Header().Get("Content-Type") != "application/pdf" || !bytes.HasPrefix(pdf.Body.Bytes(), []byte("%PDF-")) {
 		t.Fatalf("invalid generated PDF: status=%d content-type=%s body=%q", pdf.Code, pdf.Header().Get("Content-Type"), pdf.Body.Bytes())
+	}
+}
+
+func TestMatchLoadsPublishedPoliciesFromConfiguredStore(t *testing.T) {
+	policy := domain.Policy{ID: "db-policy", Version: 3, Title: "Policy từ DB", Lifecycle: "ACTIVE"}
+	server := NewServerWithConfig(platform.NewService(nil), Config{
+		DevAuth: true, WebOrigin: "http://localhost:5173",
+		PolicyStore: policyStoreStub{policies: []domain.Policy{policy}},
+	})
+
+	response := request(t, server, http.MethodPost, "/v1/matches", map[string]any{})
+
+	if response.Code != http.StatusCreated {
+		t.Fatalf("status = %d: %s", response.Code, response.Body.String())
+	}
+	var run struct {
+		Results []struct {
+			PolicyID string `json:"policy_id"`
+		} `json:"results"`
+	}
+	decode(t, response, &run)
+	if len(run.Results) != 1 || run.Results[0].PolicyID != "db-policy" {
+		t.Fatalf("results = %#v, want configured DB policy", run.Results)
 	}
 }
 

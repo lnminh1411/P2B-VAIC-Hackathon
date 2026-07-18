@@ -30,6 +30,12 @@ func NewService(policies []domain.Policy) *Service {
 	return &Service{workspaces: map[string]*workspaceState{}, policies: slices.Clone(policies)}
 }
 
+func (s *Service) ReplacePolicies(policies []domain.Policy) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.policies = slices.Clone(policies)
+}
+
 func (s *Service) workspace(id string) *workspaceState {
 	state, ok := s.workspaces[id]
 	if ok {
@@ -157,13 +163,28 @@ func (s *Service) Match(workspaceID string) MatchRun {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	state := s.workspace(workspaceID)
-	run := MatchRun{ID: uuid.NewString(), PassportVersion: state.Passport.Version, CreatedAt: time.Now().UTC(), Results: make([]MatchResult, 0)}
+	return s.matchLocked(state, state.Passport)
+}
+
+// MatchPassport matches using the persisted passport supplied by the API layer.
+// Production passport writes live in PostgreSQL, while Service keeps only transient
+// match/application state.
+func (s *Service) MatchPassport(workspaceID string, pass domain.Passport) MatchRun {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	state := s.workspace(workspaceID)
+	state.Passport = clonePassport(pass)
+	return s.matchLocked(state, pass)
+}
+
+func (s *Service) matchLocked(state *workspaceState, pass domain.Passport) MatchRun {
+	run := MatchRun{ID: uuid.NewString(), PassportVersion: pass.Version, CreatedAt: time.Now().UTC(), Results: make([]MatchResult, 0)}
 	for _, policy := range s.policies {
 		if policy.Lifecycle != "ACTIVE" {
 			continue
 		}
-		evaluation := eligibility.Evaluate(state.Passport, policy.Rules)
-		score, reasons := rank(policy, state.Passport, evaluation)
+		evaluation := eligibility.Evaluate(pass, policy.Rules)
+		score, reasons := rank(policy, pass, evaluation)
 		run.Results = append(run.Results, MatchResult{PolicyID: policy.ID, PolicyVersion: policy.Version, Title: policy.Title, Agency: policy.Agency, Benefit: policy.Benefit, BenefitAmount: policy.BenefitAmount, Deadline: policy.Deadline, Score: score, Eligibility: evaluation, RankingReasons: reasons, TemplateReady: policy.TemplateReady, RetrievalMode: "RULE_ENGINE_ONLY"})
 	}
 	sort.SliceStable(run.Results, func(i, j int) bool { return run.Results[i].Score > run.Results[j].Score })

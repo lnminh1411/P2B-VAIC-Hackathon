@@ -12,6 +12,7 @@ import (
 	"github.com/p2b/p2b/internal/httpapi"
 	"github.com/p2b/p2b/internal/pipeline"
 	"github.com/p2b/p2b/internal/platform"
+	policystore "github.com/p2b/p2b/internal/policy"
 	storageadapter "github.com/p2b/p2b/internal/storage"
 	"github.com/p2b/p2b/internal/tenancy"
 )
@@ -68,6 +69,7 @@ func main() {
 		}
 		config.UploadSigner = uploadSigner
 		config.ExtractionStore = pipeline.NewStore(database)
+		config.PolicyStore = policystore.NewStore(database)
 	}
 	server := &http.Server{
 		Addr:              address,

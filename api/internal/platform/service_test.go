@@ -69,3 +69,27 @@ func TestMatchReturnsEmptyArrayWhenNoPublishedPoliciesExist(t *testing.T) {
 		t.Fatalf("results = %#v, want non-nil empty array", run.Results)
 	}
 }
+
+func TestMatchPassportUsesPersistedPassportFacts(t *testing.T) {
+	policy := domain.Policy{
+		ID: "green-support", Version: 1, Title: "Hỗ trợ công nghệ xanh", Lifecycle: "ACTIVE",
+		SupportType: "công nghệ xanh",
+		Rules:       []domain.Rule{{ID: "province", FieldKey: "province", Operator: domain.OpEQ, Expected: "Đà Nẵng", Required: true}},
+	}
+	service := NewService([]domain.Policy{policy})
+	pass := domain.Passport{
+		Version: 7, SupportNeeds: []string{"công nghệ xanh"},
+		Fields: map[string]domain.PassportField{
+			"province": {Key: "province", Value: "Đà Nẵng", Status: domain.FieldConfirmed},
+		},
+	}
+
+	run := service.MatchPassport("workspace", pass)
+
+	if run.PassportVersion != 7 {
+		t.Fatalf("passport version = %d, want persisted version 7", run.PassportVersion)
+	}
+	if len(run.Results) != 1 || run.Results[0].Eligibility.Status != "MET" {
+		t.Fatalf("results = %#v, want policy matched from persisted passport", run.Results)
+	}
+}

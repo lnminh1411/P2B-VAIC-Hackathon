@@ -48,6 +48,9 @@ type Config struct {
 		Candidates(context.Context, string) ([]passportdomain.Candidate, error)
 		ConfirmField(context.Context, string, string, string, any, int) (domain.Passport, error)
 	}
+	PolicyStore interface {
+		Policies(context.Context, bool) ([]domain.Policy, error)
+	}
 	ReadinessChecker interface {
 		Ping(context.Context) error
 	}
@@ -422,6 +425,21 @@ func (s *Server) createMatch(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSONAllowEmpty(w, r, &input) {
 		return
 	}
+	if err := s.refreshPolicies(r.Context(), true); err != nil {
+		slog.Error("refresh policies for matching", "error", err)
+		writeError(w, http.StatusServiceUnavailable, "POLICY_STORE_UNAVAILABLE", "Policy corpus is temporarily unavailable")
+		return
+	}
+	if s.config.ExtractionStore != nil {
+		pass, err := s.config.ExtractionStore.Passport(r.Context(), workspace(r))
+		if err != nil {
+			slog.Error("load passport for matching", "error", err)
+			writeError(w, http.StatusServiceUnavailable, "PASSPORT_STORE_UNAVAILABLE", "Company passport is temporarily unavailable")
+			return
+		}
+		writeJSON(w, http.StatusCreated, s.service.MatchPassport(workspace(r), pass))
+		return
+	}
 	writeJSON(w, http.StatusCreated, s.service.Match(workspace(r)))
 }
 
@@ -434,11 +452,19 @@ func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, match)
 }
 
-func (s *Server) listPolicies(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) listPolicies(w http.ResponseWriter, r *http.Request) {
+	if err := s.refreshPolicies(r.Context(), true); err != nil {
+		writeError(w, http.StatusServiceUnavailable, "POLICY_STORE_UNAVAILABLE", "Policy corpus is temporarily unavailable")
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"policies": s.service.Policies(true)})
 }
 
 func (s *Server) getPolicy(w http.ResponseWriter, r *http.Request) {
+	if err := s.refreshPolicies(r.Context(), true); err != nil {
+		writeError(w, http.StatusServiceUnavailable, "POLICY_STORE_UNAVAILABLE", "Policy corpus is temporarily unavailable")
+		return
+	}
 	version, err := strconv.Atoi(chi.URLParam(r, "version"))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "INVALID_VERSION", "Policy version must be an integer")
@@ -636,8 +662,24 @@ func (s *Server) readAlert(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, alert)
 }
-func (s *Server) adminPolicies(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) adminPolicies(w http.ResponseWriter, r *http.Request) {
+	if err := s.refreshPolicies(r.Context(), false); err != nil {
+		writeError(w, http.StatusServiceUnavailable, "POLICY_STORE_UNAVAILABLE", "Policy corpus is temporarily unavailable")
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"policies": s.service.Policies(false)})
+}
+
+func (s *Server) refreshPolicies(ctx context.Context, activeOnly bool) error {
+	if s.config.PolicyStore == nil {
+		return nil
+	}
+	policies, err := s.config.PolicyStore.Policies(ctx, activeOnly)
+	if err != nil {
+		return err
+	}
+	s.service.ReplacePolicies(policies)
+	return nil
 }
 
 func workspace(r *http.Request) string {
