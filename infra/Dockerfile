@@ -19,8 +19,10 @@ COPY --from=api-builder /out/p2b-api /usr/local/bin/p2b-service
 COPY --from=api-builder /out/p2b-migrate /usr/local/bin/p2b-migrate
 COPY --from=api-builder /out/p2b-worker /usr/local/bin/p2b-worker
 COPY --from=api-builder /out/p2b-crawler /usr/local/bin/p2b-crawler
+COPY infra/entrypoint.sh /usr/local/bin/p2b-entrypoint
+RUN chmod 0755 /usr/local/bin/p2b-entrypoint
 USER p2b
 ENV PATH="/opt/markitdown/bin:${PATH}"
 ENV HTTP_ADDR=:8080
 EXPOSE 8080
-ENTRYPOINT ["/usr/local/bin/p2b-service"]
+ENTRYPOINT ["/usr/local/bin/p2b-entrypoint"]
