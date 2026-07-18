@@ -313,7 +313,8 @@ const translations = {
       setting_evidence: 'Evidence sắp cũ',
       setting_upcoming: 'Hồ sơ gần hạn',
       not_activated: 'Chưa kích hoạt',
-      settings_note: 'Worker và crawler scheduler hiện mới chạy heartbeat; chưa tạo alert production.',
+      active: 'Đang hoạt động',
+      settings_note: 'Hệ thống crawler và worker đang chạy ngầm để giám sát các văn bản pháp luật và tự động gửi cảnh báo.',
     },
     admin: {
       title: 'Policy Review Queue',
@@ -688,7 +689,8 @@ const translations = {
       setting_evidence: 'Stale Evidence',
       setting_upcoming: 'Upcoming Deadlines',
       not_activated: 'Not Activated',
-      settings_note: 'Worker and crawler scheduler are currently running heartbeats only; no production alerts are generated yet.',
+      active: 'Active',
+      settings_note: 'The crawler and background worker processes are running to monitor legal documents and dispatch alerts.',
     },
     admin: {
       title: 'Policy Review Queue',

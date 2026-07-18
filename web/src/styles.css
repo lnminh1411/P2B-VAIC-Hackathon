@@ -354,7 +354,30 @@ a { color: inherit; }
 .watch-settings dl { margin: 1rem 0; }
 .watch-settings dl div { display: flex; justify-content: space-between; border-top: 1px solid var(--line); padding: .7rem 0; font-size: .65rem; }
 .watch-settings dt { color: var(--soft); }
-.watch-settings dd { color: var(--green); margin: 0; }
+.watch-settings dd { margin: 0; display: flex; align-items: center; }
+.watchlist-toggle-btn {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: .6rem;
+  font-weight: 600;
+  padding: .2rem .5rem;
+  cursor: pointer;
+  transition: all .2s;
+}
+.watchlist-toggle-btn.active {
+  color: var(--green);
+  border-color: rgba(102,223,173,.3);
+  background: rgba(102,223,173,.06);
+}
+.watchlist-toggle-btn:hover {
+  border-color: var(--soft);
+}
+.watchlist-toggle-btn.active:hover {
+  border-color: var(--green);
+  background: rgba(102,223,173,.1);
+}
 .watch-settings p { color: var(--muted); font-size: .6rem; line-height: 1.6; }
 
 .admin-lock { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: .6rem .8rem; color: var(--muted); font-size: .65rem; display: flex; align-items: center; gap: .4rem; }

@@ -58,6 +58,11 @@ type Config struct {
 		ConfirmField(context.Context, string, string, string, any, int) (domain.Passport, error)
 		SaveMatchRun(ctx context.Context, matchID string, workspaceID string, passportID string, passportVersion int, retrievalMode string, resultsJSON []byte) error
 		LatestMatchRun(ctx context.Context, workspaceID string) (string, int, []byte, time.Time, error)
+		WatchlistSettings(ctx context.Context, workspaceID string) (domain.WatchlistSettings, error)
+		SaveWatchlistSettings(ctx context.Context, workspaceID string, settings domain.WatchlistSettings) error
+		Alerts(ctx context.Context, workspaceID string) ([]domain.Alert, error)
+		SaveAlert(ctx context.Context, workspaceID string, alert domain.Alert) error
+		MarkAlertRead(ctx context.Context, workspaceID string, alertID string) error
 	}
 	PolicyStore interface {
 		Policies(context.Context, bool) ([]domain.Policy, error)
@@ -140,6 +145,7 @@ func NewServerWithConfig(service *platform.Service, config Config) http.Handler 
 		r.Get("/applications/{applicationID}/download", server.downloadApplication)
 		r.Get("/alerts", server.listAlerts)
 		r.Post("/alerts/{alertID}/read", server.readAlert)
+		r.Put("/watchlist/settings", server.updateWatchlistSettings)
 		r.With(server.requireAdmin).Get("/admin/policies", server.adminPolicies)
 	})
 	return router
@@ -818,15 +824,56 @@ func (s *Server) downloadApplication(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) listAlerts(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"alerts": s.service.Alerts(workspace(r))})
-}
-func (s *Server) readAlert(w http.ResponseWriter, r *http.Request) {
-	alert, err := s.service.ReadAlert(workspace(r), chi.URLParam(r, "alertID"))
+	if s.config.ExtractionStore == nil {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"alerts":             []any{},
+			"watchlist_settings": domain.WatchlistSettings{NewPolicies: false, DeadlineChanges: false, StaleEvidence: false, UpcomingDeadlines: false},
+		})
+		return
+	}
+	dbAlerts, err := s.config.ExtractionStore.Alerts(r.Context(), workspace(r))
 	if err != nil {
 		respondServiceError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, alert)
+	settings, err := s.config.ExtractionStore.WatchlistSettings(r.Context(), workspace(r))
+	if err != nil {
+		respondServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"alerts":             dbAlerts,
+		"watchlist_settings": settings,
+	})
+}
+
+func (s *Server) readAlert(w http.ResponseWriter, r *http.Request) {
+	if s.config.ExtractionStore == nil {
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "Alert store not available")
+		return
+	}
+	alertID := chi.URLParam(r, "alertID")
+	if err := s.config.ExtractionStore.MarkAlertRead(r.Context(), workspace(r), alertID); err != nil {
+		respondServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"id": alertID, "read": true})
+}
+
+func (s *Server) updateWatchlistSettings(w http.ResponseWriter, r *http.Request) {
+	if s.config.ExtractionStore == nil {
+		writeError(w, http.StatusServiceUnavailable, "STORE_UNAVAILABLE", "Settings store is temporarily unavailable")
+		return
+	}
+	var input domain.WatchlistSettings
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	if err := s.config.ExtractionStore.SaveWatchlistSettings(r.Context(), workspace(r), input); err != nil {
+		respondServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, input)
 }
 func (s *Server) adminPolicies(w http.ResponseWriter, r *http.Request) {
 	if err := s.refreshPolicies(r.Context(), false); err != nil {

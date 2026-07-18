@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/p2b/p2b/internal/crawler"
 	"github.com/p2b/p2b/internal/extraction"
 	"github.com/p2b/p2b/internal/httpapi"
 	"github.com/p2b/p2b/internal/pipeline"
@@ -83,6 +84,21 @@ func main() {
 		config.PolicyStore = policyStore
 		config.DocumentSearcher = policyStore
 		slog.Info("policy corpus connected", "published", len(publishedPolicies))
+
+		// Start background crawler loop inside API server process
+		go func() {
+			slog.Info("Starting background crawler loop in API process...")
+			time.Sleep(5 * time.Second)
+			crawler.RunCrawler(context.Background(), database, config.ExtractionStore.(*pipeline.Store))
+			ticker := time.NewTicker(1 * time.Hour)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					crawler.RunCrawler(context.Background(), database, config.ExtractionStore.(*pipeline.Store))
+				}
+			}
+		}()
 	}
 	server := &http.Server{
 		Addr:              address,

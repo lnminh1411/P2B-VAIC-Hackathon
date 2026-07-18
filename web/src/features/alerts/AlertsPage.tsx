@@ -1,15 +1,33 @@
 import { BellRing, CalendarClock, Check, FileWarning, RefreshCw } from 'lucide-react'
 import { formatDate } from '../../lib/format'
-import type { Alert } from '../../lib/types'
+import type { Alert, WatchlistSettings } from '../../lib/types'
 import { useTranslation } from '../../lib/i18n'
 
 const icons = { POLICY_NEW: BellRing, POLICY_CHANGED: RefreshCw, DEADLINE: CalendarClock, EVIDENCE_STALE: FileWarning }
 
-export function AlertsPage({ alerts, onRead }: { alerts: Alert[]; onRead: (id: string) => void }) {
+export function AlertsPage({ 
+  alerts, 
+  settings, 
+  onRead, 
+  onUpdateSettings 
+}: { 
+  alerts: Alert[]
+  settings: WatchlistSettings
+  onRead: (id: string) => void
+  onUpdateSettings: (settings: WatchlistSettings) => void 
+}) {
   const { t } = useTranslation()
   const a = t('alerts')
 
   const unreadCount = alerts.filter(alert => !alert.read).length
+  const isAnyActive = settings.new_policies || settings.deadline_changes || settings.stale_evidence || settings.upcoming_deadlines
+
+  const toggle = (key: keyof WatchlistSettings) => {
+    onUpdateSettings({
+      ...settings,
+      [key]: !settings[key]
+    })
+  }
 
   return (
     <>
@@ -33,7 +51,7 @@ export function AlertsPage({ alerts, onRead }: { alerts: Alert[]; onRead: (id: s
             <div className="page-state">
               <Check />
               <strong>{a.no_new_alerts}</strong>
-              <span>{a.not_connected}</span>
+              <span>{isAnyActive ? 'Policy monitoring production is active.' : a.not_connected}</span>
             </div>
           ) : (
             alerts.map(alert => {
@@ -69,19 +87,47 @@ export function AlertsPage({ alerts, onRead }: { alerts: Alert[]; onRead: (id: s
           <dl>
             <div>
               <dt>{a.setting_new_policy}</dt>
-              <dd>{a.not_activated}</dd>
+              <dd>
+                <button 
+                  onClick={() => toggle('new_policies')} 
+                  className={`watchlist-toggle-btn ${settings.new_policies ? 'active' : ''}`}
+                >
+                  {settings.new_policies ? a.active : a.not_activated}
+                </button>
+              </dd>
             </div>
             <div>
               <dt>{a.setting_deadline}</dt>
-              <dd>{a.not_activated}</dd>
+              <dd>
+                <button 
+                  onClick={() => toggle('deadline_changes')} 
+                  className={`watchlist-toggle-btn ${settings.deadline_changes ? 'active' : ''}`}
+                >
+                  {settings.deadline_changes ? a.active : a.not_activated}
+                </button>
+              </dd>
             </div>
             <div>
               <dt>{a.setting_evidence}</dt>
-              <dd>{a.not_activated}</dd>
+              <dd>
+                <button 
+                  onClick={() => toggle('stale_evidence')} 
+                  className={`watchlist-toggle-btn ${settings.stale_evidence ? 'active' : ''}`}
+                >
+                  {settings.stale_evidence ? a.active : a.not_activated}
+                </button>
+              </dd>
             </div>
             <div>
               <dt>{a.setting_upcoming}</dt>
-              <dd>{a.not_activated}</dd>
+              <dd>
+                <button 
+                  onClick={() => toggle('upcoming_deadlines')} 
+                  className={`watchlist-toggle-btn ${settings.upcoming_deadlines ? 'active' : ''}`}
+                >
+                  {settings.upcoming_deadlines ? a.active : a.not_activated}
+                </button>
+              </dd>
             </div>
           </dl>
           <p>{a.settings_note}</p>

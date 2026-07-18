@@ -119,7 +119,14 @@ export default function App() {
     {page === 'passport' && <PassportPage passport={passport} candidates={candidatesQuery.data?.candidates ?? []} onConfirm={confirmCandidate} onSaveField={saveField} onRefresh={async files => { await refreshMutation.mutateAsync(files) }} refreshBusy={refreshMutation.isPending} busy={candidatesQuery.isFetching || refreshMutation.isPending} />}
     {page === 'opportunities' && <OpportunitiesPage run={matchRun} onMatch={() => matchMutation.mutate()} matching={matchMutation.isPending} selected={selectedPolicy} onSelect={setSelectedPolicy} onPrepare={prepare} enrichment={enrichment} onEnrich={policyId => enrichMutation.mutate(policyId)} onAcceptEvidence={candidateId => void acceptEvidence(candidateId)} busy={enrichMutation.isPending} error={matchMutation.error ? message(matchMutation.error, pageStateLabels.unknown_error) : undefined} />}
     {page === 'application' && <ApplicationPage policy={selectedPolicy} checklist={checklist} application={application} onCreateChecklist={() => selectedPolicy && checklistMutation.mutate(selectedPolicy.policy_id)} onMarkAvailable={itemId => void markAvailable(itemId)} onCreateApplication={() => checklist && applicationMutation.mutate(checklist.id)} onSave={async sections => { if (application) setApplication(await api.updateApplication(application.id, application.version, sections)) }} onAction={action => void applicationAction(action)} onDownload={() => void download()} busy={checklistMutation.isPending || applicationMutation.isPending} error={workflowError} />}
-    {page === 'alerts' && <AlertsPage alerts={alertsQuery.data?.alerts ?? []} onRead={id => api.readAlert(id).then(() => queryClient.invalidateQueries({ queryKey: ['alerts', workspaceScope] }))} />}
+    {page === 'alerts' && (
+      <AlertsPage 
+        alerts={alertsQuery.data?.alerts ?? []} 
+        settings={alertsQuery.data?.watchlist_settings ?? { new_policies: false, deadline_changes: false, stale_evidence: false, upcoming_deadlines: false }}
+        onRead={id => api.readAlert(id).then(() => queryClient.invalidateQueries({ queryKey: ['alerts', workspaceScope] }))}
+        onUpdateSettings={settings => api.updateWatchlistSettings(settings).then(() => queryClient.invalidateQueries({ queryKey: ['alerts', workspaceScope] }))}
+      />
+    )}
     {page === 'admin' && (adminQuery.isLoading ? <LoadingState label={shellLabels.system_loading_queue} /> : adminQuery.error ? <ErrorState message={message(adminQuery.error, pageStateLabels.unknown_error)} /> : <AdminPage policies={adminQuery.data?.policies ?? []} />)}
   </Shell>
 }

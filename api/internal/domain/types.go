@@ -117,3 +117,21 @@ type ChecklistTemplateItem struct {
 	Required    bool     `json:"required"`
 	FieldKeys   []string `json:"field_keys"`
 }
+
+type WatchlistSettings struct {
+	NewPolicies       bool `json:"new_policies"`
+	DeadlineChanges   bool `json:"deadline_changes"`
+	StaleEvidence     bool `json:"stale_evidence"`
+	UpcomingDeadlines bool `json:"upcoming_deadlines"`
+}
+
+type Alert struct {
+	ID         string    `json:"id"`
+	Type       string    `json:"type"`
+	Title      string    `json:"title"`
+	Message    string    `json:"message"`
+	PolicyID   string    `json:"policy_id,omitempty"`
+	Severity   string    `json:"severity"`
+	Read       bool      `json:"read"`
+	OccurredAt time.Time `json:"occurred_at"`
+}
