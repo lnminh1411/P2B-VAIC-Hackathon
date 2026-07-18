@@ -1,8 +1,8 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext } from 'react'
 
-type Translations = typeof translations.vi
+export type Translations = typeof translations.vi
 
-const translations = {
+export const translations = {
   vi: {
     navigation: {
       overview: 'Tổng quan',
@@ -757,9 +757,9 @@ const translations = {
   },
 }
 
-type Lang = 'vi' | 'en'
+export type Lang = 'vi' | 'en'
 
-type I18nContextProps = {
+export type I18nContextProps = {
   lang: Lang
   setLang: (lang: Lang) => void
   t: <T extends keyof Translations>(
@@ -773,33 +773,7 @@ const defaultI18nContext: I18nContextProps = {
   t: section => translations.vi[section],
 }
 
-const I18nContext = createContext<I18nContextProps>(defaultI18nContext)
-
-export function I18nProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>(() => {
-    const saved = localStorage.getItem('p2b_lang')
-    return saved === 'en' ? 'en' : 'vi'
-  })
-
-  useEffect(() => {
-    document.documentElement.lang = lang
-  }, [lang])
-
-  const setLang = (nextLang: Lang) => {
-    setLangState(nextLang)
-    localStorage.setItem('p2b_lang', nextLang)
-  }
-
-  const t = <T extends keyof Translations>(section: T): Translations[T] => {
-    return translations[lang][section]
-  }
-
-  return (
-    <I18nContext.Provider value={{ lang, setLang, t }}>
-      {children}
-    </I18nContext.Provider>
-  )
-}
+export const I18nContext = createContext<I18nContextProps>(defaultI18nContext)
 
 export function useTranslation() {
   const context = useContext(I18nContext)

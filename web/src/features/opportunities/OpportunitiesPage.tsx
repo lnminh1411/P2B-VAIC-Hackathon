@@ -15,7 +15,6 @@ export function OpportunitiesPage({ run, onMatch, matching, selected, onSelect, 
   const [query, setQuery] = useState('')
   const runResults = run?.results ?? []
   const results = runResults.filter(result => (result.title + result.benefit + result.agency).toLowerCase().includes(query.toLowerCase()))
-  const retrievalMode = runResults[0]?.retrieval_mode ?? 'NO_PUBLISHED_CORPUS'
   
   if (!run) return <EmptyMatching onMatch={onMatch} matching={matching} error={error} />
   
@@ -87,8 +86,6 @@ export function OpportunitiesPage({ run, onMatch, matching, selected, onSelect, 
             ))
           )}
         </div>
-        
-
       </div>
       
       <AnimatePresence>

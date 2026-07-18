@@ -196,46 +196,66 @@ func ValidateFieldValue(key string, value any) error {
 	}
 	switch definition.DataType {
 	case "string":
-		text, ok := value.(string)
-		maxCharacters := 2000
-		if key == "legal_name" {
-			maxCharacters = 200
-		}
-		if !ok || strings.TrimSpace(text) == "" || len([]rune(text)) > maxCharacters {
-			return fmt.Errorf("field value must be a non-empty string up to %d characters", maxCharacters)
-		}
+		return validateStringValue(key, value)
 	case "date":
-		text, ok := value.(string)
-		if !ok {
-			return errors.New("field value must be a date in YYYY-MM-DD format")
-		}
-		if _, err := time.Parse("2006-01-02", text); err != nil {
-			return errors.New("field value must be a date in YYYY-MM-DD format")
-		}
+		return validateDateValue(value)
 	case "money", "number", "integer":
-		number, ok := numericValue(value)
-		if !ok || number < 0 || (definition.DataType == "integer" && math.Trunc(number) != number) {
-			return errors.New("field value must be a non-negative number with the expected precision")
-		}
-		if key == "foreign_ownership_percent" && number > 100 {
-			return errors.New("ownership percentage must be between 0 and 100")
-		}
+		return validateNumericValue(key, definition.DataType, value)
 	case "boolean":
 		if _, ok := value.(bool); !ok {
 			return errors.New("field value must be boolean")
 		}
 	case "string_array":
-		items, ok := stringItems(value)
-		if !ok || len(items) == 0 || len(items) > 100 {
-			return errors.New("field value must contain between 1 and 100 text items")
-		}
-		for _, item := range items {
-			if strings.TrimSpace(item) == "" || len([]rune(item)) > 500 {
-				return errors.New("each field item must contain up to 500 characters")
-			}
-		}
+		return validateStringArrayValue(value)
 	default:
 		return errors.New("unsupported passport field datatype")
+	}
+	return nil
+}
+
+func validateStringValue(key string, value any) error {
+	text, ok := value.(string)
+	maxCharacters := 2000
+	if key == "legal_name" {
+		maxCharacters = 200
+	}
+	if !ok || strings.TrimSpace(text) == "" || len([]rune(text)) > maxCharacters {
+		return fmt.Errorf("field value must be a non-empty string up to %d characters", maxCharacters)
+	}
+	return nil
+}
+
+func validateDateValue(value any) error {
+	text, ok := value.(string)
+	if !ok {
+		return errors.New("field value must be a date in YYYY-MM-DD format")
+	}
+	if _, err := time.Parse(time.DateOnly, text); err != nil {
+		return errors.New("field value must be a date in YYYY-MM-DD format")
+	}
+	return nil
+}
+
+func validateNumericValue(key, dataType string, value any) error {
+	number, ok := numericValue(value)
+	if !ok || number < 0 || (dataType == "integer" && math.Trunc(number) != number) {
+		return errors.New("field value must be a non-negative number with the expected precision")
+	}
+	if key == "foreign_ownership_percent" && number > 100 {
+		return errors.New("ownership percentage must be between 0 and 100")
+	}
+	return nil
+}
+
+func validateStringArrayValue(value any) error {
+	items, ok := stringItems(value)
+	if !ok || len(items) == 0 || len(items) > 100 {
+		return errors.New("field value must contain between 1 and 100 text items")
+	}
+	for _, item := range items {
+		if strings.TrimSpace(item) == "" || len([]rune(item)) > 500 {
+			return errors.New("each field item must contain up to 500 characters")
+		}
 	}
 	return nil
 }
