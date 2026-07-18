@@ -10,9 +10,11 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/p2b/p2b/internal/authn"
 	"github.com/p2b/p2b/internal/platform"
 )
 
@@ -21,10 +23,21 @@ const maxBodyBytes = 1 << 20
 type contextKey string
 
 const workspaceKey contextKey = "workspace"
+const principalKey contextKey = "principal"
 
 type Config struct {
-	DevAuth   bool
-	WebOrigin string
+	DevAuth               bool
+	WebOrigin             string
+	Verifier              authn.Verifier
+	WorkspaceBootstrapper interface {
+		Ensure(context.Context, authn.Principal) error
+	}
+	UploadSigner interface {
+		CreateUploadURL(context.Context, string) (string, error)
+	}
+	ReadinessChecker interface {
+		Ping(context.Context) error
+	}
 }
 
 type Server struct {
@@ -44,12 +57,27 @@ func NewServerWithConfig(service *platform.Service, config Config) http.Handler 
 	router.Get("/health/live", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "live"})
 	})
-	router.Get("/health/ready", func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ready", "mode": "demo-ready"})
+	router.Get("/health/ready", func(w http.ResponseWriter, r *http.Request) {
+		if config.ReadinessChecker == nil {
+			if config.DevAuth {
+				writeJSON(w, http.StatusOK, map[string]string{"status": "ready", "mode": "development"})
+				return
+			}
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "not_ready"})
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		if err := config.ReadinessChecker.Ping(ctx); err != nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "not_ready"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ready", "mode": "production"})
 	})
 	router.Route("/v1", func(r chi.Router) {
 		r.Use(server.authenticate)
 		r.Use(server.idempotencyMiddleware)
+		r.Get("/auth/me", server.authMe)
 		r.Post("/uploads/presign", server.presignUpload)
 		r.Post("/passports/build", server.buildPassport)
 		r.Get("/jobs/{jobID}", server.getJob)
@@ -75,7 +103,7 @@ func NewServerWithConfig(service *platform.Service, config Config) http.Handler 
 		r.Get("/applications/{applicationID}/download", server.downloadApplication)
 		r.Get("/alerts", server.listAlerts)
 		r.Post("/alerts/{alertID}/read", server.readAlert)
-		r.Get("/admin/policies", server.adminPolicies)
+		r.With(server.requireAdmin).Get("/admin/policies", server.adminPolicies)
 	})
 	return router
 }
@@ -83,18 +111,70 @@ func NewServerWithConfig(service *platform.Service, config Config) http.Handler 
 func (s *Server) authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		workspaceID := ""
+		principal := authn.Principal{}
 		if s.config.DevAuth {
 			workspaceID = strings.TrimSpace(r.Header.Get("X-Workspace-ID"))
 			if workspaceID == "" {
 				workspaceID = "demo-workspace"
 			}
+			principal = authn.Principal{Subject: workspaceID, Email: "founder@p2b.local", Name: "P2B Founder", Roles: []string{"admin"}}
+		} else {
+			token, ok := bearerToken(r.Header.Get("Authorization"))
+			if !ok || s.config.Verifier == nil {
+				writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "Valid Supabase bearer token required")
+				return
+			}
+			verified, err := s.config.Verifier.Verify(r.Context(), token)
+			if err != nil {
+				if errors.Is(err, authn.ErrVerifierUnavailable) {
+					writeError(w, http.StatusServiceUnavailable, "IDENTITY_UNAVAILABLE", "Identity service is temporarily unavailable")
+					return
+				}
+				writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "Valid Supabase bearer token required")
+				return
+			}
+			principal = verified
+			workspaceID = verified.Subject
 		}
 		if workspaceID == "" {
-			writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "Supabase bearer token required")
+			writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "Valid Supabase bearer token required")
 			return
 		}
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), workspaceKey, workspaceID)))
+		if !s.config.DevAuth && s.config.WorkspaceBootstrapper != nil {
+			if err := s.config.WorkspaceBootstrapper.Ensure(r.Context(), principal); err != nil {
+				writeError(w, http.StatusServiceUnavailable, "WORKSPACE_UNAVAILABLE", "Workspace is temporarily unavailable")
+				return
+			}
+		}
+		ctx := context.WithValue(r.Context(), workspaceKey, workspaceID)
+		ctx = context.WithValue(ctx, principalKey, principal)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func (s *Server) requireAdmin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		principal, ok := r.Context().Value(principalKey).(authn.Principal)
+		if !ok || !principal.HasRole("admin") {
+			writeError(w, http.StatusForbidden, "FORBIDDEN", "Administrator role required")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func bearerToken(header string) (string, bool) {
+	scheme, token, ok := strings.Cut(strings.TrimSpace(header), " ")
+	return token, ok && strings.EqualFold(scheme, "Bearer") && token != "" && !strings.ContainsAny(token, " \t\r\n") && len(token) <= 8192
+}
+
+func (s *Server) authMe(w http.ResponseWriter, r *http.Request) {
+	principal, ok := r.Context().Value(principalKey).(authn.Principal)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "Valid Supabase bearer token required")
+		return
+	}
+	writeJSON(w, http.StatusOK, principal)
 }
 
 func (s *Server) securityHeaders(next http.Handler) http.Handler {
@@ -162,7 +242,18 @@ func (s *Server) presignUpload(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, "INVALID_PDF", "Only PDF files up to 20 MB are accepted")
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{"source_id": uuid.NewString(), "upload_url": "demo://signed-upload", "expires_in": 300, "mode": "DEMO_LOCAL"})
+	sourceID := uuid.NewString()
+	if s.config.UploadSigner == nil {
+		writeJSON(w, http.StatusCreated, map[string]any{"source_id": sourceID, "upload_url": "demo://signed-upload", "expires_in": 300, "mode": "DEMO_LOCAL"})
+		return
+	}
+	objectKey := workspace(r) + "/sources/" + sourceID + ".pdf"
+	uploadURL, err := s.config.UploadSigner.CreateUploadURL(r.Context(), objectKey)
+	if err != nil {
+		writeError(w, http.StatusServiceUnavailable, "STORAGE_UNAVAILABLE", "Private upload is temporarily unavailable")
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"source_id": sourceID, "object_key": objectKey, "upload_url": uploadURL, "expires_in": 7200, "mode": "SUPABASE_SIGNED"})
 }
 
 func (s *Server) buildPassport(w http.ResponseWriter, r *http.Request) {
@@ -439,7 +530,7 @@ func (s *Server) readAlert(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, alert)
 }
 func (s *Server) adminPolicies(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"policies": s.service.Policies(false), "warning": "Admin role enforcement requires Supabase app_metadata in production"})
+	writeJSON(w, http.StatusOK, map[string]any{"policies": s.service.Policies(false)})
 }
 
 func workspace(r *http.Request) string {
@@ -510,8 +601,17 @@ func writeError(w http.ResponseWriter, status int, code, message string) {
 	writeJSON(w, status, map[string]any{"error": map[string]string{"code": code, "message": message}})
 }
 
-func EnvConfig() Config {
-	return Config{DevAuth: strings.EqualFold(os.Getenv("DEV_AUTH"), "true"), WebOrigin: env("WEB_ORIGIN", "http://localhost:5173")}
+func EnvConfig() (Config, error) {
+	config := Config{DevAuth: strings.EqualFold(os.Getenv("DEV_AUTH"), "true"), WebOrigin: env("WEB_ORIGIN", "http://localhost:5173")}
+	if config.DevAuth {
+		return config, nil
+	}
+	verifier, err := authn.NewSupabaseVerifier(os.Getenv("SUPABASE_URL"), os.Getenv("SUPABASE_PUBLISHABLE_KEY"), nil)
+	if err != nil {
+		return Config{}, err
+	}
+	config.Verifier = verifier
+	return config, nil
 }
 func env(key, fallback string) string {
 	if value := strings.TrimSpace(os.Getenv(key)); value != "" {
