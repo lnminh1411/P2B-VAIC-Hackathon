@@ -27,6 +27,7 @@ func main() {
 		slog.Error("invalid API configuration", "error", err)
 		os.Exit(1)
 	}
+	service := platform.NewService(nil)
 	var database *pgxpool.Pool
 	if !config.DevAuth {
 		databaseURL := os.Getenv("DATABASE_URL")
@@ -69,11 +70,21 @@ func main() {
 		}
 		config.UploadSigner = uploadSigner
 		config.ExtractionStore = pipeline.NewStore(database)
-		config.PolicyStore = policystore.NewStore(database)
+		policyStore := policystore.NewStore(database)
+		policyContext, policyCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		publishedPolicies, policyErr := policyStore.Policies(policyContext, true)
+		policyCancel()
+		if policyErr != nil {
+			slog.Error("policy corpus unavailable", "error", policyErr)
+			os.Exit(1)
+		}
+		service.ReplacePolicies(publishedPolicies)
+		config.PolicyStore = policyStore
+		slog.Info("policy corpus connected", "published", len(publishedPolicies))
 	}
 	server := &http.Server{
 		Addr:              address,
-		Handler:           httpapi.NewServerWithConfig(platform.NewService(nil), config),
+		Handler:           httpapi.NewServerWithConfig(service, config),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,
