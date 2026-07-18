@@ -1,0 +1,17 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+node_modules/
+dist/
+coverage/
+.cache/
+.firebase/
+.vercel/
+api/bin/
+api/tmp/
+web/playwright-report/
+web/test-results/
+.env*

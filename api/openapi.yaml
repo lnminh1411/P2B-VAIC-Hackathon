@@ -1,0 +1,231 @@
+openapi: 3.1.0
+info:
+  title: P2B API
+  version: 0.1.0
+  description: Evidence-first company passport, policy matching, eligibility and application workflow.
+servers:
+  - url: http://localhost:8080
+security:
+  - bearerAuth: []
+paths:
+  /health/live:
+    get:
+      security: []
+      responses: { "200": { description: Live } }
+  /health/ready:
+    get:
+      security: []
+      responses: { "200": { description: Ready } }
+  /v1/uploads/presign:
+    post:
+      operationId: presignUpload
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/UploadRequest" } } } }
+      responses: { "201": { description: Signed upload operation }, "422": { $ref: "#/components/responses/Error" } }
+  /v1/uploads/{source_id}/complete:
+    post:
+      operationId: completeUpload
+      parameters:
+        - { name: source_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      responses: { "204": { description: Upload finalized and ready for extraction }, "404": { $ref: "#/components/responses/Error" } }
+  /v1/passports/build:
+    post:
+      operationId: buildPassport
+      parameters: [ { $ref: "#/components/parameters/IdempotencyKey" } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/BuildPassportRequest" } } } }
+      responses: { "202": { description: Extraction job accepted }, "400": { $ref: "#/components/responses/Error" } }
+  /v1/jobs/{job_id}:
+    get:
+      operationId: getJob
+      parameters: [ { $ref: "#/components/parameters/JobId" } ]
+      responses: { "200": { description: Async job }, "404": { $ref: "#/components/responses/Error" } }
+  /v1/passport:
+    get:
+      operationId: getPassport
+      responses: { "200": { description: Current Passport, content: { application/json: { schema: { $ref: "#/components/schemas/Passport" } } } } }
+  /v1/passport/versions:
+    get:
+      operationId: listPassportVersions
+      responses: { "200": { description: Immutable Passport history } }
+  /v1/passport/candidates:
+    get:
+      operationId: listFieldCandidates
+      responses: { "200": { description: Extracted candidates awaiting review } }
+  /v1/passport/fields/{field_key}:
+    put:
+      operationId: resolvePassportField
+      parameters: [ { $ref: "#/components/parameters/FieldKey" } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ResolveFieldRequest" } } } }
+      responses: { "200": { description: New Passport version }, "409": { $ref: "#/components/responses/Error" } }
+  /v1/matches:
+    post:
+      operationId: createMatchRun
+      parameters: [ { $ref: "#/components/parameters/IdempotencyKey" } ]
+      responses: { "201": { description: Ranked policy results } }
+  /v1/matches/{match_id}:
+    get:
+      operationId: getMatchRun
+      parameters: [ { name: match_id, in: path, required: true, schema: { type: string } } ]
+      responses: { "200": { description: Match run with criterion results } }
+  /v1/policies:
+    get:
+      operationId: listActivePolicies
+      responses: { "200": { description: Published policies } }
+  /v1/policies/{policy_id}/versions/{version}:
+    get:
+      operationId: getPolicyVersion
+      parameters:
+        - { name: policy_id, in: path, required: true, schema: { type: string } }
+        - { name: version, in: path, required: true, schema: { type: integer } }
+      responses: { "200": { description: Pinned policy version } }
+  /v1/enrichment-runs:
+    post:
+      operationId: createEnrichmentRun
+      parameters: [ { $ref: "#/components/parameters/IdempotencyKey" } ]
+      responses: { "202": { description: Trusted-source enrichment candidates } }
+  /v1/enrichment-runs/{run_id}:
+    get:
+      operationId: getEnrichmentRun
+      parameters: [ { name: run_id, in: path, required: true, schema: { type: string } } ]
+      responses: { "200": { description: Enrichment run } }
+  /v1/enrichment-candidates/{candidate_id}/accept:
+    post:
+      operationId: acceptEnrichmentCandidate
+      parameters:
+        - { name: candidate_id, in: path, required: true, schema: { type: string } }
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      responses: { "200": { description: New Passport version } }
+  /v1/enrichment-candidates/{candidate_id}/reject:
+    post:
+      operationId: rejectEnrichmentCandidate
+      parameters:
+        - { name: candidate_id, in: path, required: true, schema: { type: string } }
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      responses: { "204": { description: Candidate rejected } }
+  /v1/checklists:
+    post:
+      operationId: createChecklist
+      parameters: [ { $ref: "#/components/parameters/IdempotencyKey" } ]
+      responses: { "201": { description: Version-pinned checklist } }
+  /v1/checklists/{checklist_id}:
+    get:
+      operationId: getChecklist
+      parameters: [ { name: checklist_id, in: path, required: true, schema: { type: string } } ]
+      responses: { "200": { description: Checklist } }
+  /v1/checklists/{checklist_id}/items/{item_id}:
+    put:
+      operationId: updateChecklistItem
+      parameters:
+        - { name: checklist_id, in: path, required: true, schema: { type: string } }
+        - { name: item_id, in: path, required: true, schema: { type: string } }
+      responses: { "200": { description: Updated checklist }, "409": { $ref: "#/components/responses/Error" } }
+  /v1/applications:
+    post:
+      operationId: createApplication
+      parameters: [ { $ref: "#/components/parameters/IdempotencyKey" } ]
+      responses: { "201": { description: Draft application } }
+  /v1/applications/{application_id}:
+    get:
+      operationId: getApplication
+      parameters: [ { $ref: "#/components/parameters/ApplicationId" } ]
+      responses: { "200": { description: Application } }
+    put:
+      operationId: updateApplication
+      parameters: [ { $ref: "#/components/parameters/ApplicationId" } ]
+      responses: { "200": { description: New application version }, "409": { $ref: "#/components/responses/Error" } }
+  /v1/applications/{application_id}/{action}:
+    post:
+      operationId: transitionApplication
+      parameters:
+        - { $ref: "#/components/parameters/ApplicationId" }
+        - { name: action, in: path, required: true, schema: { type: string, enum: [submit, approve, generate] } }
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      responses: { "200": { description: Transitioned application }, "409": { $ref: "#/components/responses/Error" } }
+  /v1/applications/{application_id}/download:
+    get:
+      operationId: downloadApplication
+      parameters: [ { $ref: "#/components/parameters/ApplicationId" } ]
+      responses: { "200": { description: Generated PDF, content: { application/pdf: { schema: { type: string, contentEncoding: binary } } } } }
+  /v1/alerts:
+    get:
+      operationId: listAlerts
+      responses: { "200": { description: Workspace alerts } }
+  /v1/alerts/{alert_id}/read:
+    post:
+      operationId: readAlert
+      parameters: [ { name: alert_id, in: path, required: true, schema: { type: string } } ]
+      responses: { "200": { description: Read alert } }
+  /v1/admin/policies:
+    get:
+      operationId: listAdminPolicies
+      responses: { "200": { description: Policy review queue } }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  parameters:
+    IdempotencyKey: { name: Idempotency-Key, in: header, required: true, schema: { type: string, maxLength: 200 } }
+    JobId: { name: job_id, in: path, required: true, schema: { type: string } }
+    FieldKey: { name: field_key, in: path, required: true, schema: { type: string } }
+    ApplicationId: { name: application_id, in: path, required: true, schema: { type: string } }
+  responses:
+    Error:
+      description: Structured API error
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties: { code: { type: string }, message: { type: string }, details: { type: array, items: { type: string } } }
+    UploadRequest:
+      type: object
+      required: [filename, content_type, size_bytes]
+      properties: { filename: { type: string }, content_type: { const: application/pdf }, size_bytes: { type: integer, maximum: 20971520 } }
+    BuildPassportRequest:
+      type: object
+      required: [company_name]
+      properties:
+        company_name: { type: string, maxLength: 200 }
+        website: { type: string, format: uri }
+        support_needs: { type: array, items: { type: string } }
+        source_names: { type: array, maxItems: 10, items: { type: string } }
+        source_ids: { type: array, maxItems: 10, items: { type: string, format: uuid } }
+    ResolveFieldRequest:
+      type: object
+      required: [value, expected_version]
+      properties: { value: {}, expected_version: { type: integer, minimum: 1 } }
+    Evidence:
+      type: object
+      required: [source_id, source_name, quote, content_hash, observed_at]
+      properties:
+        source_id: { type: string }
+        source_name: { type: string }
+        url: { type: string, format: uri }
+        page: { type: integer }
+        quote: { type: string }
+        content_hash: { type: string }
+        observed_at: { type: string, format: date-time }
+    PassportField:
+      type: object
+      required: [key, value, data_type, status, confidence, evidence]
+      properties:
+        key: { type: string }
+        value: {}
+        data_type: { type: string }
+        status: { type: string, enum: [MISSING, EXTRACTED, NEEDS_REVIEW, CONFIRMED, CONFLICTED, STALE] }
+        confidence: { type: number, minimum: 0, maximum: 1 }
+        evidence: { type: array, items: { $ref: "#/components/schemas/Evidence" } }
+    Passport:
+      type: object
+      required: [id, workspace_id, company_name, version, fields, updated_at]
+      properties:
+        id: { type: string }
+        workspace_id: { type: string }
+        company_name: { type: string }
+        website: { type: string }
+        version: { type: integer }
+        fields: { type: object, additionalProperties: { $ref: "#/components/schemas/PassportField" } }
+        updated_at: { type: string, format: date-time }
