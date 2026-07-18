@@ -5,6 +5,7 @@
     "dockerfilePath": "infra/Dockerfile"
   },
   "deploy": {
+    "startCommand": "/usr/local/bin/p2b-service",
     "preDeployCommand": "/usr/local/bin/p2b-migrate",
     "healthcheckPath": "/health/ready",
     "healthcheckTimeout": 30,
