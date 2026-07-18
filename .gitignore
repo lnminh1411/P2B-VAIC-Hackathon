@@ -1,0 +1,16 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+node_modules/
+dist/
+coverage/
+.cache/
+.firebase/
+api/bin/
+api/tmp/
+web/playwright-report/
+web/test-results/
+
