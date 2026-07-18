@@ -17,7 +17,7 @@ const navigation: Array<{ id: Page; icon: typeof LayoutDashboard }> = [
   { id: 'admin', icon: ShieldCheck },
 ]
 
-export function Shell({ page, companyName, workspaces, activeWorkspaceId, onWorkspaceChange, onCreateWorkspace, onNavigate, children, unreadAlerts = 0 }: { page: Page; companyName: string; workspaces: Workspace[]; activeWorkspaceId?: string; onWorkspaceChange: (workspaceId: string) => void; onCreateWorkspace: () => void; onNavigate: (page: Page) => void; children: ReactNode; unreadAlerts?: number }) {
+export function Shell({ page, workspaces, activeWorkspaceId, onWorkspaceChange, onCreateWorkspace, onNavigate, children, unreadAlerts = 0 }: { page: Page; workspaces: Workspace[]; activeWorkspaceId?: string; onWorkspaceChange: (workspaceId: string) => void; onCreateWorkspace: () => void; onNavigate: (page: Page) => void; children: ReactNode; unreadAlerts?: number }) {
   const { user, signOut } = useAuth()
   const { t, lang, setLang } = useTranslation()
   const [mobileOpen, setMobileOpen] = useState(false)

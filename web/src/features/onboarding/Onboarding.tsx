@@ -1,4 +1,4 @@
-import { ArrowRight, FileText, Link2, LockKeyhole, Sparkles, UploadCloud } from 'lucide-react'
+import { ArrowRight, FileText, Link2, UploadCloud } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useMemo, useState, type FormEvent } from 'react'
 import type { CompanyOnboardingInput } from './buildPassportPayload'

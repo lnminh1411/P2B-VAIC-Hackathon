@@ -11,6 +11,7 @@ import { buildPassportPayload, type CompanyOnboardingInput } from './features/on
 import { OpportunitiesPage } from './features/opportunities/OpportunitiesPage'
 import { PassportPage } from './features/passport/PassportPage'
 import { api, ApiError, getApiWorkspaceId, setApiWorkspaceId } from './lib/api'
+import { waitForJob } from './lib/jobPolling'
 import type { Application, Checklist, EnrichmentRun, MatchResult } from './lib/types'
 import { useTranslation } from './lib/i18n'
 
@@ -51,14 +52,7 @@ export default function App() {
     mutationFn: async (input: CompanyOnboardingInput) => {
       const uploads = await Promise.all(input.files.map(file => api.uploadPDF(file)))
       const job = await api.buildPassport(buildPassportPayload(input, uploads.map(upload => upload.source_id)))
-      if (job.status === 'SUCCEEDED') return job
-      for (let attempt = 0; attempt < 480; attempt += 1) {
-        await new Promise(resolve => window.setTimeout(resolve, 1500))
-        const current = await api.job(job.id)
-        if (current.status === 'SUCCEEDED') return current
-        if (current.status === 'FAILED' || current.status === 'DEAD_LETTER') throw new Error(current.last_error || pageStateLabels.extract_fail)
-      }
-      throw new Error(pageStateLabels.timeout)
+      return waitForJob(job, { load: api.job, failureMessage: pageStateLabels.extract_fail, timeoutMessage: pageStateLabels.timeout })
     },
     onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['passport', workspaceScope] }), queryClient.invalidateQueries({ queryKey: ['candidates', workspaceScope] }), queryClient.invalidateQueries({ queryKey: ['match', workspaceScope] })]); setPage('passport') },
   })
@@ -66,14 +60,7 @@ export default function App() {
     mutationFn: async (files: File[]) => {
       const uploads = await Promise.all(files.map(file => api.uploadPDF(file)))
       const job = await api.refreshPassport(uploads.map(upload => upload.source_id))
-      if (job.status === 'SUCCEEDED') return job
-      for (let attempt = 0; attempt < 480; attempt += 1) {
-        await new Promise(resolve => window.setTimeout(resolve, 1500))
-        const current = await api.job(job.id)
-        if (current.status === 'SUCCEEDED') return current
-        if (current.status === 'FAILED' || current.status === 'DEAD_LETTER') throw new Error(current.last_error || pageStateLabels.update_fail)
-      }
-      throw new Error(pageStateLabels.timeout)
+      return waitForJob(job, { load: api.job, failureMessage: pageStateLabels.update_fail, timeoutMessage: pageStateLabels.timeout })
     },
     onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['passport', workspaceScope] }), queryClient.invalidateQueries({ queryKey: ['candidates', workspaceScope] }), queryClient.invalidateQueries({ queryKey: ['match', workspaceScope] })]) },
   })
@@ -89,7 +76,7 @@ export default function App() {
   if (passportQuery.error) return <ErrorState message={message(passportQuery.error, pageStateLabels.unknown_error)} onRetry={() => passportQuery.refetch()} />
   const passport = passportQuery.data
   const shellProps = { workspaces, activeWorkspaceId: selectedWorkspaceId, onWorkspaceChange: (workspaceId: string) => { setSelectedPolicy(undefined); setChecklist(undefined); setApplication(undefined); setWorkflowError(undefined); setApiWorkspaceId(workspaceId); setActiveWorkspaceId(workspaceId); setPage('overview') }, onCreateWorkspace: () => { createWorkspaceMutation.mutate(shellLabels.unnamed_workspace) } }
-  if (!passport || !passport.company_name) return <Shell page="overview" companyName={passport?.company_name ?? ''} {...shellProps} onNavigate={setPage}><Onboarding onSubmit={input => buildMutation.mutate(input)} busy={buildMutation.isPending} error={buildMutation.error ? message(buildMutation.error, pageStateLabels.unknown_error) : undefined} /></Shell>
+  if (!passport || !passport.company_name) return <Shell page="overview" {...shellProps} onNavigate={setPage}><Onboarding onSubmit={input => buildMutation.mutate(input)} busy={buildMutation.isPending} error={buildMutation.error ? message(buildMutation.error, pageStateLabels.unknown_error) : undefined} /></Shell>
 
   const saveField = async (fieldKey: string, value: unknown) => {
     const current = queryClient.getQueryData<typeof passport>(['passport', workspaceScope]) ?? passportQuery.data!
@@ -122,7 +109,7 @@ export default function App() {
   }
   const prepare = (policy: MatchResult) => { setSelectedPolicy(policy); setChecklist(undefined); setApplication(undefined); setWorkflowError(undefined); setPage('application') }
 
-  return <Shell page={page} companyName={passport.company_name} {...shellProps} onNavigate={setPage} unreadAlerts={(alertsQuery.data?.alerts ?? []).filter(alert => !alert.read).length}>
+  return <Shell page={page} {...shellProps} onNavigate={setPage} unreadAlerts={(alertsQuery.data?.alerts ?? []).filter(alert => !alert.read).length}>
     {page === 'overview' && <Dashboard passport={passport} matchRun={matchRun} selectedPolicy={activeSelectedPolicy} checklist={checklist} application={activeApplication} onNavigate={setPage} />}
     {page === 'passport' && <PassportPage passport={passport} candidates={candidatesQuery.data?.candidates ?? []} onConfirm={confirmCandidate} onSaveField={saveField} onRefresh={async files => { await refreshMutation.mutateAsync(files) }} refreshBusy={refreshMutation.isPending} busy={candidatesQuery.isFetching || refreshMutation.isPending} />}
     {page === 'opportunities' && <OpportunitiesPage run={matchRun} onMatch={() => matchMutation.mutate()} matching={matchMutation.isPending} selected={selectedPolicy} onSelect={setSelectedPolicy} onPrepare={prepare} enrichment={enrichment} onEnrich={policyId => enrichMutation.mutate(policyId)} onAcceptEvidence={candidateId => void acceptEvidence(candidateId)} busy={enrichMutation.isPending} error={matchMutation.error ? message(matchMutation.error, pageStateLabels.unknown_error) : undefined} />}

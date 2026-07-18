@@ -4,6 +4,7 @@ import { StatusBadge } from '../../components/StatusBadge'
 import { displayValue, formatDate } from '../../lib/format'
 import type { Application, Checklist, MatchResult, MatchRun, Passport } from '../../lib/types'
 import { useTranslation } from '../../lib/i18n'
+import { useState } from 'react'
 
 export function Dashboard({ passport, matchRun, selectedPolicy, checklist, application, onNavigate }: {
   passport: Passport
@@ -16,6 +17,7 @@ export function Dashboard({ passport, matchRun, selectedPolicy, checklist, appli
   const { t } = useTranslation()
   const d = t('dashboard')
   const fieldsLabels = t('fields') as Record<string, string>
+  const [renderedAt] = useState(Date.now)
 
   const fields = Object.values(passport.fields)
   const confirmed = fields.filter(field => field.status === 'CONFIRMED').length
@@ -29,7 +31,7 @@ export function Dashboard({ passport, matchRun, selectedPolicy, checklist, appli
   const matchedCount = matchRun?.results?.length
   const nearestDeadline = (matchRun?.results ?? [])
     .map(result => ({ value: result.deadline, timestamp: Date.parse(result.deadline) }))
-    .filter(item => item.value && !item.value.startsWith('0001-') && Number.isFinite(item.timestamp) && item.timestamp >= Date.now())
+    .filter(item => item.value && !item.value.startsWith('0001-') && Number.isFinite(item.timestamp) && item.timestamp >= renderedAt)
     .sort((left, right) => left.timestamp - right.timestamp)[0]?.value
   const hasApplicationWork = Boolean(selectedPolicy || checklist || application)
 
