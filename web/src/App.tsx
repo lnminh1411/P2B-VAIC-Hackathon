@@ -83,6 +83,7 @@ export default function App() {
   const checklistMutation = useMutation({ mutationFn: (policyId: string) => api.createChecklist(policyId), onSuccess: setChecklist })
   const applicationMutation = useMutation({ mutationFn: ({ checklistId, templateId }: { checklistId: string; templateId?: string }) => api.createApplication(checklistId, templateId), onSuccess: data => { setApplication(data); queryClient.setQueryData(['application-draft', workspaceScope], { application: data }) } })
   const templateUploadMutation = useMutation({ mutationFn: (file: File) => api.uploadApplicationTemplate(file), onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['application-templates', workspaceScope] }) } })
+  const watchlistMutation = useMutation({ mutationFn: api.updateWatchlistSettings, onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['alerts', workspaceScope] }) } })
 
   if (workspacesQuery.isLoading || passportQuery.isLoading) return <LoadingState label={pageStateLabels.loading_workspace} />
   if (workspacesQuery.error) return <ErrorState message={message(workspacesQuery.error, pageStateLabels.unknown_error)} onRetry={() => workspacesQuery.refetch()} />
@@ -132,7 +133,7 @@ export default function App() {
         alerts={alertsQuery.data?.alerts ?? []}
         settings={alertsQuery.data?.watchlist_settings ?? { new_policies: false, deadline_changes: false, stale_evidence: false, upcoming_deadlines: false }}
         onRead={id => api.readAlert(id).then(() => queryClient.invalidateQueries({ queryKey: ['alerts', workspaceScope] }))}
-        onUpdateSettings={settings => api.updateWatchlistSettings(settings).then(() => queryClient.invalidateQueries({ queryKey: ['alerts', workspaceScope] }))}
+        onUpdateSettings={settings => watchlistMutation.mutate(settings)}
       />
     )}
     {page === 'admin' && (adminQuery.isLoading ? <LoadingState label={shellLabels.system_loading_queue} /> : adminQuery.error ? <ErrorState message={message(adminQuery.error, pageStateLabels.unknown_error)} /> : <AdminPage policies={adminQuery.data?.policies ?? []} />)}
