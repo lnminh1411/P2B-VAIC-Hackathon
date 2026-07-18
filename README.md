@@ -1,7 +1,7 @@
 <p align="center">
-  <img src="docs/partners-Startup-Wheel-2-1457523754.png" height="80" />
+  <img src="docs/partners-Startup-Wheel-2-1457523754.png" height="160" />
   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="docs/image_mq89wa3204e6-708052919_122106772845310881_1859218663441673925_n-3300313680-removebg-preview.png" height="80" />
+  <img src="docs/image_mq89wa3204e6-708052919_122106772845310881_1859218663441673925_n-3300313680-removebg-preview.png" height="200" />
 </p>
 
 <p align="center">
