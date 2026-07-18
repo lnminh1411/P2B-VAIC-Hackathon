@@ -36,4 +36,4 @@ Production wiring after credentials and official source allowlists are supplied:
 - [x] Add canonical field catalog to Gemini structured extraction
 - [x] Add targeted completeness pass for missing fields
 - [x] Add privacy-safe rejection diagnostics
-- [ ] Run full quality gates and deploy Railway backend/worker
+- [x] Run full quality gates and deploy Railway backend/worker
