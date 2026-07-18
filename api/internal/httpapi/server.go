@@ -60,6 +60,9 @@ type Config struct {
 	PolicyStore interface {
 		Policies(context.Context, bool) ([]domain.Policy, error)
 	}
+	DocumentSearcher interface {
+		SearchDocuments(context.Context, domain.Passport) ([]domain.DocumentMatch, string, error)
+	}
 	ReadinessChecker interface {
 		Ping(context.Context) error
 	}
@@ -535,17 +538,27 @@ func (s *Server) createMatch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "POLICY_STORE_UNAVAILABLE", "Policy corpus is temporarily unavailable")
 		return
 	}
+	pass := s.service.Passport(workspace(r))
 	if s.config.ExtractionStore != nil {
-		pass, err := s.config.ExtractionStore.Passport(r.Context(), workspace(r))
+		persisted, err := s.config.ExtractionStore.Passport(r.Context(), workspace(r))
 		if err != nil {
 			slog.Error("load passport for matching", "error", err)
 			writeError(w, http.StatusServiceUnavailable, "PASSPORT_STORE_UNAVAILABLE", "Company passport is temporarily unavailable")
 			return
 		}
-		writeJSON(w, http.StatusCreated, s.service.MatchPassport(workspace(r), pass))
+		pass = persisted
+	}
+	if s.config.DocumentSearcher != nil {
+		documents, mode, err := s.config.DocumentSearcher.SearchDocuments(r.Context(), pass)
+		if err != nil {
+			slog.ErrorContext(r.Context(), "hybrid policy search failed", "error", err)
+			writeError(w, http.StatusServiceUnavailable, "POLICY_SEARCH_UNAVAILABLE", "Policy search is temporarily unavailable")
+			return
+		}
+		writeJSON(w, http.StatusCreated, s.service.MatchPassportHybrid(workspace(r), pass, documents, mode))
 		return
 	}
-	writeJSON(w, http.StatusCreated, s.service.Match(workspace(r)))
+	writeJSON(w, http.StatusCreated, s.service.MatchPassport(workspace(r), pass))
 }
 
 func (s *Server) getMatch(w http.ResponseWriter, r *http.Request) {

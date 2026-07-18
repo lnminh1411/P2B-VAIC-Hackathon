@@ -95,6 +95,21 @@ type Policy struct {
 	TemplateReady bool                    `json:"template_ready"`
 }
 
+// DocumentMatch is an unstructured legal document retrieved from the production
+// corpus. It is intentionally separate from Policy: a retrieved document has
+// relevance evidence, but no reviewed eligibility rules yet.
+type DocumentMatch struct {
+	ID           string
+	Version      int
+	Title        string
+	Agency       string
+	Excerpt      string
+	SourceURL    string
+	LexicalScore float64
+	VectorScore  float64
+	HybridScore  float64
+}
+
 type ChecklistTemplateItem struct {
 	Key         string   `json:"key"`
 	Title       string   `json:"title"`

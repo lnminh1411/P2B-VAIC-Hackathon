@@ -2,6 +2,8 @@ package platform
 
 import (
 	"errors"
+	"fmt"
+	"math"
 	"slices"
 	"sort"
 	"strings"
@@ -163,7 +165,7 @@ func (s *Service) Match(workspaceID string) MatchRun {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	state := s.workspace(workspaceID)
-	return s.matchLocked(state, state.Passport)
+	return s.matchLocked(state, state.Passport, nil, "RULE_ENGINE_ONLY")
 }
 
 // MatchPassport matches using the persisted passport supplied by the API layer.
@@ -174,22 +176,76 @@ func (s *Service) MatchPassport(workspaceID string, pass domain.Passport) MatchR
 	defer s.mu.Unlock()
 	state := s.workspace(workspaceID)
 	state.Passport = clonePassport(pass)
-	return s.matchLocked(state, pass)
+	return s.matchLocked(state, pass, nil, "RULE_ENGINE_ONLY")
 }
 
-func (s *Service) matchLocked(state *workspaceState, pass domain.Passport) MatchRun {
+// MatchPassportHybrid combines deterministic eligibility evaluation for reviewed
+// policies with semantic retrieval from the legal-document corpus.
+func (s *Service) MatchPassportHybrid(workspaceID string, pass domain.Passport, documents []domain.DocumentMatch, retrievalMode string) MatchRun {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	state := s.workspace(workspaceID)
+	state.Passport = clonePassport(pass)
+	if strings.TrimSpace(retrievalMode) == "" {
+		retrievalMode = "HYBRID_RULE_VECTOR"
+	}
+	return s.matchLocked(state, pass, documents, retrievalMode)
+}
+
+func (s *Service) matchLocked(state *workspaceState, pass domain.Passport, documents []domain.DocumentMatch, retrievalMode string) MatchRun {
 	run := MatchRun{ID: uuid.NewString(), PassportVersion: pass.Version, CreatedAt: time.Now().UTC(), Results: make([]MatchResult, 0)}
+	knownSources := make(map[string]struct{}, len(s.policies))
 	for _, policy := range s.policies {
 		if policy.Lifecycle != "ACTIVE" {
 			continue
 		}
 		evaluation := eligibility.Evaluate(pass, policy.Rules)
 		score, reasons := rank(policy, pass, evaluation)
-		run.Results = append(run.Results, MatchResult{PolicyID: policy.ID, PolicyVersion: policy.Version, Title: policy.Title, Agency: policy.Agency, Benefit: policy.Benefit, BenefitAmount: policy.BenefitAmount, Deadline: policy.Deadline, Score: score, Eligibility: evaluation, RankingReasons: reasons, TemplateReady: policy.TemplateReady, RetrievalMode: "RULE_ENGINE_ONLY"})
+		mode := "RULE_ENGINE_ONLY"
+		if len(documents) > 0 {
+			mode = retrievalMode
+		}
+		run.Results = append(run.Results, MatchResult{PolicyID: policy.ID, PolicyVersion: policy.Version, Title: policy.Title, Agency: policy.Agency, Benefit: policy.Benefit, BenefitAmount: policy.BenefitAmount, Deadline: policy.Deadline, Score: score, Eligibility: evaluation, RankingReasons: reasons, TemplateReady: policy.TemplateReady, RetrievalMode: mode, SourceURL: policy.SourceURL})
+		if policy.SourceURL != "" {
+			knownSources[policy.SourceURL] = struct{}{}
+		}
+	}
+	for _, document := range documents {
+		if document.ID == "" {
+			continue
+		}
+		if _, duplicate := knownSources[document.SourceURL]; document.SourceURL != "" && duplicate {
+			continue
+		}
+		score := documentMatchScore(document)
+		reasons := []string{"Văn bản được tìm thấy trong kho dữ liệu pháp luật"}
+		if document.VectorScore > 0 {
+			reasons = append(reasons, fmt.Sprintf("Độ tương đồng ngữ nghĩa %.0f%%", math.Min(document.VectorScore, 1)*100))
+		}
+		if document.LexicalScore > 0 {
+			reasons = append(reasons, "Có từ khóa phù hợp với Company Passport")
+		}
+		evaluation := eligibility.Result{Status: eligibility.StatusMissingInfo, Criteria: []eligibility.CriterionResult{}}
+		run.Results = append(run.Results, MatchResult{
+			PolicyID: document.ID, PolicyVersion: document.Version, Title: document.Title,
+			Agency: document.Agency, Benefit: document.Excerpt, Score: score,
+			Eligibility: evaluation, RankingReasons: reasons, RetrievalMode: retrievalMode,
+			SourceURL: document.SourceURL,
+		})
 	}
 	sort.SliceStable(run.Results, func(i, j int) bool { return run.Results[i].Score > run.Results[j].Score })
 	state.Matches[run.ID] = run
 	return run
+}
+
+func documentMatchScore(document domain.DocumentMatch) int {
+	vector := math.Max(0, math.Min(document.VectorScore, 1))
+	lexical := math.Max(0, math.Min(document.LexicalScore, 1))
+	score := 25 + int(math.Round(vector*60)) + int(math.Round(lexical*14))
+	if score > 99 {
+		return 99
+	}
+	return score
 }
 
 func (s *Service) MatchRun(workspaceID, id string) (MatchRun, error) {

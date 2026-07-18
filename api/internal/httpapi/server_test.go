@@ -49,6 +49,16 @@ type policyStoreStub struct {
 	err      error
 }
 
+type documentSearcherStub struct {
+	documents []domain.DocumentMatch
+	mode      string
+	err       error
+}
+
+func (s documentSearcherStub) SearchDocuments(_ context.Context, _ domain.Passport) ([]domain.DocumentMatch, string, error) {
+	return s.documents, s.mode, s.err
+}
+
 func (s policyStoreStub) Policies(_ context.Context, _ bool) ([]domain.Policy, error) {
 	return s.policies, s.err
 }
@@ -312,6 +322,42 @@ func TestMatchLoadsPublishedPoliciesFromConfiguredStore(t *testing.T) {
 	decode(t, response, &run)
 	if len(run.Results) != 1 || run.Results[0].PolicyID != "db-policy" {
 		t.Fatalf("results = %#v, want configured DB policy", run.Results)
+	}
+}
+
+func TestMatchReturnsRetrievedDocumentsWhenNoStructuredPoliciesExist(t *testing.T) {
+	service := platform.NewService(nil)
+	if _, err := service.BuildPassport("local-development-workspace", platform.BuildPassportInput{
+		CompanyName: "Công ty Xanh", SupportNeeds: []string{"đổi mới công nghệ"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	server := NewServerWithConfig(service, Config{
+		DevAuth: true, WebOrigin: "http://localhost:5173",
+		PolicyStore: policyStoreStub{},
+		DocumentSearcher: documentSearcherStub{
+			mode: "HYBRID_RULE_VECTOR",
+			documents: []domain.DocumentMatch{{
+				ID: "document-1", Version: 1, Title: "Chính sách đổi mới công nghệ", Agency: "Bộ KH&CN",
+				Excerpt: "Hỗ trợ doanh nghiệp đổi mới công nghệ.", VectorScore: 0.9, HybridScore: 0.03,
+			}},
+		},
+	})
+
+	response := request(t, server, http.MethodPost, "/v1/matches", map[string]any{})
+
+	if response.Code != http.StatusCreated {
+		t.Fatalf("status = %d: %s", response.Code, response.Body.String())
+	}
+	var run struct {
+		Results []struct {
+			PolicyID      string `json:"policy_id"`
+			RetrievalMode string `json:"retrieval_mode"`
+		} `json:"results"`
+	}
+	decode(t, response, &run)
+	if len(run.Results) != 1 || run.Results[0].PolicyID != "document-1" || run.Results[0].RetrievalMode != "HYBRID_RULE_VECTOR" {
+		t.Fatalf("results = %#v, want retrieved production document", run.Results)
 	}
 }
 

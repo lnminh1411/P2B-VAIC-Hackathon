@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/p2b/p2b/internal/domain"
+	"github.com/p2b/p2b/internal/eligibility"
 )
 
 func TestBuildPassportDoesNotInventCompanyFacts(t *testing.T) {
@@ -91,5 +92,46 @@ func TestMatchPassportUsesPersistedPassportFacts(t *testing.T) {
 	}
 	if len(run.Results) != 1 || run.Results[0].Eligibility.Status != "MET" {
 		t.Fatalf("results = %#v, want policy matched from persisted passport", run.Results)
+	}
+}
+
+func TestMatchPassportHybridCombinesRulePoliciesAndRetrievedDocuments(t *testing.T) {
+	policy := domain.Policy{
+		ID: "green-support", Version: 1, Title: "Hỗ trợ công nghệ xanh", Lifecycle: "ACTIVE",
+		SupportType: "công nghệ xanh",
+		Rules:       []domain.Rule{{ID: "province", FieldKey: "province", Operator: domain.OpEQ, Expected: "Đà Nẵng", Required: true}},
+	}
+	service := NewService([]domain.Policy{policy})
+	pass := domain.Passport{
+		Version: 8, SupportNeeds: []string{"công nghệ xanh"},
+		Fields: map[string]domain.PassportField{
+			"province": {Key: "province", Value: "Đà Nẵng", Status: domain.FieldConfirmed},
+		},
+	}
+	documents := []domain.DocumentMatch{{
+		ID: "legal-document", Version: 2, Title: "Nghị định hỗ trợ doanh nghiệp xanh",
+		Agency: "Bộ Khoa học và Công nghệ", Excerpt: "Doanh nghiệp đổi mới công nghệ được hỗ trợ.",
+		SourceURL: "https://vbpl.vn/legal-document", VectorScore: 0.91, LexicalScore: 0.24, HybridScore: 0.032,
+	}}
+
+	run := service.MatchPassportHybrid("workspace", pass, documents, "HYBRID_RULE_VECTOR")
+
+	if len(run.Results) != 2 {
+		t.Fatalf("results = %#v, want one rule result and one document result", run.Results)
+	}
+	var documentResult *MatchResult
+	for index := range run.Results {
+		if run.Results[index].PolicyID == "legal-document" {
+			documentResult = &run.Results[index]
+		}
+	}
+	if documentResult == nil {
+		t.Fatal("retrieved legal document missing from match results")
+	}
+	if documentResult.Eligibility.Status != eligibility.StatusMissingInfo {
+		t.Fatalf("document eligibility = %s, want MISSING_INFO until rules are structured", documentResult.Eligibility.Status)
+	}
+	if documentResult.RetrievalMode != "HYBRID_RULE_VECTOR" || documentResult.SourceURL != documents[0].SourceURL {
+		t.Fatalf("document result = %#v", documentResult)
 	}
 }

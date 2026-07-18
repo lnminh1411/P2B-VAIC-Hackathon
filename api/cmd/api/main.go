@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/p2b/p2b/internal/extraction"
 	"github.com/p2b/p2b/internal/httpapi"
 	"github.com/p2b/p2b/internal/pipeline"
 	"github.com/p2b/p2b/internal/platform"
@@ -70,7 +71,7 @@ func main() {
 		}
 		config.UploadSigner = uploadSigner
 		config.ExtractionStore = pipeline.NewStore(database)
-		policyStore := policystore.NewStore(database)
+		policyStore := policystore.NewStore(database, extraction.ONNXEmbedder{})
 		policyContext, policyCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		publishedPolicies, policyErr := policyStore.Policies(policyContext, true)
 		policyCancel()
@@ -80,6 +81,7 @@ func main() {
 		}
 		service.ReplacePolicies(publishedPolicies)
 		config.PolicyStore = policyStore
+		config.DocumentSearcher = policyStore
 		slog.Info("policy corpus connected", "published", len(publishedPolicies))
 	}
 	server := &http.Server{

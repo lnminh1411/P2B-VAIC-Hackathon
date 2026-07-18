@@ -10,7 +10,13 @@ import (
 	"time"
 )
 
-const defaultEmbeddingTimeout = 30 * time.Second
+const (
+	defaultEmbeddingTimeout = 30 * time.Second
+	embeddingDimensions     = 768
+	maxConcurrentEmbeddings = 2
+)
+
+var embeddingSlots = make(chan struct{}, maxConcurrentEmbeddings)
 
 type ONNXEmbedder struct {
 	PythonExecutable string
@@ -23,15 +29,23 @@ func (e ONNXEmbedder) Embed(ctx context.Context, text string) ([]float32, error)
 	if timeout <= 0 {
 		timeout = defaultEmbeddingTimeout
 	}
-	
+
 	embedCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	release, err := acquireEmbeddingSlot(embedCtx)
+	if err != nil {
+		if embedCtx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("embedding calculation timed out after %s", timeout)
+		}
+		return nil, fmt.Errorf("embedding calculation canceled: %w", err)
+	}
+	defer release()
 
 	pyExec := strings.TrimSpace(e.PythonExecutable)
 	if pyExec == "" {
 		pyExec = "/opt/markitdown/bin/python"
 	}
-	
+
 	script := strings.TrimSpace(e.ScriptPath)
 	if script == "" {
 		script = "/usr/local/bin/calculate_embeddings.py"
@@ -39,7 +53,7 @@ func (e ONNXEmbedder) Embed(ctx context.Context, text string) ([]float32, error)
 
 	var stdout, stderr bytes.Buffer
 	cmd := exec.CommandContext(embedCtx, pyExec, script)
-	
+
 	// Pass the input text via stdin to avoid argument length limits
 	cmd.Stdin = strings.NewReader(text)
 	cmd.Stdout = &stdout
@@ -71,6 +85,18 @@ func (e ONNXEmbedder) Embed(ctx context.Context, text string) ([]float32, error)
 		}
 		return nil, fmt.Errorf("failed to parse embedding output: %w (stdout: %s)", err, stdout.String())
 	}
+	if len(result) != embeddingDimensions {
+		return nil, fmt.Errorf("embedding helper returned %d dimensions, want %d", len(result), embeddingDimensions)
+	}
 
 	return result, nil
+}
+
+func acquireEmbeddingSlot(ctx context.Context) (func(), error) {
+	select {
+	case embeddingSlots <- struct{}{}:
+		return func() { <-embeddingSlots }, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 }

@@ -24,7 +24,24 @@ describe('OpportunitiesPage', () => {
 
     render(<OpportunitiesPage {...props} run={run} />)
 
-    expect(screen.getByText('Chưa có policy đã publish')).toBeInTheDocument()
+    expect(screen.getByText('Chưa tìm thấy kết quả phù hợp')).toBeInTheDocument()
     expect(screen.getByText('NO PUBLISHED CORPUS')).toBeInTheDocument()
+  })
+
+  it('renders a retrieved legal document with a safe source link and no fake deadline', () => {
+	const run: MatchRun = {
+	  id: 'match-2', passport_version: 3, created_at: '2026-07-19T00:00:00Z',
+	  results: [{
+		policy_id: 'document-1', policy_version: 1, title: 'Nghị định hỗ trợ doanh nghiệp', agency: 'Bộ KH&CN',
+		benefit: 'Điều khoản hỗ trợ đổi mới công nghệ', benefit_amount: '', deadline: '0001-01-01T00:00:00Z', score: 82,
+		eligibility: { status: 'MISSING_INFO', criteria: [] }, ranking_reasons: ['Độ tương đồng ngữ nghĩa 91%'],
+		template_ready: false, retrieval_mode: 'HYBRID_RULE_VECTOR', source_url: 'https://vbpl.vn/van-ban/1',
+	  }],
+	}
+
+	render(<OpportunitiesPage {...props} run={run} selected={run.results[0]} />)
+
+	expect(screen.getByText('Không thời hạn')).toBeInTheDocument()
+	expect(screen.getByRole('link', { name: /Mở văn bản nguồn/ })).toHaveAttribute('href', 'https://vbpl.vn/van-ban/1')
   })
 })

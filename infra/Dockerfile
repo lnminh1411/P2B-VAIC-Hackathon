@@ -22,6 +22,10 @@ COPY --from=api-builder /out/p2b-crawler /usr/local/bin/p2b-crawler
 COPY scripts/calculate_embeddings.py /usr/local/bin/calculate_embeddings.py
 COPY infra/entrypoint.sh /usr/local/bin/p2b-entrypoint
 RUN chmod 0755 /usr/local/bin/p2b-entrypoint /usr/local/bin/calculate_embeddings.py
+ENV P2B_MODEL_CACHE_DIR=/opt/p2b-embedding-model
+RUN mkdir -p "${P2B_MODEL_CACHE_DIR}" \
+    && printf '%s' 'query: production model preload' | /opt/markitdown/bin/python /usr/local/bin/calculate_embeddings.py >/dev/null \
+    && chown -R p2b:p2b "${P2B_MODEL_CACHE_DIR}"
 USER p2b
 ENV PATH="/opt/markitdown/bin:${PATH}"
 ENV HTTP_ADDR=:8080

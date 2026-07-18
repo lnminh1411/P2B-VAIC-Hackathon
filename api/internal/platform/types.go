@@ -37,6 +37,7 @@ type MatchResult struct {
 	RankingReasons []string           `json:"ranking_reasons"`
 	TemplateReady  bool               `json:"template_ready"`
 	RetrievalMode  string             `json:"retrieval_mode"`
+	SourceURL      string             `json:"source_url,omitempty"`
 }
 
 type MatchRun struct {

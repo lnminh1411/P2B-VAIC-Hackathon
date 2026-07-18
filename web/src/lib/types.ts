@@ -73,6 +73,7 @@ export interface MatchResult {
   ranking_reasons: string[]
   template_ready: boolean
   retrieval_mode: string
+	 source_url?: string
 }
 
 export interface MatchRun { id: string; passport_version: number; created_at: string; results: MatchResult[] }

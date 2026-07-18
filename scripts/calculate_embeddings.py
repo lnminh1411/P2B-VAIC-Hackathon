@@ -36,6 +36,7 @@ def load_model_and_tokenizer():
         download_file(MODEL_URL, MODEL_PATH)
         
     tokenizer = Tokenizer.from_file(TOKENIZER_PATH)
+    tokenizer.enable_truncation(max_length=512)
     
     # Configure ONNX Runtime session for low-resource CPU execution
     sess_options = ort.SessionOptions()
@@ -62,7 +63,8 @@ def main():
             
         tokenizer, session = load_model_and_tokenizer()
         
-        # Tokenize (E5 requires "passage: " prefix for documents)
+        # Caller supplies the E5 prefix: "passage: " for documents and
+        # "query: " for Passport search queries.
         encoded = tokenizer.encode(input_data)
         
         input_ids = np.array([encoded.ids], dtype=np.int64)
