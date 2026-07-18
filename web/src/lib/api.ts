@@ -1,4 +1,4 @@
-import type { Alert, Application, ApplicationTemplate, Candidate, Checklist, EnrichmentRun, MatchRun, Passport, Workspace } from './types'
+import type { Alert, Application, ApplicationTemplate, Candidate, Checklist, EnrichmentRun, MatchRun, Passport, WatchlistSettings, Workspace } from './types'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080'
 const WORKSPACE = 'p2b-local-development'
@@ -93,8 +93,9 @@ export const api = {
     if (!response.ok) throw new ApiError('Không thể tải PDF', response.status)
     return response.blob()
   },
-  alerts: () => request<{ alerts: Alert[] }>('/v1/alerts'),
-  readAlert: (id: string) => request<Alert>(`/v1/alerts/${id}/read`, { method: 'POST' }),
+  alerts: () => request<{ alerts: Alert[]; watchlist_settings: WatchlistSettings }>('/v1/alerts'),
+  updateWatchlistSettings: (settings: WatchlistSettings) => request<WatchlistSettings>('/v1/watchlist/settings', { method: 'PUT', body: JSON.stringify(settings) }),
+  readAlert: (id: string) => request<{ id: string; read: boolean }>(`/v1/alerts/${id}/read`, { method: 'POST' }),
   adminPolicies: () => request<{ policies: Array<{ id: string; title: string; agency: string; lifecycle: string; version: number; verified_at: string; template_ready: boolean }> }>('/v1/admin/policies'),
 }
 

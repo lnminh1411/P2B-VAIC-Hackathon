@@ -48,9 +48,9 @@ func TestApplicationDraftCacheMigrationIsLoaded(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, migration := range migrations {
-		if migration.Version == 6 && strings.Contains(migration.SQL, "application_draft_templates") && strings.Contains(migration.SQL, "application_draft_cache") {
+		if migration.Version == 7 && strings.Contains(migration.SQL, "application_draft_templates") && strings.Contains(migration.SQL, "application_draft_cache") {
 			return
 		}
 	}
-	t.Fatal("migration 6 must create application draft template and cache tables")
+	t.Fatal("migration 7 must create application draft template and cache tables")
 }

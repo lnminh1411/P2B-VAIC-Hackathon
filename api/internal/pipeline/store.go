@@ -419,3 +419,103 @@ func (s *Store) LatestMatchRun(ctx context.Context, workspaceID string) (id stri
 	}
 	return id, passportVersion, resultsJSON, createdAt, nil
 }
+
+func (s *Store) WatchlistSettings(ctx context.Context, workspaceID string) (domain.WatchlistSettings, error) {
+	var settings domain.WatchlistSettings
+	var encodedSettings []byte
+	err := s.database.QueryRow(ctx, `SELECT watchlist_settings FROM companies WHERE workspace_id = $1::uuid`, workspaceID).Scan(&encodedSettings)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.WatchlistSettings{NewPolicies: false, DeadlineChanges: false, StaleEvidence: false, UpcomingDeadlines: false}, nil
+	}
+	if err != nil {
+		return domain.WatchlistSettings{NewPolicies: false, DeadlineChanges: false, StaleEvidence: false, UpcomingDeadlines: false}, err
+	}
+	if err = json.Unmarshal(encodedSettings, &settings); err != nil {
+		return domain.WatchlistSettings{NewPolicies: false, DeadlineChanges: false, StaleEvidence: false, UpcomingDeadlines: false}, err
+	}
+	return settings, nil
+}
+
+func (s *Store) SaveWatchlistSettings(ctx context.Context, workspaceID string, settings domain.WatchlistSettings) error {
+	encodedSettings, err := json.Marshal(settings)
+	if err != nil {
+		return err
+	}
+	_, err = s.database.Exec(ctx, `
+		INSERT INTO companies (workspace_id, legal_name, support_needs, watchlist_settings)
+		VALUES ($1::uuid, 'Chưa có tên', '{}', $2)
+		ON CONFLICT (workspace_id) DO UPDATE SET watchlist_settings = EXCLUDED.watchlist_settings, updated_at = now()`,
+		workspaceID, encodedSettings)
+	return err
+}
+
+func (s *Store) SaveAlert(ctx context.Context, workspaceID string, alert domain.Alert) error {
+	payloadMap := map[string]any{
+		"title":     alert.Title,
+		"message":   alert.Message,
+		"policy_id": alert.PolicyID,
+	}
+	encodedPayload, err := json.Marshal(payloadMap)
+	if err != nil {
+		return err
+	}
+	var readAt *time.Time
+	if alert.Read {
+		now := time.Now().UTC()
+		readAt = &now
+	}
+	_, err = s.database.Exec(ctx, `
+		INSERT INTO alerts (id, workspace_id, type, severity, payload, read_at, created_at)
+		VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7)`,
+		alert.ID, workspaceID, alert.Type, alert.Severity, encodedPayload, readAt, alert.OccurredAt)
+	return err
+}
+
+func (s *Store) Alerts(ctx context.Context, workspaceID string) ([]domain.Alert, error) {
+	rows, err := s.database.Query(ctx, `
+		SELECT id, type, severity, payload, read_at, created_at
+		FROM alerts
+		WHERE workspace_id = $1::uuid
+		ORDER BY created_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	alerts := make([]domain.Alert, 0)
+	for rows.Next() {
+		var idStr, alertType, severity string
+		var encodedPayload []byte
+		var readAt *time.Time
+		var createdAt time.Time
+		if err := rows.Scan(&idStr, &alertType, &severity, &encodedPayload, &readAt, &createdAt); err != nil {
+			return nil, err
+		}
+		var payloadMap map[string]any
+		if err := json.Unmarshal(encodedPayload, &payloadMap); err != nil {
+			return nil, err
+		}
+		title, _ := payloadMap["title"].(string)
+		message, _ := payloadMap["message"].(string)
+		policyID, _ := payloadMap["policy_id"].(string)
+
+		alerts = append(alerts, domain.Alert{
+			ID:         idStr,
+			Type:       alertType,
+			Severity:   severity,
+			Title:      title,
+			Message:    message,
+			PolicyID:   policyID,
+			Read:       readAt != nil,
+			OccurredAt: createdAt.UTC(),
+		})
+	}
+	return alerts, nil
+}
+
+func (s *Store) MarkAlertRead(ctx context.Context, workspaceID string, alertID string) error {
+	_, err := s.database.Exec(ctx, `
+		UPDATE alerts SET read_at = now() WHERE workspace_id = $1::uuid AND id = $2::uuid`,
+		workspaceID, alertID)
+	return err
+}

@@ -18,3 +18,12 @@ A semantic segment of a legal document (typically split at the Article/Điều l
 
 ### Eligibility Rule
 A deterministic criteria check (e.g., `EQ`, `IN`, `CONTAINS`, `GT`, `GTE`, `LT`, `LTE`, `EXISTS`, `DATE_BEFORE`, `DATE_AFTER`) mapped to a specific *Company Passport* field. Rules evaluate to `MET`, `NOT_MET`, or `MISSING_INFO`.
+
+### Crawler (Trình quét)
+An automated background worker that queries the legal corpus (VBPL registry) for new or modified decrees. It identifies updates to decree text, metadata, or lifecycle states (e.g., transitioning to *Expired*).
+
+### Alert (Cảnh báo)
+A workspace-specific notification generated when the Crawler identifies a change relevant to that company's profile (e.g., a matching policy's deadline is modified, or a decree backing verified evidence goes stale/expires).
+
+### Watchlist (Danh sách theo dõi)
+A set of active monitoring configurations for a workspace that filters and routes newly generated crawler alerts (e.g., New Policies, Deadline Changes, Stale Evidence, Upcoming Deadlines).

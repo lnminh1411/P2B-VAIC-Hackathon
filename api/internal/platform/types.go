@@ -111,16 +111,7 @@ type ApplicationDraftContext struct {
 	Policy    domain.Policy
 }
 
-type Alert struct {
-	ID         string    `json:"id"`
-	Type       string    `json:"type"`
-	Title      string    `json:"title"`
-	Message    string    `json:"message"`
-	PolicyID   string    `json:"policy_id,omitempty"`
-	Severity   string    `json:"severity"`
-	Read       bool      `json:"read"`
-	OccurredAt time.Time `json:"occurred_at"`
-}
+type Alert = domain.Alert
 
 type workspaceState struct {
 	Passport          domain.Passport

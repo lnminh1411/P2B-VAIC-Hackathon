@@ -133,3 +133,10 @@ export interface ApplicationTemplate {
 }
 
 export interface Alert { id: string; type: string; title: string; message: string; policy_id?: string; severity: string; read: boolean; occurred_at: string }
+
+export interface WatchlistSettings {
+  new_policies: boolean
+  deadline_changes: boolean
+  stale_evidence: boolean
+  upcoming_deadlines: boolean
+}
