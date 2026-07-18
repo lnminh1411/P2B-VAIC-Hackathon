@@ -4,14 +4,22 @@ import { useMemo, useState, type FormEvent } from 'react'
 
 const needs = ['Vốn ưu đãi', 'Thuế', 'R&D', 'Chuyển đổi số', 'Đào tạo', 'Công nghệ xanh', 'Đổi mới sáng tạo']
 
-export function Onboarding({ onSubmit, busy, error }: { onSubmit: (data: { company_name: string; website: string; support_needs: string[]; source_names: string[] }) => void; busy: boolean; error?: string }) {
-  const [company, setCompany] = useState('Công ty Cổ phần GreenTech Việt Nam')
-  const [website, setWebsite] = useState('https://greentech.example.vn')
-  const [selected, setSelected] = useState(['Vốn ưu đãi', 'Công nghệ xanh', 'Đổi mới sáng tạo'])
-  const [files, setFiles] = useState<string[]>(['dang-ky-doanh-nghiep.pdf', 'pitch-deck-2026.pdf'])
+export function Onboarding({ onSubmit, busy, error }: { onSubmit: (data: { company_name: string; website: string; support_needs: string[]; files: File[] }) => void; busy: boolean; error?: string }) {
+  const [company, setCompany] = useState('')
+  const [website, setWebsite] = useState('')
+  const [selected, setSelected] = useState<string[]>([])
+  const [files, setFiles] = useState<File[]>([])
+  const [fileError, setFileError] = useState<string>()
   const canSubmit = useMemo(() => company.trim().length >= 2 && selected.length > 0, [company, selected])
   const toggle = (need: string) => setSelected(current => current.includes(need) ? current.filter(item => item !== need) : [...current, need])
-  const submit = (event: FormEvent) => { event.preventDefault(); if (canSubmit) onSubmit({ company_name: company.trim(), website: website.trim(), support_needs: selected, source_names: files }) }
+  const submit = (event: FormEvent) => { event.preventDefault(); if (canSubmit) onSubmit({ company_name: company.trim(), website: website.trim(), support_needs: selected, files }) }
+  const selectFiles = (next: File[]) => {
+    setFileError(undefined)
+    if (next.length > 10) { setFileError('Tối đa 10 file PDF.'); return }
+    if (next.some(file => file.size > 20 * 1024 * 1024)) { setFileError('Mỗi file PDF phải nhỏ hơn hoặc bằng 20 MB.'); return }
+    if (next.some(file => file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf'))) { setFileError('Chỉ chấp nhận file PDF.'); return }
+    setFiles(next)
+  }
 
   return (
     <div className="onboarding-shell">
@@ -29,8 +37,9 @@ export function Onboarding({ onSubmit, busy, error }: { onSubmit: (data: { compa
           <label>Tên doanh nghiệp<input value={company} onChange={event => setCompany(event.target.value)} maxLength={200} required /></label>
           <label>Website doanh nghiệp<div className="input-icon"><Link2 /><input value={website} onChange={event => setWebsite(event.target.value)} type="url" placeholder="https://" /></div></label>
           <fieldset><legend>Bạn đang tìm hỗ trợ gì?</legend><div className="choice-cloud">{needs.map(need => <button type="button" key={need} data-selected={selected.includes(need)} onClick={() => toggle(need)}>{need}</button>)}</div></fieldset>
-          <label className="upload-zone"><UploadCloud /><strong>Thêm tài liệu PDF</strong><span>Đăng ký doanh nghiệp, pitch deck, hồ sơ năng lực · tối đa 20 MB/file</span><input type="file" accept="application/pdf,.pdf" multiple onChange={event => setFiles(Array.from(event.target.files ?? []).slice(0, 10).map(file => file.name))} /></label>
-          {files.length > 0 && <div className="file-list">{files.map(file => <span key={file}><FileText />{file}</span>)}</div>}
+          <label className="upload-zone"><UploadCloud /><strong>Thêm tài liệu PDF</strong><span>Đăng ký doanh nghiệp, pitch deck, hồ sơ năng lực · tối đa 10 file, 20 MB/file</span><input type="file" accept="application/pdf,.pdf" multiple onChange={event => selectFiles(Array.from(event.target.files ?? []))} /></label>
+          {files.length > 0 && <div className="file-list">{files.map(file => <span key={`${file.name}-${file.size}`}><FileText />{file.name}</span>)}</div>}
+          {fileError && <p className="inline-error" role="alert">{fileError}</p>}
           {error && <p className="inline-error" role="alert">{error}</p>}
           <button className="button primary wide" disabled={!canSubmit || busy}>{busy ? 'Đang phân tích hồ sơ…' : 'Xây Company Passport'}<ArrowRight /></button>
           <p className="form-note">AI chỉ tạo đề xuất. Bạn sẽ kiểm tra từng dữ kiện trước khi matching.</p>
@@ -39,4 +48,3 @@ export function Onboarding({ onSubmit, busy, error }: { onSubmit: (data: { compa
     </div>
   )
 }
-

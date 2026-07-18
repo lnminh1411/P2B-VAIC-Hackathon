@@ -27,7 +27,13 @@ export default function App() {
   const alertsQuery = useQuery({ queryKey: ['alerts'], queryFn: api.alerts, enabled: Boolean(passportQuery.data?.company_name) })
   const adminQuery = useQuery({ queryKey: ['admin-policies'], queryFn: api.adminPolicies, enabled: page === 'admin' })
 
-  const buildMutation = useMutation({ mutationFn: api.buildPassport, onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['passport'] }), queryClient.invalidateQueries({ queryKey: ['candidates'] })]); setPage('passport') } })
+  const buildMutation = useMutation({
+    mutationFn: async (input: { company_name: string; website: string; support_needs: string[]; files: File[] }) => {
+      await Promise.all(input.files.map(file => api.uploadPDF(file)))
+      return api.buildPassport({ ...input, source_names: input.files.map(file => file.name) })
+    },
+    onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['passport'] }), queryClient.invalidateQueries({ queryKey: ['candidates'] })]); setPage('passport') },
+  })
   const matchMutation = useMutation({ mutationFn: api.match, onSuccess: data => setMatchRun(data) })
   const enrichMutation = useMutation({ mutationFn: api.startEnrichment, onSuccess: setEnrichment })
   const checklistMutation = useMutation({ mutationFn: (policyId: string) => api.createChecklist(policyId), onSuccess: setChecklist })
@@ -64,7 +70,7 @@ export default function App() {
   }
   const prepare = (policy: MatchResult) => { setSelectedPolicy(policy); setChecklist(undefined); setApplication(undefined); setPage('application') }
 
-  return <Shell page={page} onNavigate={setPage} unreadAlerts={(alertsQuery.data?.alerts ?? []).filter(alert => !alert.read).length}>
+  return <Shell page={page} companyName={passport.company_name} onNavigate={setPage} unreadAlerts={(alertsQuery.data?.alerts ?? []).filter(alert => !alert.read).length}>
     {page === 'overview' && <Dashboard passport={passport} onNavigate={setPage} />}
     {page === 'passport' && <PassportPage passport={passport} candidates={candidatesQuery.data?.candidates ?? []} onConfirm={confirmCandidate} busy={candidatesQuery.isFetching} />}
     {page === 'opportunities' && <OpportunitiesPage run={matchRun} onMatch={() => matchMutation.mutate()} matching={matchMutation.isPending} selected={selectedPolicy} onSelect={setSelectedPolicy} onPrepare={prepare} enrichment={enrichment} onEnrich={policyId => enrichMutation.mutate(policyId)} onAcceptEvidence={candidateId => void acceptEvidence(candidateId)} busy={enrichMutation.isPending} />}
@@ -75,4 +81,3 @@ export default function App() {
 }
 
 function message(error: unknown) { return error instanceof ApiError || error instanceof Error ? error.message : 'Đã xảy ra lỗi không xác định' }
-
