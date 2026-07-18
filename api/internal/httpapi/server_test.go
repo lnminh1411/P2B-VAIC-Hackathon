@@ -2,13 +2,122 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/p2b/p2b/internal/authn"
 	"github.com/p2b/p2b/internal/platform"
 )
+
+type verifierStub struct {
+	principal authn.Principal
+	err       error
+}
+
+type readinessStub struct {
+	err error
+}
+
+func (r readinessStub) Ping(_ context.Context) error {
+	return r.err
+}
+
+func (v verifierStub) Verify(_ context.Context, _ string) (authn.Principal, error) {
+	return v.principal, v.err
+}
+
+func TestProductionAuthDerivesWorkspaceFromVerifiedPrincipal(t *testing.T) {
+	principal := authn.Principal{Subject: "0f34fe4f-37dc-43c0-9277-67e49b7b06b5", Email: "founder@greentech.vn", Name: "Nguyễn Minh Anh"}
+	server := NewServerWithConfig(platform.NewDemoService(), Config{
+		WebOrigin: "https://app.p2b.vn",
+		Verifier:  verifierStub{principal: principal},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/auth/me", nil)
+	req.Header.Set("Authorization", "Bearer verified-token")
+	req.Header.Set("X-Workspace-ID", "attacker-controlled-workspace")
+	response := httptest.NewRecorder()
+	server.ServeHTTP(response, req)
+	if response.Code != http.StatusOK {
+		t.Fatalf("auth me status = %d: %s", response.Code, response.Body.String())
+	}
+	var me authn.Principal
+	decode(t, response, &me)
+	if me.Subject != principal.Subject || me.Email != principal.Email {
+		t.Fatalf("principal = %#v, want %#v", me, principal)
+	}
+
+	passportReq := httptest.NewRequest(http.MethodGet, "/v1/passport", nil)
+	passportReq.Header.Set("Authorization", "Bearer verified-token")
+	passportReq.Header.Set("X-Workspace-ID", "attacker-controlled-workspace")
+	passportResponse := httptest.NewRecorder()
+	server.ServeHTTP(passportResponse, passportReq)
+	var passport struct {
+		WorkspaceID string `json:"workspace_id"`
+	}
+	decode(t, passportResponse, &passport)
+	if passport.WorkspaceID != principal.Subject {
+		t.Fatalf("workspace = %q, want verified subject %q", passport.WorkspaceID, principal.Subject)
+	}
+}
+
+func TestAdminPoliciesRequiresTrustedAdminRole(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		roles      []string
+		wantStatus int
+	}{
+		{name: "member denied", wantStatus: http.StatusForbidden},
+		{name: "admin allowed", roles: []string{"admin"}, wantStatus: http.StatusOK},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			principal := authn.Principal{Subject: "0f34fe4f-37dc-43c0-9277-67e49b7b06b5", Email: "founder@greentech.vn", Roles: test.roles}
+			server := NewServerWithConfig(platform.NewDemoService(), Config{Verifier: verifierStub{principal: principal}})
+			request := httptest.NewRequest(http.MethodGet, "/v1/admin/policies", nil)
+			request.Header.Set("Authorization", "Bearer verified-token")
+			response := httptest.NewRecorder()
+
+			server.ServeHTTP(response, request)
+
+			if response.Code != test.wantStatus {
+				t.Fatalf("status = %d, want %d: %s", response.Code, test.wantStatus, response.Body.String())
+			}
+		})
+	}
+}
+
+func TestReadinessReflectsDatabaseHealth(t *testing.T) {
+	tests := []struct {
+		name       string
+		err        error
+		wantStatus int
+		wantBody   string
+	}{
+		{name: "database ready", wantStatus: http.StatusOK, wantBody: `"status":"ready"`},
+		{name: "database unavailable", err: errors.New("connection refused"), wantStatus: http.StatusServiceUnavailable, wantBody: `"status":"not_ready"`},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			server := NewServerWithConfig(platform.NewDemoService(), Config{ReadinessChecker: readinessStub{err: test.err}})
+			request := httptest.NewRequest(http.MethodGet, "/health/ready", nil)
+			response := httptest.NewRecorder()
+
+			server.ServeHTTP(response, request)
+
+			if response.Code != test.wantStatus {
+				t.Fatalf("status = %d, want %d: %s", response.Code, test.wantStatus, response.Body.String())
+			}
+			if !bytes.Contains(response.Body.Bytes(), []byte(test.wantBody)) {
+				t.Fatalf("body = %s, want to contain %s", response.Body.String(), test.wantBody)
+			}
+		})
+	}
+}
 
 func TestGoldenPathBuildConfirmMatchAndGenerate(t *testing.T) {
 	server := NewServer(platform.NewDemoService())
