@@ -99,11 +99,13 @@ export interface Application {
   id: string
   checklist_id: string
   policy_id: string
+  passport_version: number
+  policy_version: number
+  template_version: number
   version: number
   status: string
   sections: Record<string, string>
-  blocking_reasons: string[]
+  blocking_reasons: string[] | null
 }
 
 export interface Alert { id: string; type: string; title: string; message: string; policy_id?: string; severity: string; read: boolean; occurred_at: string }
-

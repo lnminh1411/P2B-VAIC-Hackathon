@@ -10,7 +10,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -29,8 +28,9 @@ type Config struct {
 }
 
 type Server struct {
-	service *platform.Service
-	config  Config
+	service     *platform.Service
+	config      Config
+	idempotency *idempotencyStore
 }
 
 func NewServer(service *platform.Service) http.Handler {
@@ -38,7 +38,7 @@ func NewServer(service *platform.Service) http.Handler {
 }
 
 func NewServerWithConfig(service *platform.Service, config Config) http.Handler {
-	server := &Server{service: service, config: config}
+	server := &Server{service: service, config: config, idempotency: newIdempotencyStore()}
 	router := chi.NewRouter()
 	router.Use(server.recoverer, server.securityHeaders, server.cors, server.limitBody)
 	router.Get("/health/live", func(w http.ResponseWriter, _ *http.Request) {
@@ -49,6 +49,7 @@ func NewServerWithConfig(service *platform.Service, config Config) http.Handler 
 	})
 	router.Route("/v1", func(r chi.Router) {
 		r.Use(server.authenticate)
+		r.Use(server.idempotencyMiddleware)
 		r.Post("/uploads/presign", server.presignUpload)
 		r.Post("/passports/build", server.buildPassport)
 		r.Get("/jobs/{jobID}", server.getJob)
@@ -518,5 +519,3 @@ func env(key, fallback string) string {
 	}
 	return fallback
 }
-
-var _ = time.Second

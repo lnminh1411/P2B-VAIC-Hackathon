@@ -20,10 +20,13 @@ func (s *Service) CreateChecklist(workspaceID, policyID string) (Checklist, erro
 	}
 	checklist := Checklist{ID: uuid.NewString(), PolicyID: policy.ID, PolicyVersion: policy.Version, Version: 1, UpdatedAt: time.Now().UTC()}
 	for _, template := range policy.Checklist {
-		status := "MISSING"
+		status := "AVAILABLE"
+		if len(template.FieldKeys) == 0 {
+			status = "MISSING"
+		}
 		for _, fieldKey := range template.FieldKeys {
-			if field, exists := state.Passport.Fields[fieldKey]; exists && field.Status == domain.FieldConfirmed {
-				status = "AVAILABLE"
+			if field, exists := state.Passport.Fields[fieldKey]; !exists || field.Status != domain.FieldConfirmed {
+				status = "MISSING"
 				break
 			}
 		}
@@ -211,7 +214,7 @@ func (s *Service) ReadAlert(workspaceID, id string) (Alert, error) {
 }
 
 func applicationBlockers(checklist Checklist, templateReady bool) []string {
-	var reasons []string
+	reasons := make([]string, 0)
 	if !templateReady {
 		reasons = append(reasons, "Chính sách chưa có mẫu hồ sơ được duyệt")
 	}

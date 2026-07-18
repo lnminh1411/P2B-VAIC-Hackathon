@@ -12,22 +12,29 @@
 
 Company documents, Passport facts, policy review decisions, application snapshots, access tokens and provider keys.
 
-## Required controls
+## Implemented controls in the runnable MVP
 
-- Every workspace-owned query scopes by authenticated `workspace_id`; unknown/cross-workspace IDs return 404.
-- PDF MIME sniffing, 20 MB/file and 200-page/workspace build caps; no user input enters shell commands.
-- HTTPS-only website collection; reject loopback, private, link-local and metadata IPs and revalidate redirects.
-- AI output never executes code, SQL, markup or network calls; strict typed decode and evidence matching.
-- Policy and application activation are human actions with version checks and append-only audit events.
-- CORS allowlist, CSP/security headers, bounded bodies/timeouts and generic external errors.
+- Demo resources are scoped by `workspace_id`; the Supabase schema has RLS enabled with no browser policies.
+- Upload presign validates PDF type and 20 MB/file; Passport build caps the source list at 10.
+- AI candidates are typed, evidence-grounded and never auto-confirmed.
+- Policy and application activation are explicit human actions with version checks.
+- CORS allowlist, CSP/security headers, bounded bodies/timeouts, replay-safe idempotency and generic errors.
 - No document text, tokens, service keys or full Passport payloads in logs.
 
-## Abuse cases covered by tests
+## Covered by automated tests
 
 - Unknown Passport field and unsupported rule operator.
 - Missing/conflicted facts incorrectly treated as `NOT_MET`.
-- Cross-workspace resource enumeration.
-- Private-IP enrichment URL and DNS-rebinding redirect.
-- Duplicate async requests and stale aggregate updates.
-- Unreviewed policy becoming searchable or exportable.
+- Duplicate mutation replay, idempotency-key misuse and stale aggregate updates.
+- Multi-field checklist items incorrectly treated as available.
+- Null API collections crashing application review.
+- Full application approval and generated PDF validity boundary.
 
+## Production release gates
+
+- Verify Supabase JWT and membership on every API request; enforce admin role from trusted claims.
+- MIME sniff, ClamAV scan, page/text caps and OCR sandbox before any document enters extraction.
+- Reject loopback, private, link-local and metadata IPs; pin DNS decisions and revalidate every redirect.
+- Isolate untrusted web text from agent instructions and reject unsupported evidence.
+- Test cross-tenant enumeration against the PostgreSQL adapter and signed Storage paths.
+- Confirm unreviewed policies can never enter retrieval and crawl changes require admin approval.
