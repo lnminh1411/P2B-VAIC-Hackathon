@@ -1,0 +1,9 @@
+api/
+docs/
+e2e/
+infra/
+supabase/
+tasks/
+templates/
+Makefile
+railway.json
