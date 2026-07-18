@@ -112,12 +112,13 @@ type Alert struct {
 }
 
 type workspaceState struct {
-	Passport     domain.Passport
-	Candidates   []passport.Candidate
-	Jobs         map[string]Job
-	Matches      map[string]MatchRun
-	Enrichment   map[string]EnrichmentRun
-	Checklists   map[string]Checklist
-	Applications map[string]Application
-	Alerts       []Alert
+	Passport          domain.Passport
+	Candidates        []passport.Candidate
+	Jobs              map[string]Job
+	Matches           map[string]MatchRun
+	RetrievedPolicies map[string]domain.Policy
+	Enrichment        map[string]EnrichmentRun
+	Checklists        map[string]Checklist
+	Applications      map[string]Application
+	Alerts            []Alert
 }

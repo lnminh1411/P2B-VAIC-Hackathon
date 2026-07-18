@@ -105,12 +105,13 @@ func TestMatchPassportHybridCombinesRulePoliciesAndRetrievedDocuments(t *testing
 	pass := domain.Passport{
 		Version: 8, SupportNeeds: []string{"công nghệ xanh"},
 		Fields: map[string]domain.PassportField{
-			"province": {Key: "province", Value: "Đà Nẵng", Status: domain.FieldConfirmed},
+			"legal_name": {Key: "legal_name", Value: "Công ty Xanh", Status: domain.FieldConfirmed},
+			"province":   {Key: "province", Value: "Đà Nẵng", Status: domain.FieldConfirmed},
 		},
 	}
 	documents := []domain.DocumentMatch{{
 		ID: "legal-document", Version: 2, Title: "Nghị định hỗ trợ doanh nghiệp xanh",
-		Agency: "Bộ Khoa học và Công nghệ", Excerpt: "Doanh nghiệp đổi mới công nghệ được hỗ trợ.",
+		Agency: "Bộ Khoa học và Công nghệ", Excerpt: "Giới thiệu Giới thiệu Doanh nghiệp đổi mới công nghệ được hỗ trợ. Điều kiện áp dụng cần được đối chiếu theo phạm vi, đối tượng, ngoại lệ và thời hạn quy định trong văn bản nguồn. Hồ sơ phải được người phụ trách rà soát trước khi nộp. Nội dung lặp lại này chỉ dùng để kiểm tra phần trích dẫn được rút gọn, dễ đọc và không chiếm toàn bộ thẻ kết quả. Nội dung lặp lại này chỉ dùng để kiểm tra phần trích dẫn được rút gọn, dễ đọc và không chiếm toàn bộ thẻ kết quả.",
 		SourceURL: "https://vbpl.vn/legal-document", VectorScore: 0.91, LexicalScore: 0.24, HybridScore: 0.032,
 	}}
 
@@ -133,5 +134,42 @@ func TestMatchPassportHybridCombinesRulePoliciesAndRetrievedDocuments(t *testing
 	}
 	if documentResult.RetrievalMode != "HYBRID_RULE_VECTOR" || documentResult.SourceURL != documents[0].SourceURL {
 		t.Fatalf("document result = %#v", documentResult)
+	}
+	if len([]rune(documentResult.Benefit)) > 360 {
+		t.Fatalf("document excerpt has %d runes, want a compact legal summary", len([]rune(documentResult.Benefit)))
+	}
+	if len(documentResult.Eligibility.Criteria) < 3 {
+		t.Fatalf("document criteria = %#v, want explicit human-review criteria", documentResult.Eligibility.Criteria)
+	}
+	for _, criterion := range documentResult.Eligibility.Criteria {
+		if criterion.Status != eligibility.StatusMissingInfo || criterion.Citation.URL != documents[0].SourceURL {
+			t.Fatalf("criterion = %#v, want missing-info criterion citing source document", criterion)
+		}
+	}
+	if !documentResult.TemplateReady {
+		t.Fatal("retrieved document should expose the generic P2B working template")
+	}
+
+	checklist, err := service.CreateChecklist("workspace", documentResult.PolicyID)
+	if err != nil {
+		t.Fatalf("create checklist from retrieved document: %v", err)
+	}
+	if len(checklist.Items) < 2 {
+		t.Fatalf("retrieved document checklist = %#v, want actionable review items", checklist.Items)
+	}
+	for _, item := range checklist.Items {
+		if item.Required && item.Status != "AVAILABLE" {
+			checklist, err = service.UpdateChecklistItem("workspace", checklist.ID, item.ID, "AVAILABLE", "Người phụ trách đã đối chiếu văn bản nguồn", checklist.Version)
+			if err != nil {
+				t.Fatalf("confirm retrieved document checklist item: %v", err)
+			}
+		}
+	}
+	application, err := service.CreateApplication("workspace", checklist.ID)
+	if err != nil {
+		t.Fatalf("create application from retrieved document: %v", err)
+	}
+	if len(application.BlockingReasons) != 0 {
+		t.Fatalf("application blockers = %v, want no missing-template dead end", application.BlockingReasons)
 	}
 }

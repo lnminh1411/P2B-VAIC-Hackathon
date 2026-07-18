@@ -18,6 +18,23 @@ const application = {
 } as unknown as Application
 
 describe('ApplicationPage', () => {
+	it('offers a transparent P2B working template for a retrieved legal document', () => {
+	  render(<ApplicationPage
+		policy={{ ...policy, retrieval_mode: 'HYBRID_RULE_VECTOR', eligibility: { status: 'MISSING_INFO', criteria: [{ rule_id: 'document-review-1' }] } } as MatchResult}
+		onCreateChecklist={vi.fn()}
+		onMarkAvailable={vi.fn()}
+		onCreateApplication={vi.fn()}
+		onSave={vi.fn()}
+		onAction={vi.fn()}
+		onDownload={vi.fn()}
+		busy={false}
+	  />)
+
+	  expect(screen.getByRole('heading', { name: 'Tạo checklist từ văn bản' })).toBeInTheDocument()
+	  expect(screen.getByText(/mẫu làm việc P2B/)).toBeInTheDocument()
+	  expect(screen.getByRole('button', { name: /Tạo checklist/ })).toBeEnabled()
+	})
+
   it('renders applications whose API payload has null blocking reasons', () => {
     render(<ApplicationPage
       policy={policy}

@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useState } from 'react'
 import { StatusBadge } from '../../components/StatusBadge'
 import { displayValue, formatDate } from '../../lib/format'
+import { isRetrievedDocument } from '../../lib/policy'
 import type { EnrichmentRun, MatchResult, MatchRun } from '../../lib/types'
 import { useTranslation } from '../../lib/i18n'
 
@@ -131,7 +132,8 @@ function PolicyDrawer({ result, onClose, onPrepare, enrichment, onEnrich, onAcce
   const { t } = useTranslation()
   const o = t('opportunities')
   const missing = result.eligibility.criteria.filter(item => item.status === 'MISSING_INFO')
-  
+  const retrieved = isRetrievedDocument(result)
+
   return (
     <>
       <motion.button className="drawer-scrim" aria-label="Đóng chi tiết" onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
@@ -157,7 +159,7 @@ function PolicyDrawer({ result, onClose, onPrepare, enrichment, onEnrich, onAcce
         
         <section>
           <div className="drawer-section-title">
-            <h3>{o.eligibility_check}</h3>
+            <h3>{retrieved ? o.criteria_review_title : o.eligibility_check}</h3>
             <StatusBadge status={result.eligibility.status} />
           </div>
           <div className="criteria-list">
@@ -169,7 +171,7 @@ function PolicyDrawer({ result, onClose, onPrepare, enrichment, onEnrich, onAcce
                   <StatusBadge status={criterion.status} />
                   <div>
                     <strong>{criterion.description}</strong>
-                    <p>{o.observed_prefix}{displayValue(criterion.observed)} {o.condition_prefix} {criterion.operator} {displayValue(criterion.expected)}</p>
+                    <p>{retrieved ? o.criteria_manual_review : <>{o.observed_prefix}{displayValue(criterion.observed)} {o.condition_prefix} {criterion.operator} {displayValue(criterion.expected)}</>}</p>
                     <a href={criterion.citation.url} target="_blank" rel="noreferrer">{criterion.citation.source_name}<ExternalLink /></a>
                   </div>
                 </article>
@@ -178,7 +180,7 @@ function PolicyDrawer({ result, onClose, onPrepare, enrichment, onEnrich, onAcce
           </div>
         </section>
         
-        {missing.length > 0 && (
+        {missing.length > 0 && !retrieved && (
           <section className="missing-section">
             <div className="drawer-section-title">
               <h3>{o.missing_data}</h3>
@@ -206,7 +208,7 @@ function PolicyDrawer({ result, onClose, onPrepare, enrichment, onEnrich, onAcce
         )}
         
         <footer>
-          <span>{result.template_ready ? o.template_available : o.template_missing}</span>
+          <span>{retrieved && result.template_ready ? o.template_working : result.template_ready ? o.template_available : o.template_missing}</span>
           <button className="button primary" onClick={onPrepare} disabled={!result.template_ready}>{o.prepare_btn}<ArrowRight /></button>
         </footer>
       </motion.aside>

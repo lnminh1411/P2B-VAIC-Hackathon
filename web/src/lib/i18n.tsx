@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
+import { createContext, useContext, useState, type ReactNode } from 'react'
 
 type Translations = typeof translations.vi
 
@@ -212,6 +212,8 @@ const translations = {
       open_source: 'Mở văn bản nguồn ',
       benefit_section: 'Quyền lợi / nội dung liên quan',
       eligibility_check: 'Kiểm tra điều kiện',
+      criteria_review_title: 'Tiêu chí cần xác minh',
+      criteria_manual_review: 'Cần người phụ trách đối chiếu trực tiếp với văn bản nguồn.',
       criteria_empty: 'Văn bản được tìm bằng ngữ nghĩa; cần cấu trúc rule trước khi kết luận eligibility.',
       observed_prefix: 'Quan sát: ',
       condition_prefix: ' · Điều kiện ',
@@ -222,6 +224,7 @@ const translations = {
       evidence_accepted: 'Đã nhận',
       evidence_accept: 'Xác nhận',
       template_available: 'Có template PDF đã duyệt',
+      template_working: 'Mẫu hồ sơ P2B sẵn sàng · cần đối chiếu mẫu chính thức',
       template_missing: 'Chưa có template PDF',
       prepare_btn: 'Chuẩn bị hồ sơ',
     },
@@ -250,6 +253,8 @@ const translations = {
       h1_em: 'bộ hồ sơ hành động.',
       step1_title: 'Tạo checklist từ policy version',
       step1_desc: 'Rule engine xác định tài liệu bắt buộc. AI không tự đánh dấu tài liệu là đã có.',
+      document_step1_title: 'Tạo checklist từ văn bản',
+      document_step1_desc: 'Tạo mẫu làm việc P2B để rà soát điều kiện và chuẩn bị nội dung. Cần đối chiếu mẫu chính thức với cơ quan ban hành trước khi nộp.',
       step1_btn: 'Tạo checklist',
       step_1_of_3: 'BƯỚC 1/3',
       checklist_subtitle: 'Tài liệu cần chuẩn bị',
@@ -263,6 +268,7 @@ const translations = {
       gate_policy_pinned: 'Policy version được pin',
       gate_passport_pinned: 'Passport version được pin',
       gate_template_approved: 'Template đã được admin duyệt',
+      gate_template_working: 'Mẫu hồ sơ làm việc được pin',
       step_2_of_3: 'BƯỚC 2/3 · HUMAN REVIEW',
       editor_subtitle: 'Nội dung hồ sơ',
       save_version_btn: 'Lưu phiên bản',
@@ -576,6 +582,8 @@ const translations = {
       open_source: 'Open source document ',
       benefit_section: 'Benefits / related content',
       eligibility_check: 'Eligibility check',
+      criteria_review_title: 'Criteria requiring verification',
+      criteria_manual_review: 'A responsible reviewer must check this directly against the source document.',
       criteria_empty: 'Document found semantically; rules need structuring before eligibility can be concluded.',
       observed_prefix: 'Observed: ',
       condition_prefix: ' · Condition ',
@@ -586,6 +594,7 @@ const translations = {
       evidence_accepted: 'Accepted',
       evidence_accept: 'Confirm',
       template_available: 'Approved PDF template available',
+      template_working: 'P2B working package ready · verify the official form before filing',
       template_missing: 'No PDF template available',
       prepare_btn: 'Prepare Application',
     },
@@ -614,6 +623,8 @@ const translations = {
       h1_em: 'an actionable package.',
       step1_title: 'Generate checklist from policy version',
       step1_desc: 'Rule engine determines required documents. AI does not automatically mark documents as available.',
+      document_step1_title: 'Create checklist from document',
+      document_step1_desc: 'Create a P2B working package to review conditions and prepare content. Verify the official form with the issuing authority before filing.',
       step1_btn: 'Generate checklist',
       step_1_of_3: 'STEP 1/3',
       checklist_subtitle: 'Checklist to prepare',
@@ -627,6 +638,7 @@ const translations = {
       gate_policy_pinned: 'Policy version pinned',
       gate_passport_pinned: 'Passport version pinned',
       gate_template_approved: 'Template approved by admin',
+      gate_template_working: 'Working application package pinned',
       step_2_of_3: 'STEP 2/3 · HUMAN REVIEW',
       editor_subtitle: 'Application Contents',
       save_version_btn: 'Save Version',
@@ -743,7 +755,13 @@ type I18nContextProps = {
   ) => Translations[T]
 }
 
-const I18nContext = createContext<I18nContextProps | undefined>(undefined)
+const defaultI18nContext: I18nContextProps = {
+  lang: 'vi',
+  setLang: () => undefined,
+  t: section => translations.vi[section],
+}
+
+const I18nContext = createContext<I18nContextProps>(defaultI18nContext)
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(() => {

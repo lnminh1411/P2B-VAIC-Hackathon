@@ -14,7 +14,7 @@ func (s *Service) CreateChecklist(workspaceID, policyID string) (Checklist, erro
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	state := s.workspace(workspaceID)
-	policy, ok := findPolicy(s.policies, policyID)
+	policy, ok := s.findWorkspacePolicy(state, policyID)
 	if !ok || policy.Lifecycle != "ACTIVE" {
 		return Checklist{}, ErrNotFound
 	}
@@ -85,7 +85,7 @@ func (s *Service) CreateApplication(workspaceID, checklistID string) (Applicatio
 	if !ok {
 		return Application{}, ErrNotFound
 	}
-	policy, ok := findPolicy(s.policies, checklist.PolicyID)
+	policy, ok := s.findWorkspacePolicy(state, checklist.PolicyID)
 	if !ok {
 		return Application{}, ErrNotFound
 	}
@@ -144,7 +144,10 @@ func (s *Service) TransitionApplication(workspaceID, id, action string) (Applica
 		return Application{}, ErrNotFound
 	}
 	checklist := state.Checklists[application.ChecklistID]
-	policy, _ := findPolicy(s.policies, application.PolicyID)
+	policy, ok := s.findWorkspacePolicy(state, application.PolicyID)
+	if !ok {
+		return Application{}, ErrNotFound
+	}
 	switch action {
 	case "submit":
 		if application.Status != "DRAFT_READY" {
@@ -186,7 +189,10 @@ func (s *Service) ApplicationPDF(workspaceID, id string) ([]byte, string, error)
 	if application.Status != "GENERATED" {
 		return nil, "", ErrConflict
 	}
-	policy, _ := findPolicy(s.policies, application.PolicyID)
+	policy, ok := s.findWorkspacePolicy(state, application.PolicyID)
+	if !ok {
+		return nil, "", ErrNotFound
+	}
 	lines := []string{"P2B APPLICATION PACKAGE", "Company: " + state.Passport.CompanyName, "Policy: " + policy.Title, "Agency: " + policy.Agency, "Status: Human reviewed", ""}
 	for _, key := range []string{"company_overview", "support_need", "proposal"} {
 		lines = append(lines, key+": "+application.Sections[key])

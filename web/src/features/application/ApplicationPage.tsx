@@ -1,6 +1,7 @@
 import { Check, Download, FileCheck2, FileText, LockKeyhole, Send, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import { StatusBadge } from '../../components/StatusBadge'
+import { isRetrievedDocument } from '../../lib/policy'
 import type { Application, Checklist, MatchResult } from '../../lib/types'
 import { useTranslation } from '../../lib/i18n'
 
@@ -11,7 +12,8 @@ export function ApplicationPage({ policy, checklist, application, onCreateCheckl
   const app = t('application')
 
   if (!policy) return <div className="application-empty"><FileCheck2 /><span className="kicker">APPLICATION PREPARATION</span><h1>{app.empty_h1}</h1><p>{app.empty_desc}</p></div>
-  return <><section className="page-heading split-heading"><div><span className="kicker">APPLICATION · {policy.agency}</span><h1>{app.h1}<em>{app.h1_em}</em></h1><p>{policy.title}</p></div>{application && <StatusBadge status={application.status} />}</section>{!checklist ? <StartCard title={app.step1_title} copy={app.step1_desc} action={app.step1_btn} onClick={onCreateChecklist} busy={busy} /> : !application ? <ChecklistReview checklist={checklist} onMarkAvailable={onMarkAvailable} onCreate={onCreateApplication} busy={busy} /> : <ApplicationEditor application={application} onSave={onSave} onAction={onAction} onDownload={onDownload} busy={busy} error={error} />}</>
+  const retrieved = isRetrievedDocument(policy)
+  return <><section className="page-heading split-heading"><div><span className="kicker">APPLICATION · {policy.agency}</span><h1>{app.h1}<em>{app.h1_em}</em></h1><p>{policy.title}</p></div>{application && <StatusBadge status={application.status} />}</section>{!checklist ? <StartCard title={retrieved ? app.document_step1_title : app.step1_title} copy={retrieved ? app.document_step1_desc : app.step1_desc} action={app.step1_btn} onClick={onCreateChecklist} busy={busy} /> : !application ? <ChecklistReview checklist={checklist} retrieved={retrieved} onMarkAvailable={onMarkAvailable} onCreate={onCreateApplication} busy={busy} /> : <ApplicationEditor application={application} onSave={onSave} onAction={onAction} onDownload={onDownload} busy={busy} error={error} />}</>
 }
 
 function StartCard({ title, copy, action, onClick, busy }: { title: string; copy: string; action: string; onClick: () => void; busy: boolean }) {
@@ -20,11 +22,11 @@ function StartCard({ title, copy, action, onClick, busy }: { title: string; copy
   return <section className="start-card panel"><div className="step-orb"><Sparkles /></div><span>{app.step_1_of_3}</span><h2>{title}</h2><p>{copy}</p><button className="button primary" onClick={onClick} disabled={busy}>{action}<Check /></button></section>
 }
 
-function ChecklistReview({ checklist, onMarkAvailable, onCreate, busy }: { checklist: Checklist; onMarkAvailable: (itemId: string) => void; onCreate: () => void; busy: boolean }) {
+function ChecklistReview({ checklist, retrieved, onMarkAvailable, onCreate, busy }: { checklist: Checklist; retrieved: boolean; onMarkAvailable: (itemId: string) => void; onCreate: () => void; busy: boolean }) {
   const { t } = useTranslation()
   const app = t('application')
   const missing = checklist.items.filter(item => item.required && item.status !== 'AVAILABLE')
-  return <div className="application-grid"><section className="panel checklist-panel"><div className="panel-title"><div><span>{app.step_1_of_3} · DOCUMENT CHECKLIST</span><h2>{app.checklist_subtitle}</h2></div><strong>{checklist.items.length - missing.length}/{checklist.items.length}</strong></div><div className="checklist-list">{checklist.items.map(item => <article key={item.id}><div className="doc-icon"><FileText /></div><div><strong>{item.title}</strong><p>{item.description || app.default_desc}</p><small>{item.required ? app.required : app.optional} · {item.field_keys.join(', ')}</small></div><StatusBadge status={item.status} />{item.status !== 'AVAILABLE' && <button className="button secondary" disabled={busy} onClick={() => onMarkAvailable(item.id)}>{app.confirm_available_btn}</button>}</article>)}</div></section><aside className="panel approval-card"><LockKeyhole /><h3>Human approval gate</h3><p>{app.gate_desc}</p><ul><li><Check />{app.gate_policy_pinned}</li><li><Check />{app.gate_passport_pinned}</li><li><Check />{app.gate_template_approved}</li></ul><button className="button primary wide" disabled={missing.length > 0 || busy} onClick={onCreate}>{app.draft_btn}</button>{missing.length > 0 && <small>{app.missing_items_footer.replace('{count}', String(missing.length))}</small>}</aside></div>
+  return <div className="application-grid"><section className="panel checklist-panel"><div className="panel-title"><div><span>{app.step_1_of_3} · DOCUMENT CHECKLIST</span><h2>{app.checklist_subtitle}</h2></div><strong>{checklist.items.length - missing.length}/{checklist.items.length}</strong></div><div className="checklist-list">{checklist.items.map(item => <article key={item.id}><div className="doc-icon"><FileText /></div><div><strong>{item.title}</strong><p>{item.description || app.default_desc}</p><small>{item.required ? app.required : app.optional}{item.field_keys.length > 0 ? ` · ${item.field_keys.join(', ')}` : ''}</small></div><StatusBadge status={item.status} />{item.status !== 'AVAILABLE' && <button className="button secondary" disabled={busy} onClick={() => onMarkAvailable(item.id)}>{app.confirm_available_btn}</button>}</article>)}</div></section><aside className="panel approval-card"><LockKeyhole /><h3>Human approval gate</h3><p>{app.gate_desc}</p><ul><li><Check />{app.gate_policy_pinned}</li><li><Check />{app.gate_passport_pinned}</li><li><Check />{retrieved ? app.gate_template_working : app.gate_template_approved}</li></ul><button className="button primary wide" disabled={missing.length > 0 || busy} onClick={onCreate}>{app.draft_btn}</button>{missing.length > 0 && <small>{app.missing_items_footer.replace('{count}', String(missing.length))}</small>}</aside></div>
 }
 
 function ApplicationEditor({ application, onSave, onAction, onDownload, busy, error }: { application: Application; onSave: (sections: Record<string, string>) => void; onAction: (action: 'submit' | 'approve' | 'generate') => void; onDownload: () => void; busy: boolean; error?: string }) {
