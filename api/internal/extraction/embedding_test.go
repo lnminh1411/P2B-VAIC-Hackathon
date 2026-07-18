@@ -3,6 +3,7 @@ package extraction
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -27,6 +28,12 @@ func TestONNXEmbedderRunsEmbedding(t *testing.T) {
 	// If the script doesn't exist, we are probably running go tests from elsewhere; skip
 	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
 		t.Skip("calculate_embeddings.py script not found, skipping real test")
+	}
+
+	// Check if python and all required dependencies are available
+	depCheck := exec.Command(pythonExec, "-c", "import onnxruntime, tokenizers, numpy")
+	if err := depCheck.Run(); err != nil {
+		t.Skip("Python dependencies (onnxruntime, tokenizers, numpy) are not installed, skipping real embedding test")
 	}
 
 	embedder := ONNXEmbedder{
