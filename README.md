@@ -11,7 +11,7 @@
 ---
 
 ## 🎯 Đề bài / Problem Statement: Policy & Grant Navigator
-**National Innovation Center (NIC) • Innovation**
+**National Innovation Center (NIC) • Innovation Track**
 
 An AI assistant that helps startups, FDI enterprises, and high-tech companies discover relevant government policies, incentives, and funding opportunities by:
 *   **Searching and interpreting** applicable laws, decrees, circulars, and government support programs based on the company’s needs.
