@@ -48,7 +48,7 @@ func main() {
 	store := pipeline.NewStore(database)
 	processor := workerprocessor.Processor{
 		Store: store, Downloader: storage,
-		Converter: extraction.MarkItDownConverter{Executable: env("MARKITDOWN_BIN", "markitdown"), OCRExecutable: env("TESSERACT_BIN", "tesseract"), PDFToImage: env("PDFTOPPM_BIN", "pdftoppm"), OCRLanguages: env("OCR_LANGUAGES", "vie+eng")},
+		Converter: extraction.MarkItDownConverter{Executable: env("MARKITDOWN_BIN", "markitdown"), PDFTextExecutable: env("PDFTEXT_BIN", "pdftotext"), OCRExecutable: env("TESSERACT_BIN", "tesseract"), PDFToImage: env("PDFTOPPM_BIN", "pdftoppm"), OCRLanguages: env("OCR_LANGUAGES", "vie+eng")},
 		Extractor: gemini, Model: model,
 	}
 	slog.Info("P2B extraction worker ready", "queue", "postgres", "model", model, "concurrency", 1)

@@ -23,12 +23,13 @@ const (
 var errOutputLimit = errors.New("MarkItDown output exceeds limit")
 
 type MarkItDownConverter struct {
-	Executable     string
-	OCRExecutable  string
-	PDFToImage     string
-	OCRLanguages   string
-	Timeout        time.Duration
-	MaxOutputBytes int
+	Executable        string
+	PDFTextExecutable string
+	OCRExecutable     string
+	PDFToImage        string
+	OCRLanguages      string
+	Timeout           time.Duration
+	MaxOutputBytes    int
 }
 
 func (c MarkItDownConverter) Convert(ctx context.Context, inputPath string) (string, error) {
@@ -44,12 +45,22 @@ func (c MarkItDownConverter) Convert(ctx context.Context, inputPath string) (str
 	defer cancel()
 
 	markdown, conversionErr := c.runMarkItDown(conversionContext, inputPath, limit)
-	if conversionErr == nil && markdownQualityError(markdown) == nil {
-		return strings.TrimSpace(markdown), nil
-	}
 	qualityErr := markdownQualityError(markdown)
+	if conversionErr == nil && qualityErr == nil {
+		markdown = strings.TrimSpace(markdown)
+		if !shouldSupplementWithLayout(markdown) {
+			return markdown, nil
+		}
+		if layout, layoutErr := c.runPDFText(conversionContext, inputPath, limit); layoutErr == nil {
+			return supplementWithLayout(markdown, layout, limit), nil
+		}
+		return markdown, nil
+	}
 	if conversionErr != nil && qualityErr == nil {
 		qualityErr = conversionErr
+	}
+	if layout, layoutErr := c.runPDFText(conversionContext, inputPath, limit); layoutErr == nil {
+		return layout, nil
 	}
 	if ocrMarkdown, ocrErr := c.convertWithOCR(conversionContext, inputPath, limit); ocrErr == nil {
 		return ocrMarkdown, nil
@@ -58,6 +69,47 @@ func (c MarkItDownConverter) Convert(ctx context.Context, inputPath string) (str
 		return "", conversionErr
 	}
 	return "", qualityErr
+}
+
+func (c MarkItDownConverter) runPDFText(ctx context.Context, inputPath string, limit int) (string, error) {
+	executable := strings.TrimSpace(c.PDFTextExecutable)
+	if executable == "" {
+		executable = "pdftotext"
+	}
+	output := &limitedBuffer{remaining: limit}
+	var stderr bytes.Buffer
+	command := exec.CommandContext(ctx, executable, "-layout", "-enc", "UTF-8", inputPath, "-")
+	command.Stdout = output
+	command.Stderr = &stderr
+	if err := command.Run(); err != nil {
+		if errors.Is(output.err, errOutputLimit) {
+			return "", errOutputLimit
+		}
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return "", errors.New("pdftotext conversion timed out")
+		}
+		return "", fmt.Errorf("pdftotext conversion failed: %s", boundedError(stderr.String()))
+	}
+	result := strings.TrimSpace(output.String())
+	if err := markdownQualityError(result); err != nil {
+		return "", err
+	}
+	return result, nil
+}
+
+func shouldSupplementWithLayout(markdown string) bool {
+	return strings.Count(markdown, "|") >= 12
+}
+
+func supplementWithLayout(markdown, layout string, limit int) string {
+	if normalizeEvidence(markdown) == normalizeEvidence(layout) {
+		return markdown
+	}
+	combined := "## MarkItDown extraction\n" + markdown + "\n\n## Layout-preserving PDF text\n" + layout
+	if len(combined) > limit {
+		return markdown
+	}
+	return combined
 }
 
 func (c MarkItDownConverter) runMarkItDown(ctx context.Context, inputPath string, limit int) (string, error) {

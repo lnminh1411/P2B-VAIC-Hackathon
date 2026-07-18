@@ -29,3 +29,11 @@ Production wiring after credentials and official source allowlists are supplied:
 - [x] Preserve existing passport facts during refresh
 - [x] Add field-specific semantic evidence validation
 - [x] Add extraction quality gates and regression coverage for charter capital and employee concepts
+
+## Production extraction recall repair
+
+- [x] Add layout-preserving PDF text supplementation
+- [x] Add canonical field catalog to Gemini structured extraction
+- [x] Add targeted completeness pass for missing fields
+- [x] Add privacy-safe rejection diagnostics
+- [ ] Run full quality gates and deploy Railway backend/worker

@@ -28,3 +28,13 @@ Allow one authenticated account to own and switch between multiple business work
 3. Refresh-document API and durable worker flow, with no destructive passport reset.
 4. Passport upload/update UI and candidate refresh behavior.
 5. Extraction accuracy gates, semantic rules, regression tests, and final review.
+
+## Production extraction recall repair
+
+### Acceptance criteria
+
+1. PDF có bảng được bổ sung text `pdftotext -layout` để giữ quan hệ nhãn–giá trị; PDF ít text vẫn dùng OCR.
+2. Gemini nhận catalog có label/type/semantic guidance, dùng `thinkingLevel=high`, và chạy completeness pass có mục tiêu cho field còn thiếu.
+3. Worker log số raw/valid/rejected candidate và nhóm lý do, không log quote hoặc giá trị nhạy cảm.
+4. Candidate vẫn phải qua exact-evidence và semantic validation; không tự động xác nhận Passport.
+5. Test, lint, build và Railway production health đều đạt.

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"sort"
 	"strings"
 	"time"
 
@@ -14,24 +15,60 @@ import (
 type FieldDefinition struct {
 	Label                  string
 	DataType               string
+	Description            string
 	EvidenceTerms          []string
 	ForbiddenEvidenceTerms []string
 }
 
 var fieldDefinitions = map[string]FieldDefinition{
-	"legal_name": {Label: "Tên pháp lý", DataType: "string"}, "tax_code": {Label: "Mã số thuế", DataType: "string"},
-	"legal_form": {Label: "Loại hình doanh nghiệp", DataType: "string"}, "incorporation_date": {Label: "Ngày thành lập", DataType: "date"},
-	"operating_status": {Label: "Trạng thái hoạt động", DataType: "string"}, "charter_capital": {Label: "Vốn điều lệ", DataType: "money", EvidenceTerms: []string{"vốn điều lệ", "charter capital"}},
-	"revenue": {Label: "Doanh thu", DataType: "money"}, "assets": {Label: "Tổng tài sản", DataType: "money"},
-	"employee_count": {Label: "Số lao động", DataType: "integer", EvidenceTerms: []string{"số lao động", "số nhân viên", "tổng số lao động", "tổng số nhân viên", "employee count", "headcount"}, ForbiddenEvidenceTerms: []string{"môi giới", "broker", "cộng tác viên"}}, "registered_address": {Label: "Địa chỉ đăng ký", DataType: "string"},
-	"province": {Label: "Tỉnh/thành", DataType: "string"}, "industrial_zone": {Label: "Khu công nghiệp", DataType: "string"},
-	"industry_codes": {Label: "Ngành nghề", DataType: "string_array"}, "products": {Label: "Sản phẩm", DataType: "string_array"},
-	"technologies": {Label: "Công nghệ", DataType: "string_array"}, "markets": {Label: "Thị trường", DataType: "string_array"},
-	"fdi_status": {Label: "Doanh nghiệp FDI", DataType: "boolean"}, "foreign_ownership_percent": {Label: "Tỷ lệ vốn nước ngoài", DataType: "number"},
-	"women_owned": {Label: "Doanh nghiệp nữ làm chủ", DataType: "boolean"}, "rd_capacity": {Label: "Năng lực R&D", DataType: "string"},
-	"intellectual_property": {Label: "Sở hữu trí tuệ", DataType: "string_array"}, "certifications": {Label: "Chứng nhận", DataType: "string_array"},
-	"green_project": {Label: "Dự án công nghệ xanh", DataType: "string_array"}, "funding_need": {Label: "Nhu cầu vốn", DataType: "money"},
-	"support_plan": {Label: "Kế hoạch sử dụng hỗ trợ", DataType: "string"},
+	"legal_name":                {Label: "Tên pháp lý", DataType: "string", Description: "Tên đăng ký đầy đủ của pháp nhân, không dùng tên sản phẩm hoặc thương hiệu nếu không phải tên pháp lý."},
+	"tax_code":                  {Label: "Mã số thuế", DataType: "string", Description: "Mã số thuế hoặc mã số doanh nghiệp của pháp nhân."},
+	"legal_form":                {Label: "Loại hình doanh nghiệp", DataType: "string", Description: "Loại hình pháp lý như công ty cổ phần, công ty TNHH hoặc doanh nghiệp tư nhân."},
+	"incorporation_date":        {Label: "Ngày thành lập", DataType: "date", Description: "Ngày thành lập hoặc ngày đăng ký lần đầu; value phải ở dạng YYYY-MM-DD."},
+	"operating_status":          {Label: "Trạng thái hoạt động", DataType: "string", Description: "Trạng thái pháp lý hoặc hoạt động hiện tại của doanh nghiệp."},
+	"charter_capital":           {Label: "Vốn điều lệ", DataType: "money", Description: "Chỉ vốn điều lệ. Nếu tài liệu nêu nhiều mốc lịch sử, trả từng giá trị có mốc thời gian thay vì tự chọn giá trị hiện tại.", EvidenceTerms: []string{"vốn điều lệ", "charter capital"}},
+	"revenue":                   {Label: "Doanh thu", DataType: "money", Description: "Doanh thu của doanh nghiệp, giữ quote chứa kỳ báo cáo và đơn vị."},
+	"assets":                    {Label: "Tổng tài sản", DataType: "money", Description: "Tổng tài sản của doanh nghiệp, không dùng vốn chủ sở hữu hoặc vốn hóa thị trường."},
+	"employee_count":            {Label: "Số lao động", DataType: "integer", Description: "Tổng số người lao động hoặc tổng headcount toàn doanh nghiệp; không dùng nhân lực môi giới, cộng tác viên hoặc một bộ phận.", EvidenceTerms: []string{"số lao động", "số nhân viên", "tổng số lao động", "tổng số nhân viên", "employee count", "headcount"}, ForbiddenEvidenceTerms: []string{"môi giới", "broker", "cộng tác viên"}},
+	"registered_address":        {Label: "Địa chỉ đăng ký", DataType: "string", Description: "Địa chỉ trụ sở chính hoặc địa chỉ đăng ký của pháp nhân."},
+	"province":                  {Label: "Tỉnh/thành", DataType: "string", Description: "Tỉnh hoặc thành phố trực thuộc trung ương của địa chỉ đăng ký."},
+	"industrial_zone":           {Label: "Khu công nghiệp", DataType: "string", Description: "Tên khu công nghiệp, khu chế xuất hoặc khu công nghệ nơi doanh nghiệp hoạt động."},
+	"industry_codes":            {Label: "Ngành nghề", DataType: "string_array", Description: "Ngành nghề kinh doanh hoặc mã ngành được nêu rõ cho doanh nghiệp."},
+	"products":                  {Label: "Sản phẩm", DataType: "string_array", Description: "Sản phẩm hoặc dịch vụ cụ thể doanh nghiệp cung cấp."},
+	"technologies":              {Label: "Công nghệ", DataType: "string_array", Description: "Công nghệ, nền tảng kỹ thuật hoặc quy trình công nghệ doanh nghiệp đang sử dụng."},
+	"markets":                   {Label: "Thị trường", DataType: "string_array", Description: "Thị trường địa lý hoặc phân khúc khách hàng mục tiêu của doanh nghiệp."},
+	"fdi_status":                {Label: "Doanh nghiệp FDI", DataType: "boolean", Description: "Đúng khi tài liệu xác định doanh nghiệp là FDI hoặc có vốn đầu tư nước ngoài; không suy đoán."},
+	"foreign_ownership_percent": {Label: "Tỷ lệ vốn nước ngoài", DataType: "number", Description: "Tỷ lệ phần trăm sở hữu hoặc vốn góp nước ngoài, từ 0 đến 100."},
+	"women_owned":               {Label: "Doanh nghiệp nữ làm chủ", DataType: "boolean", Description: "Đúng khi tài liệu xác định doanh nghiệp do phụ nữ sở hữu hoặc làm chủ; không suy từ tên người đại diện."},
+	"rd_capacity":               {Label: "Năng lực R&D", DataType: "string", Description: "Mô tả năng lực nghiên cứu và phát triển của doanh nghiệp."},
+	"intellectual_property":     {Label: "Sở hữu trí tuệ", DataType: "string_array", Description: "Bằng sáng chế, nhãn hiệu, bản quyền, kiểu dáng hoặc tài sản sở hữu trí tuệ được nêu rõ."},
+	"certifications":            {Label: "Chứng nhận", DataType: "string_array", Description: "Chứng nhận, tiêu chuẩn hoặc giấy chứng nhận doanh nghiệp đã đạt được."},
+	"green_project":             {Label: "Dự án công nghệ xanh", DataType: "string_array", Description: "Dự án, hoạt động hoặc giải pháp xanh được mô tả rõ; không suy diễn từ tuyên bố chung."},
+	"funding_need":              {Label: "Nhu cầu vốn", DataType: "money", Description: "Số tiền doanh nghiệp đang cần huy động hoặc đề nghị hỗ trợ; không dùng vốn điều lệ, doanh thu hoặc tài sản."},
+	"support_plan":              {Label: "Kế hoạch sử dụng hỗ trợ", DataType: "string", Description: "Kế hoạch cụ thể sử dụng khoản hỗ trợ hoặc nguồn vốn đề nghị."},
+}
+
+type CanonicalFieldDefinition struct {
+	Key                    string
+	Label                  string
+	DataType               string
+	Description            string
+	EvidenceTerms          []string
+	ForbiddenEvidenceTerms []string
+}
+
+func CanonicalFieldCatalog() []CanonicalFieldDefinition {
+	keys := make([]string, 0, len(fieldDefinitions))
+	for key := range fieldDefinitions {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	result := make([]CanonicalFieldDefinition, 0, len(keys))
+	for _, key := range keys {
+		definition := fieldDefinitions[key]
+		result = append(result, CanonicalFieldDefinition{Key: key, Label: definition.Label, DataType: definition.DataType, Description: definition.Description, EvidenceTerms: definition.EvidenceTerms, ForbiddenEvidenceTerms: definition.ForbiddenEvidenceTerms})
+	}
+	return result
 }
 
 type Candidate struct {

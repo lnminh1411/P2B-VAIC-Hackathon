@@ -7,10 +7,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 
 	"github.com/p2b/p2b/internal/extraction"
+	passportservice "github.com/p2b/p2b/internal/passport"
 	"github.com/p2b/p2b/internal/pipeline"
 )
 
@@ -41,6 +43,10 @@ type Extractor interface {
 	Extract(context.Context, string) ([]extraction.Candidate, error)
 }
 
+type TargetedExtractor interface {
+	ExtractFields(context.Context, string, []string) ([]extraction.Candidate, error)
+}
+
 type Processor struct {
 	Store      Store
 	Downloader Downloader
@@ -64,7 +70,8 @@ func (p Processor) Process(ctx context.Context, job pipeline.Job) error {
 		if err = p.Store.StartSource(ctx, source.ID); err != nil {
 			return p.fail(ctx, job, err)
 		}
-		if err = p.processSource(ctx, job.WorkspaceID, source); err != nil {
+		leaseProgress := 10 + (index * 85 / max(len(sources), 1))
+		if err = p.processSource(ctx, job.ID, job.WorkspaceID, source, leaseProgress); err != nil {
 			_ = p.Store.FailSource(ctx, source.ID, err.Error())
 			return p.fail(ctx, job, err)
 		}
@@ -79,7 +86,7 @@ func (p Processor) Process(ctx context.Context, job pipeline.Job) error {
 	return nil
 }
 
-func (p Processor) processSource(ctx context.Context, workspaceID string, source pipeline.SourceRecord) error {
+func (p Processor) processSource(ctx context.Context, jobID, workspaceID string, source pipeline.SourceRecord, leaseProgress int) error {
 	content, err := p.Downloader.Download(ctx, source.ObjectKey, source.SizeBytes)
 	if err != nil {
 		return fmt.Errorf("download %s: %w", source.Filename, err)
@@ -110,14 +117,40 @@ func (p Processor) processSource(ctx context.Context, workspaceID string, source
 	if err != nil {
 		return fmt.Errorf("convert %s: %w", source.Filename, err)
 	}
+	markdownChunks := chunks(markdown, maxGeminiChunkBytes)
+	slog.Info("source text extracted", "source_id", source.ID, "markdown_bytes", len(markdown), "chunks", len(markdownChunks))
 	allCandidates := make([]extraction.Candidate, 0)
-	for _, chunk := range chunks(markdown, maxGeminiChunkBytes) {
+	for chunkIndex, chunk := range markdownChunks {
 		candidates, extractErr := p.Extractor.Extract(ctx, chunk)
 		if extractErr != nil {
 			return fmt.Errorf("extract %s with Gemini: %w", source.Filename, extractErr)
 		}
-		valid, _ := extraction.ValidateCandidates(chunk, candidates)
+		valid, rejected := extraction.ValidateCandidates(chunk, candidates)
+		logExtractionDiagnostics(source.ID, chunkIndex, "initial", candidates, valid, rejected)
 		allCandidates = append(allCandidates, valid...)
+		if err = p.Store.SetJobProgress(ctx, jobID, leaseProgress); err != nil {
+			return fmt.Errorf("renew extraction job lease: %w", err)
+		}
+
+		targetedExtractor, supportsTargetedExtraction := p.Extractor.(TargetedExtractor)
+		if !supportsTargetedExtraction {
+			continue
+		}
+		missingFields := missingCanonicalFields(allCandidates)
+		if len(missingFields) == 0 {
+			continue
+		}
+		targetedCandidates, targetedErr := targetedExtractor.ExtractFields(ctx, chunk, missingFields)
+		if targetedErr != nil {
+			return fmt.Errorf("complete %s with Gemini: %w", source.Filename, targetedErr)
+		}
+		targetedCandidates = candidatesForFields(targetedCandidates, missingFields)
+		targetedValid, targetedRejected := extraction.ValidateCandidates(chunk, targetedCandidates)
+		logExtractionDiagnostics(source.ID, chunkIndex, "targeted", targetedCandidates, targetedValid, targetedRejected)
+		allCandidates = append(allCandidates, targetedValid...)
+		if err = p.Store.SetJobProgress(ctx, jobID, leaseProgress); err != nil {
+			return fmt.Errorf("renew extraction job lease: %w", err)
+		}
 	}
 	allCandidates = deduplicate(allCandidates)
 	if err = p.Store.SaveCandidates(ctx, workspaceID, source.ID, source.Filename, contentHash, allCandidates); err != nil {
@@ -127,6 +160,54 @@ func (p Processor) processSource(ctx context.Context, workspaceID string, source
 		return err
 	}
 	return nil
+}
+
+func missingCanonicalFields(candidates []extraction.Candidate) []string {
+	present := make(map[string]struct{}, len(candidates))
+	for _, candidate := range candidates {
+		present[candidate.FieldKey] = struct{}{}
+	}
+	missing := make([]string, 0)
+	for _, definition := range passportservice.CanonicalFieldCatalog() {
+		if _, exists := present[definition.Key]; !exists {
+			missing = append(missing, definition.Key)
+		}
+	}
+	return missing
+}
+
+func candidatesForFields(candidates []extraction.Candidate, fields []string) []extraction.Candidate {
+	allowed := make(map[string]struct{}, len(fields))
+	for _, field := range fields {
+		allowed[field] = struct{}{}
+	}
+	result := make([]extraction.Candidate, 0, len(candidates))
+	for _, candidate := range candidates {
+		if _, exists := allowed[candidate.FieldKey]; exists {
+			result = append(result, candidate)
+		}
+	}
+	return result
+}
+
+func summarizeRejections(rejected []extraction.RejectedCandidate) map[string]int {
+	result := make(map[string]int)
+	for _, item := range rejected {
+		result[item.Reason]++
+	}
+	return result
+}
+
+func logExtractionDiagnostics(sourceID string, chunkIndex int, pass string, raw, valid []extraction.Candidate, rejected []extraction.RejectedCandidate) {
+	slog.Info("Gemini extraction evaluated",
+		"source_id", sourceID,
+		"chunk", chunkIndex+1,
+		"pass", pass,
+		"raw_candidates", len(raw),
+		"valid_candidates", len(valid),
+		"rejected_candidates", len(rejected),
+		"rejection_reasons", summarizeRejections(rejected),
+	)
 }
 
 func (p Processor) fail(ctx context.Context, job pipeline.Job, cause error) error {
