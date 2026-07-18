@@ -18,6 +18,7 @@ const (
 	defaultGeminiEndpoint  = "https://generativelanguage.googleapis.com/v1beta"
 	maxGeminiResponseBytes = 2 << 20
 	maxGeminiMarkdownBytes = 512 << 10
+	maxGeminiCandidates    = 100
 )
 
 type GeminiExtractor struct {
@@ -63,7 +64,6 @@ func (g *GeminiExtractor) Extract(ctx context.Context, markdown string) ([]Candi
 		"systemInstruction": map[string]any{"parts": []map[string]string{{"text": systemInstruction}}},
 		"contents":          []map[string]any{{"role": "user", "parts": []map[string]string{{"text": markdown}}}},
 		"generationConfig": map[string]any{
-			"temperature":        0,
 			"thinkingConfig":     map[string]string{"thinkingLevel": "minimal"},
 			"responseMimeType":   "application/json",
 			"responseJsonSchema": candidateSchema,
@@ -112,6 +112,9 @@ func (g *GeminiExtractor) Extract(ctx context.Context, markdown string) ([]Candi
 	if err := json.Unmarshal([]byte(envelope.Candidates[0].Content.Parts[0].Text), &output); err != nil {
 		return nil, fmt.Errorf("decode Gemini structured content: %w", err)
 	}
+	if len(output.Candidates) > maxGeminiCandidates {
+		return nil, fmt.Errorf("Gemini returned more than %d candidates", maxGeminiCandidates)
+	}
 	return output.Candidates, nil
 }
 
@@ -123,14 +126,13 @@ var candidateSchema = map[string]any{
 	"required":             []string{"candidates"},
 	"properties": map[string]any{
 		"candidates": map[string]any{
-			"type":     "array",
-			"maxItems": 100,
+			"type": "array",
 			"items": map[string]any{
 				"type":                 "object",
 				"additionalProperties": false,
 				"required":             []string{"field_key", "value", "data_type", "confidence", "quote"},
 				"properties": map[string]any{
-					"field_key":  map[string]any{"type": "string", "enum": canonicalFieldNames()},
+					"field_key": map[string]any{"type": "string", "enum": canonicalFieldNames()},
 					"value": map[string]any{"anyOf": []map[string]any{
 						{"type": "string"}, {"type": "number"}, {"type": "integer"}, {"type": "boolean"},
 						{"type": "array", "items": map[string]any{"type": "string"}},
