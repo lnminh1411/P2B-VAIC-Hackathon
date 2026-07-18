@@ -107,13 +107,29 @@ export interface Application {
   id: string
   checklist_id: string
   policy_id: string
+  policy_title?: string
+  policy_agency?: string
   passport_version: number
   policy_version: number
+  template_id?: string
+  template_name?: string
   template_version: number
   version: number
   status: string
   sections: Record<string, string>
   blocking_reasons: string[] | null
+  generation_warning?: string
+  updated_at?: string
+}
+
+export interface ApplicationTemplate {
+  id: string
+  name: string
+  filename: string
+  content_type: string
+  placeholders: string[]
+  created_at: string
+  updated_at: string
 }
 
 export interface Alert { id: string; type: string; title: string; message: string; policy_id?: string; severity: string; read: boolean; occurred_at: string }

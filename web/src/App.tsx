@@ -11,7 +11,7 @@ import { buildPassportPayload, type CompanyOnboardingInput } from './features/on
 import { OpportunitiesPage } from './features/opportunities/OpportunitiesPage'
 import { PassportPage } from './features/passport/PassportPage'
 import { api, ApiError, getApiWorkspaceId, setApiWorkspaceId } from './lib/api'
-import type { Application, Checklist, EnrichmentRun, MatchResult, MatchRun } from './lib/types'
+import type { Application, Checklist, EnrichmentRun, MatchResult } from './lib/types'
 import { useTranslation } from './lib/i18n'
 
 export default function App() {
@@ -39,6 +39,13 @@ export default function App() {
   const selectedWorkspaceId = workspaceScope ?? workspaces[0]?.id
   const matchQuery = useQuery({ queryKey: ['match', workspaceScope], queryFn: api.getMatch, enabled: Boolean(workspaceScope && passportQuery.data?.company_name) })
   const matchRun = matchQuery.data?.results && matchQuery.data.results.length > 0 ? matchQuery.data : undefined
+  const templatesQuery = useQuery({ queryKey: ['application-templates', workspaceScope], queryFn: api.applicationTemplates, enabled: Boolean(workspaceScope && passportQuery.data?.company_name) })
+  const latestApplicationQuery = useQuery({ queryKey: ['application-draft', workspaceScope], queryFn: api.latestApplication, enabled: Boolean(workspaceScope && passportQuery.data?.company_name) })
+
+  const latestCachedApplication = latestApplicationQuery.data?.application ?? undefined
+  const matchingCachedApplication = selectedPolicy && latestCachedApplication?.policy_id !== selectedPolicy.policy_id ? undefined : latestCachedApplication
+  const activeApplication = application ?? matchingCachedApplication
+  const activeSelectedPolicy = selectedPolicy ?? matchRun?.results.find(result => result.policy_id === activeApplication?.policy_id)
 
   const buildMutation = useMutation({
     mutationFn: async (input: CompanyOnboardingInput) => {
@@ -74,13 +81,14 @@ export default function App() {
   const matchMutation = useMutation({ mutationFn: api.match, onSuccess: data => { queryClient.setQueryData(['match', workspaceScope], data) } })
   const enrichMutation = useMutation({ mutationFn: api.startEnrichment, onSuccess: setEnrichment })
   const checklistMutation = useMutation({ mutationFn: (policyId: string) => api.createChecklist(policyId), onSuccess: setChecklist })
-  const applicationMutation = useMutation({ mutationFn: (checklistId: string) => api.createApplication(checklistId), onSuccess: setApplication })
+  const applicationMutation = useMutation({ mutationFn: ({ checklistId, templateId }: { checklistId: string; templateId?: string }) => api.createApplication(checklistId, templateId), onSuccess: data => { setApplication(data); queryClient.setQueryData(['application-draft', workspaceScope], { application: data }) } })
+  const templateUploadMutation = useMutation({ mutationFn: (file: File) => api.uploadApplicationTemplate(file), onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['application-templates', workspaceScope] }) } })
 
   if (workspacesQuery.isLoading || passportQuery.isLoading) return <LoadingState label={pageStateLabels.loading_workspace} />
   if (workspacesQuery.error) return <ErrorState message={message(workspacesQuery.error, pageStateLabels.unknown_error)} onRetry={() => workspacesQuery.refetch()} />
   if (passportQuery.error) return <ErrorState message={message(passportQuery.error, pageStateLabels.unknown_error)} onRetry={() => passportQuery.refetch()} />
   const passport = passportQuery.data
-  const shellProps = { workspaces, activeWorkspaceId: selectedWorkspaceId, onWorkspaceChange: (workspaceId: string) => { setApiWorkspaceId(workspaceId); setActiveWorkspaceId(workspaceId); setPage('overview') }, onCreateWorkspace: () => { createWorkspaceMutation.mutate(shellLabels.unnamed_workspace) } }
+  const shellProps = { workspaces, activeWorkspaceId: selectedWorkspaceId, onWorkspaceChange: (workspaceId: string) => { setSelectedPolicy(undefined); setChecklist(undefined); setApplication(undefined); setWorkflowError(undefined); setApiWorkspaceId(workspaceId); setActiveWorkspaceId(workspaceId); setPage('overview') }, onCreateWorkspace: () => { createWorkspaceMutation.mutate(shellLabels.unnamed_workspace) } }
   if (!passport || !passport.company_name) return <Shell page="overview" companyName={passport?.company_name ?? ''} {...shellProps} onNavigate={setPage}><Onboarding onSubmit={input => buildMutation.mutate(input)} busy={buildMutation.isPending} error={buildMutation.error ? message(buildMutation.error, pageStateLabels.unknown_error) : undefined} /></Shell>
 
   const saveField = async (fieldKey: string, value: unknown) => {
@@ -102,23 +110,23 @@ export default function App() {
   }
   const markAvailable = async (itemId: string) => { if (!checklist) return; const updated = await api.updateChecklist(checklist.id, itemId, checklist.version, 'AVAILABLE', 'Người dùng xác nhận tài liệu trong workspace'); setChecklist(updated) }
   const applicationAction = async (action: 'submit' | 'approve' | 'generate') => {
-    if (!application) return
+    if (!activeApplication) return
     setWorkflowError(undefined)
-    try { setApplication(await api.applicationAction(application.id, action)) } catch (error) { setWorkflowError(message(error, pageStateLabels.unknown_error)) }
+    try { const updated = await api.applicationAction(activeApplication.id, action); setApplication(updated); queryClient.setQueryData(['application-draft', workspaceScope], { application: updated }) } catch (error) { setWorkflowError(message(error, pageStateLabels.unknown_error)) }
   }
   const download = async () => {
-    if (!application) return
-    const blob = await api.downloadApplication(application.id)
+    if (!activeApplication) return
+    const blob = await api.downloadApplication(activeApplication.id)
     const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a'); anchor.href = url; anchor.download = `P2B-${application.id}.pdf`; anchor.click(); URL.revokeObjectURL(url)
+    const anchor = document.createElement('a'); anchor.href = url; anchor.download = `P2B-${activeApplication.id}.pdf`; anchor.click(); URL.revokeObjectURL(url)
   }
-  const prepare = (policy: MatchResult) => { setSelectedPolicy(policy); setChecklist(undefined); setApplication(undefined); setPage('application') }
+  const prepare = (policy: MatchResult) => { setSelectedPolicy(policy); setChecklist(undefined); setApplication(undefined); setWorkflowError(undefined); setPage('application') }
 
   return <Shell page={page} companyName={passport.company_name} {...shellProps} onNavigate={setPage} unreadAlerts={(alertsQuery.data?.alerts ?? []).filter(alert => !alert.read).length}>
-    {page === 'overview' && <Dashboard passport={passport} matchRun={matchRun} selectedPolicy={selectedPolicy} checklist={checklist} application={application} onNavigate={setPage} />}
+    {page === 'overview' && <Dashboard passport={passport} matchRun={matchRun} selectedPolicy={activeSelectedPolicy} checklist={checklist} application={activeApplication} onNavigate={setPage} />}
     {page === 'passport' && <PassportPage passport={passport} candidates={candidatesQuery.data?.candidates ?? []} onConfirm={confirmCandidate} onSaveField={saveField} onRefresh={async files => { await refreshMutation.mutateAsync(files) }} refreshBusy={refreshMutation.isPending} busy={candidatesQuery.isFetching || refreshMutation.isPending} />}
     {page === 'opportunities' && <OpportunitiesPage run={matchRun} onMatch={() => matchMutation.mutate()} matching={matchMutation.isPending} selected={selectedPolicy} onSelect={setSelectedPolicy} onPrepare={prepare} enrichment={enrichment} onEnrich={policyId => enrichMutation.mutate(policyId)} onAcceptEvidence={candidateId => void acceptEvidence(candidateId)} busy={enrichMutation.isPending} error={matchMutation.error ? message(matchMutation.error, pageStateLabels.unknown_error) : undefined} />}
-    {page === 'application' && <ApplicationPage policy={selectedPolicy} checklist={checklist} application={application} onCreateChecklist={() => selectedPolicy && checklistMutation.mutate(selectedPolicy.policy_id)} onMarkAvailable={itemId => void markAvailable(itemId)} onCreateApplication={() => checklist && applicationMutation.mutate(checklist.id)} onSave={async sections => { if (application) setApplication(await api.updateApplication(application.id, application.version, sections)) }} onAction={action => void applicationAction(action)} onDownload={() => void download()} busy={checklistMutation.isPending || applicationMutation.isPending} error={workflowError} />}
+    {page === 'application' && <ApplicationPage policy={activeSelectedPolicy} checklist={checklist} application={activeApplication} templates={templatesQuery.data?.templates ?? []} onCreateChecklist={() => activeSelectedPolicy && checklistMutation.mutate(activeSelectedPolicy.policy_id)} onMarkAvailable={itemId => void markAvailable(itemId)} onCreateApplication={templateId => checklist && applicationMutation.mutate({ checklistId: checklist.id, templateId })} onUploadTemplate={async file => { await templateUploadMutation.mutateAsync(file) }} onSave={async sections => { if (!activeApplication) return; const updated = await api.updateApplication(activeApplication.id, activeApplication.version, sections); setApplication(updated); queryClient.setQueryData(['application-draft', workspaceScope], { application: updated }); return updated }} onAction={action => void applicationAction(action)} onDownload={() => void download()} busy={checklistMutation.isPending || applicationMutation.isPending || templateUploadMutation.isPending} error={workflowError || (templateUploadMutation.error ? message(templateUploadMutation.error, pageStateLabels.unknown_error) : undefined)} />}
     {page === 'alerts' && <AlertsPage alerts={alertsQuery.data?.alerts ?? []} onRead={id => api.readAlert(id).then(() => queryClient.invalidateQueries({ queryKey: ['alerts', workspaceScope] }))} />}
     {page === 'admin' && (adminQuery.isLoading ? <LoadingState label={shellLabels.system_loading_queue} /> : adminQuery.error ? <ErrorState message={message(adminQuery.error, pageStateLabels.unknown_error)} /> : <AdminPage policies={adminQuery.data?.policies ?? []} />)}
   </Shell>

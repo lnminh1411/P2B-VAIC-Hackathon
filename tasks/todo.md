@@ -1,5 +1,14 @@
 # P2B MVP tasks
 
+## Cached application drafts and LLM templates
+
+- [x] Persist workspace-scoped templates and versioned drafts
+- [x] Upload/list/select PDF, DOCX and TXT templates
+- [x] Generate grounded draft sections with configured Gemini 3.1 Flash-Lite
+- [x] Autosave edits and restore latest application draft
+- [x] Cover API, generation and UI behavior with regression tests
+- [x] Run Go tests, web tests, focused lint and build
+
 - [x] Foundation, OpenAPI contract, migrations and deploy configuration
 - [x] Passport domain, evidence provenance and human review workflow
 - [x] Deterministic eligibility rule engine

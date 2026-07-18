@@ -1,4 +1,4 @@
-import type { Alert, Application, Candidate, Checklist, EnrichmentRun, MatchRun, Passport, Workspace } from './types'
+import type { Alert, Application, ApplicationTemplate, Candidate, Checklist, EnrichmentRun, MatchRun, Passport, Workspace } from './types'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080'
 const WORKSPACE = 'p2b-local-development'
@@ -27,7 +27,7 @@ class ApiError extends Error {
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers)
-  headers.set('Content-Type', 'application/json')
+  if (!(init.body instanceof FormData)) headers.set('Content-Type', 'application/json')
   if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`)
   const workspaceId = activeWorkspaceId ?? (DEV_AUTH ? WORKSPACE : undefined)
   if (workspaceId) headers.set('X-Workspace-ID', workspaceId)
@@ -73,7 +73,15 @@ export const api = {
   rejectEnrichment: (candidateId: string) => request<void>(`/v1/enrichment-candidates/${candidateId}/reject`, { method: 'POST' }),
   createChecklist: (policyId: string) => request<Checklist>('/v1/checklists', { method: 'POST', body: JSON.stringify({ policy_id: policyId }) }),
   updateChecklist: (checklistId: string, itemId: string, version: number, status: string, evidenceSource: string) => request<Checklist>(`/v1/checklists/${checklistId}/items/${itemId}`, { method: 'PUT', body: JSON.stringify({ status, evidence_source: evidenceSource, expected_version: version }) }),
-  createApplication: (checklistId: string) => request<Application>('/v1/applications', { method: 'POST', body: JSON.stringify({ checklist_id: checklistId }) }),
+  applicationTemplates: () => request<{ templates: ApplicationTemplate[] }>('/v1/application-templates'),
+  uploadApplicationTemplate: (file: File, name = file.name.replace(/\.[^.]+$/, '')) => {
+    const form = new FormData()
+    form.append('name', name)
+    form.append('file', file)
+    return request<ApplicationTemplate>('/v1/application-templates', { method: 'POST', body: form })
+  },
+  latestApplication: () => request<{ application?: Application | null }>('/v1/applications/latest'),
+  createApplication: (checklistId: string, templateId?: string) => request<Application>('/v1/applications', { method: 'POST', body: JSON.stringify({ checklist_id: checklistId, template_id: templateId || undefined }) }),
   updateApplication: (applicationId: string, version: number, sections: Record<string, string>) => request<Application>(`/v1/applications/${applicationId}`, { method: 'PUT', body: JSON.stringify({ expected_version: version, sections }) }),
   applicationAction: (applicationId: string, action: 'submit' | 'approve' | 'generate') => request<Application>(`/v1/applications/${applicationId}/${action}`, { method: 'POST' }),
   downloadApplication: async (applicationId: string) => {

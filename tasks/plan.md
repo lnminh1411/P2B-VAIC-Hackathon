@@ -8,6 +8,23 @@
 
 Each slice must leave `make test`, `make lint` and `make build` green.
 
+## Cached application drafts and LLM templates
+
+### Architecture decisions
+
+- Add workspace-scoped PostgreSQL repositories without changing existing immutable core tables.
+- Convert uploaded PDF/DOCX/TXT templates to bounded plain text with existing MarkItDown runtime.
+- Reuse Passport's `GEMINI_API_KEY`, `GEMINI_MODEL` and Gemini endpoint behavior.
+- Generate structured editable sections; autosave them with optimistic version checks.
+- Restore latest draft and selected template through TanStack Query.
+
+### Ordered slices
+
+1. Add template/draft contracts, additive migration, repository and tests.
+2. Add Gemini application generation and template upload/list APIs.
+3. Add template picker, generation flow and automatic draft caching UI.
+4. Run full quality gates and manual browser verification.
+
 ## Multi-business passport refresh plan
 
 ### Overview
