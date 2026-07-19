@@ -95,11 +95,15 @@ export default function App() {
     const current = queryClient.getQueryData<typeof passport>(['passport', workspaceScope]) ?? passportQuery.data!
     const updated = await api.confirmField(fieldKey, value, current.version)
     queryClient.setQueryData(['passport', workspaceScope], updated)
-    await Promise.all([queryClient.invalidateQueries({ queryKey: ['match', workspaceScope] }), queryClient.invalidateQueries({ queryKey: ['passport-versions', workspaceScope] })])
+    void queryClient.invalidateQueries({ queryKey: ['match', workspaceScope] })
+    void queryClient.invalidateQueries({ queryKey: ['passport-versions', workspaceScope] })
   }
   const confirmCandidate = async (candidate: NonNullable<typeof candidatesQuery.data>['candidates'][number]) => {
     await saveField(candidate.field_key, candidate.value)
-    await queryClient.invalidateQueries({ queryKey: ['candidates', workspaceScope] })
+    queryClient.setQueryData(['candidates', workspaceScope], (previous: typeof candidatesQuery.data) =>
+      previous ? { candidates: previous.candidates.map(item => item.field_key === candidate.field_key ? { ...item, status: 'ACCEPTED' } : item) } : previous
+    )
+    void queryClient.invalidateQueries({ queryKey: ['candidates', workspaceScope] })
   }
   const acceptEvidence = async (candidateId: string) => {
     const current = queryClient.getQueryData<typeof passport>(['passport', workspaceScope]) ?? passport

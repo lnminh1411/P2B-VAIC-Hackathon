@@ -222,6 +222,8 @@ a { color: inherit; }
 .evidence-source span { font-size: .7rem; }
 .evidence-source small { color: var(--muted); font-size: .58rem; }
 .evidence-source blockquote, .candidate-card blockquote { grid-column: 1 / -1; margin: .4rem 0 0; padding-left: .65rem; border-left: 2px solid var(--purple); color: var(--soft); font-size: .68rem; line-height: 1.55; }
+.candidate-card blockquote { display: flex; align-items: flex-start; gap: .4rem; }
+.candidate-card blockquote svg { width: 13px; height: 13px; flex: 0 0 auto; margin-top: .2rem; color: var(--purple); opacity: .7; }
 .evidence-source code { grid-column: 1/-1; color: #6f6878; font-size: .55rem; }
 .evidence-note { color: var(--muted); font-size: .6rem; line-height: 1.5; display: flex; gap: .4rem; margin: 1rem 0 0; }
 .evidence-note svg { width: 15px; flex: 0 0 auto; color: var(--green); }
