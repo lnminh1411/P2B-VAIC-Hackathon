@@ -41,10 +41,30 @@ export function PassportPage({ passport, candidates, versions, onConfirm, onSave
   const [selectedKey, setSelectedKey] = useState('legal_name')
   const [editingKey, setEditingKey] = useState<string>()
   const [refreshError, setRefreshError] = useState<string>()
+  const [candidateError, setCandidateError] = useState<string>()
   const selected = fields[selectedKey] ?? visibleFields[0]
   const pending = candidates.filter(candidate => candidate.status !== 'ACCEPTED')
   const confirmedCount = visibleFields.filter(field => field.status === 'CONFIRMED').length
-  const confirmAll = async () => { for (const candidate of pending) await onConfirm(candidate) }
+  const confirmOne = async (candidate: Candidate) => {
+    setCandidateError(undefined)
+    try {
+      await onConfirm(candidate)
+    } catch (error) {
+      setCandidateError(error instanceof Error ? error.message : p.err_confirm_fail_single)
+    }
+  }
+  const confirmAll = async () => {
+    setCandidateError(undefined)
+    const failed: string[] = []
+    for (const candidate of pending) {
+      try {
+        await onConfirm(candidate)
+      } catch {
+        failed.push(fieldsLabels[candidate.field_key] || candidate.field_key)
+      }
+    }
+    if (failed.length > 0) setCandidateError(p.err_confirm_fail.replace('{fields}', failed.join(', ')))
+  }
   const edit = (field: PassportField) => { setSelectedKey(field.key); setEditingKey(field.key) }
   const save = async (fieldKey: string, value: unknown) => { await onSaveField(fieldKey, value); setEditingKey(undefined) }
   
@@ -130,6 +150,7 @@ export function PassportPage({ passport, candidates, versions, onConfirm, onSave
         </Tabs.Content>
         
         <Tabs.Content value="candidates">
+          {candidateError && <p className="inline-error" role="alert">{candidateError}</p>}
           <div className="candidate-list">
             {pending.length === 0 ? (
               <div className="page-state">
@@ -138,7 +159,7 @@ export function PassportPage({ passport, candidates, versions, onConfirm, onSave
                 <span>{p.no_candidates_desc}</span>
               </div>
             ) : (
-              pending.map(candidate => <CandidateCard key={candidate.id} candidate={candidate} busy={busy} onConfirm={onConfirm} />)
+              pending.map(candidate => <CandidateCard key={candidate.id} candidate={candidate} busy={busy} onConfirm={confirmOne} />)
             )}
           </div>
         </Tabs.Content>
