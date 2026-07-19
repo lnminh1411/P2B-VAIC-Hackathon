@@ -17,7 +17,7 @@ const navigation: Array<{ id: Page; icon: typeof LayoutDashboard }> = [
   { id: 'admin', icon: ShieldCheck },
 ]
 
-export function Shell({ page, workspaces, activeWorkspaceId, onWorkspaceChange, onCreateWorkspace, onNavigate, children, unreadAlerts = 0 }: { page: Page; workspaces: Workspace[]; activeWorkspaceId?: string; onWorkspaceChange: (workspaceId: string) => void; onCreateWorkspace: () => void; onNavigate: (page: Page) => void; children: ReactNode; unreadAlerts?: number }) {
+export function Shell({ page, workspaces, activeWorkspaceId, onWorkspaceChange, onCreateWorkspace, onDeleteWorkspace, onNavigate, children, unreadAlerts = 0 }: { page: Page; workspaces: Workspace[]; activeWorkspaceId?: string; onWorkspaceChange: (workspaceId: string) => void; onCreateWorkspace: () => void; onDeleteWorkspace?: (workspaceId: string) => Promise<void>; onNavigate: (page: Page) => void; children: ReactNode; unreadAlerts?: number }) {
   const { user, signOut } = useAuth()
   const { t, lang, setLang } = useTranslation()
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -40,7 +40,7 @@ export function Shell({ page, workspaces, activeWorkspaceId, onWorkspaceChange, 
           <div><strong>P2B</strong><span>{shellLabels.brand_sub}</span></div>
           <button className="sidebar-close" aria-label={shellLabels.close_nav} onClick={() => setMobileOpen(false)}><X /></button>
         </div>
-        <WorkspaceSwitcher workspaces={workspaces} activeWorkspaceId={activeWorkspaceId} onChange={onWorkspaceChange} onCreate={onCreateWorkspace} />
+        <WorkspaceSwitcher workspaces={workspaces} activeWorkspaceId={activeWorkspaceId} defaultWorkspaceId={user?.id} onChange={onWorkspaceChange} onCreate={onCreateWorkspace} onDelete={onDeleteWorkspace} />
         <nav aria-label="Điều hướng chính">
           {navigation.filter(item => item.id !== 'admin' || user?.isAdmin).map(({ id, icon: Icon }) => (
             <button key={id} className="nav-item" data-active={page === id} onClick={() => navigate(id)}>

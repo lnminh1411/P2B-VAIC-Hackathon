@@ -3,7 +3,7 @@ import { Check, ChevronRight, FileSearch, PencilLine, Quote, ShieldCheck, Upload
 import { useState, type FormEvent } from 'react'
 import { StatusBadge } from '../../components/StatusBadge'
 import { displayValue, formatDate } from '../../lib/format'
-import type { Candidate, Passport, PassportField } from '../../lib/types'
+import type { Candidate, Passport, PassportField, PassportVersion } from '../../lib/types'
 import { useTranslation } from '../../lib/i18n'
 
 const groupedFieldKeys = [
@@ -16,6 +16,7 @@ const groupedFieldKeys = [
 type PassportPageProps = {
   passport: Passport
   candidates: Candidate[]
+  versions: PassportVersion[]
   onConfirm: (candidate: Candidate) => Promise<void>
   onSaveField: (fieldKey: string, value: unknown) => Promise<void>
   onRefresh?: (files: File[]) => Promise<void>
@@ -23,7 +24,7 @@ type PassportPageProps = {
   busy: boolean
 }
 
-export function PassportPage({ passport, candidates, onConfirm, onSaveField, onRefresh, refreshBusy = false, busy }: PassportPageProps) {
+export function PassportPage({ passport, candidates, versions, onConfirm, onSaveField, onRefresh, refreshBusy = false, busy }: PassportPageProps) {
   const { t } = useTranslation()
   const fieldsLabels = t('fields') as Record<string, string>
   const p = t('passport')
@@ -143,22 +144,30 @@ export function PassportPage({ passport, candidates, onConfirm, onSaveField, onR
         </Tabs.Content>
         
         <Tabs.Content value="history">
-          <div className="timeline">
-            <div>
-              <b>v{passport.version}</b>
-              <span>
-                <strong>{p.version_current}</strong>
-                {p.version_current_desc}
-              </span>
+          {versions.length === 0 ? (
+            <div className="page-state">
+              <ShieldCheck />
+              <strong>{p.history_empty}</strong>
+              <span>{p.history_empty_desc}</span>
             </div>
-            <div>
-              <b>v1</b>
-              <span>
-                <strong>{p.version_initial}</strong>
-                {p.version_initial_desc}
-              </span>
+          ) : (
+            <div className="timeline">
+              {versions.map((version, index) => (
+                <div key={version.version}>
+                  <b>v{version.version}</b>
+                  <span>
+                    <strong>{version.version === 1 ? p.version_initial : index === 0 ? p.version_current : p.history_updated_label}</strong>
+                    <small>{formatDate(version.created_at)}</small>
+                    {version.changed_fields.length > 0
+                      ? p.history_changed_prefix + version.changed_fields.join(', ')
+                      : version.version === 1
+                        ? p.version_initial_desc
+                        : p.history_no_changes}
+                  </span>
+                </div>
+              ))}
             </div>
-          </div>
+          )}
         </Tabs.Content>
       </Tabs.Root>
     </>

@@ -6,11 +6,22 @@ import (
 	"math"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/p2b/p2b/internal/domain"
 )
+
+// FormatConfirmedValue renders a confirmed field value for display/citation.
+// JSON-decoded numbers arrive as float64; fmt.Sprint renders large ones in
+// scientific notation (e.g. "2.5e+09"), so floats get decimal formatting instead.
+func FormatConfirmedValue(value any) string {
+	if number, ok := value.(float64); ok {
+		return strconv.FormatFloat(number, 'f', -1, 64)
+	}
+	return fmt.Sprint(value)
+}
 
 type FieldDefinition struct {
 	Label                  string
@@ -137,7 +148,7 @@ func ConfirmField(pass domain.Passport, key string, value any, expectedVersion i
 	field.Status = domain.FieldConfirmed
 	field.Confidence = 1
 	field.Evidence = append(field.Evidence, domain.Evidence{
-		SourceID: "user-input", SourceName: "Người dùng xác nhận", Quote: fmt.Sprint(value),
+		SourceID: "user-input", SourceName: "Người dùng xác nhận", Quote: FormatConfirmedValue(value),
 		ContentHash: fmt.Sprintf("user-confirmation:v%d", expectedVersion+1), ObservedAt: time.Now().UTC(),
 	})
 	pass.Fields[key] = field

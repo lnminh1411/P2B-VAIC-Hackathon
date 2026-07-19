@@ -113,8 +113,18 @@ type ApplicationDraftContext struct {
 
 type Alert = domain.Alert
 
+// PassportVersion summarizes one entry in a passport's version history.
+type PassportVersion struct {
+	Version       int       `json:"version"`
+	CreatedBy     string    `json:"created_by"`
+	CreatedAt     time.Time `json:"created_at"`
+	ChangedFields []string  `json:"changed_fields"`
+}
+
 type workspaceState struct {
 	Passport          domain.Passport
+	Versions          []PassportVersion
+	versionFields     []map[string]domain.PassportField
 	Candidates        []passport.Candidate
 	Jobs              map[string]Job
 	Matches           map[string]MatchRun

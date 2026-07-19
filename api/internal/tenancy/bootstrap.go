@@ -132,6 +132,30 @@ func (b *Bootstrapper) Create(ctx context.Context, principal authn.Principal, di
 	return domain.Workspace{ID: workspaceID.String(), DisplayName: displayName, Role: "OWNER", CreatedAt: time.Now().UTC()}, nil
 }
 
+func (b *Bootstrapper) Delete(ctx context.Context, principal authn.Principal, workspaceID string) error {
+	if err := validateSubject(principal.Subject); err != nil {
+		return err
+	}
+	if _, err := uuid.Parse(workspaceID); err != nil {
+		return ErrWorkspaceAccess
+	}
+	if workspaceID == principal.Subject {
+		return errors.New("the default workspace cannot be deleted")
+	}
+	if b.database == nil {
+		return errors.New("workspace database is unavailable")
+	}
+	tag, err := b.database.Exec(ctx, `
+		DELETE FROM workspaces WHERE id = $1::uuid AND owner_subject = $2::uuid`, workspaceID, principal.Subject)
+	if err != nil {
+		return fmt.Errorf("delete workspace: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrWorkspaceAccess
+	}
+	return nil
+}
+
 func validateSubject(subject string) error {
 	if _, err := uuid.Parse(subject); err != nil {
 		return ErrInvalidSubject

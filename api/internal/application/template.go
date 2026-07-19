@@ -8,9 +8,43 @@ import (
 	"time"
 
 	"github.com/p2b/p2b/internal/domain"
+	passportdomain "github.com/p2b/p2b/internal/passport"
 )
 
 var placeholderPattern = regexp.MustCompile(`\{\{\s*([a-zA-Z0-9_]+)\s*\}\}`)
+
+var wellKnownVariableLabels = map[string]string{
+	"company_name":  "Tên doanh nghiệp",
+	"website":       "Website",
+	"policy_title":  "Tên chính sách",
+	"policy_agency": "Cơ quan ban hành",
+	"policy_source": "Nguồn văn bản",
+	"current_date":  "Ngày hiện tại",
+}
+
+// LabelForVariable resolves a template variable key to a human-readable Vietnamese
+// label, falling back to the passport field label, then the raw key.
+func LabelForVariable(key string) string {
+	if label, ok := wellKnownVariableLabels[key]; ok {
+		return label
+	}
+	if definition, ok := passportdomain.LookupField(key); ok {
+		return definition.Label
+	}
+	return key
+}
+
+// MissingVariables returns which placeholders referenced by text have no
+// non-blank value in variables, in template order.
+func MissingVariables(text string, variables map[string]string) []string {
+	missing := make([]string, 0)
+	for _, key := range ExtractPlaceholders(text) {
+		if strings.TrimSpace(variables[key]) == "" {
+			missing = append(missing, key)
+		}
+	}
+	return missing
+}
 
 type GenerationRequest struct {
 	TemplateText string            `json:"template_text"`
@@ -36,7 +70,7 @@ func RenderTemplate(text string, variables map[string]string) string {
 		if value := strings.TrimSpace(variables[key]); value != "" {
 			return value
 		}
-		return "[CẦN BỔ SUNG: " + key + "]"
+		return "[CẦN BỔ SUNG: " + LabelForVariable(key) + "]"
 	})
 }
 

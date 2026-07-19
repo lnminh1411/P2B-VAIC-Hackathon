@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"reflect"
 	"slices"
 	"sort"
 	"strings"
@@ -75,6 +76,7 @@ func (s *Service) BuildPassport(workspaceID string, input BuildPassportInput) (J
 	state.Passport.Version++
 	state.Passport.UpdatedAt = now
 	state.Candidates = nil
+	recordPassportVersion(state, "dev")
 	job := Job{ID: uuid.NewString(), Type: "PASSPORT_BUILD", Status: "SUCCEEDED", Progress: 100, CreatedAt: now}
 	state.Jobs[job.ID] = job
 	return job, nil
@@ -109,6 +111,44 @@ func (s *Service) Candidates(workspaceID string) []passportservice.Candidate {
 	return slices.Clone(s.workspace(workspaceID).Candidates)
 }
 
+func (s *Service) PassportVersions(workspaceID string) []PassportVersion {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	versions := slices.Clone(s.workspace(workspaceID).Versions)
+	for left, right := 0, len(versions)-1; left < right; left, right = left+1, right-1 {
+		versions[left], versions[right] = versions[right], versions[left]
+	}
+	return versions
+}
+
+// recordPassportVersion snapshots the workspace's current passport fields as a new
+// version history entry. Call it after every mutation that bumps Passport.Version.
+func recordPassportVersion(state *workspaceState, createdBy string) {
+	fields := clonePassport(state.Passport).Fields
+	var previous map[string]domain.PassportField
+	if len(state.versionFields) > 0 {
+		previous = state.versionFields[len(state.versionFields)-1]
+	}
+	changed := make([]string, 0)
+	for key, field := range fields {
+		if prior, existed := previous[key]; !existed || !reflect.DeepEqual(prior.Value, field.Value) {
+			changed = append(changed, fieldLabelFor(key))
+		}
+	}
+	sort.Strings(changed)
+	state.Versions = append(state.Versions, PassportVersion{
+		Version: state.Passport.Version, CreatedBy: createdBy, CreatedAt: state.Passport.UpdatedAt, ChangedFields: changed,
+	})
+	state.versionFields = append(state.versionFields, fields)
+}
+
+func fieldLabelFor(key string) string {
+	if definition, exists := passportservice.LookupField(key); exists {
+		return definition.Label
+	}
+	return key
+}
+
 func (s *Service) ConfirmField(workspaceID, key string, value any, expectedVersion int) (domain.Passport, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -126,6 +166,7 @@ func (s *Service) ConfirmField(workspaceID, key string, value any, expectedVersi
 			state.Candidates[index].Status = "ACCEPTED"
 		}
 	}
+	recordPassportVersion(state, "dev")
 	return passportservice.EnsureCanonicalFields(clonePassport(updated)), nil
 }
 
@@ -313,7 +354,10 @@ func retrievedDocumentPolicy(document domain.DocumentMatch, benefit string) doma
 func documentMatchScore(document domain.DocumentMatch) int {
 	vector := math.Max(0, math.Min(document.VectorScore, 1))
 	lexical := math.Max(0, math.Min(document.LexicalScore, 1))
-	score := 25 + int(math.Round(vector*60)) + int(math.Round(lexical*14))
+	// A small fixed floor (not the dominant term) keeps a bare match above 0
+	// without flattening real differences in vector/lexical relevance into a
+	// narrow band near the top of the range.
+	score := 5 + int(math.Round(vector*70)) + int(math.Round(lexical*25))
 	if score > 99 {
 		return 99
 	}
@@ -385,6 +429,7 @@ func (s *Service) AcceptEnrichment(workspaceID, candidateID string, expectedVers
 			state.Passport = merged
 			run.Candidates[index].Status = "ACCEPTED"
 			state.Enrichment[runID] = run
+			recordPassportVersion(state, "dev")
 			return clonePassport(merged), nil
 		}
 	}

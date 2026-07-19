@@ -34,6 +34,7 @@ export default function App() {
   const workspaceScope = selectedFromList ?? workspacesQuery.data?.active_workspace_id
   const passportQuery = useQuery({ queryKey: ['passport', workspaceScope], queryFn: api.passport, retry: 1, enabled: Boolean(workspaceScope) })
   const candidatesQuery = useQuery({ queryKey: ['candidates', workspaceScope], queryFn: api.candidates, enabled: Boolean(workspaceScope && passportQuery.data?.company_name) })
+  const passportVersionsQuery = useQuery({ queryKey: ['passport-versions', workspaceScope], queryFn: api.passportVersions, enabled: Boolean(workspaceScope && passportQuery.data?.company_name) })
   const alertsQuery = useQuery({ queryKey: ['alerts', workspaceScope], queryFn: api.alerts, enabled: Boolean(workspaceScope && passportQuery.data?.company_name) })
   const adminQuery = useQuery({ queryKey: ['admin-policies'], queryFn: api.adminPolicies, enabled: page === 'admin' })
   const workspaces = workspacesQuery.data?.workspaces ?? []
@@ -54,7 +55,7 @@ export default function App() {
       const job = await api.buildPassport(buildPassportPayload(input, uploads.map(upload => upload.source_id)))
       return waitForJob(job, { load: api.job, failureMessage: pageStateLabels.extract_fail, timeoutMessage: pageStateLabels.timeout })
     },
-    onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['passport', workspaceScope] }), queryClient.invalidateQueries({ queryKey: ['candidates', workspaceScope] }), queryClient.invalidateQueries({ queryKey: ['match', workspaceScope] })]); setPage('passport') },
+    onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['passport', workspaceScope] }), queryClient.invalidateQueries({ queryKey: ['candidates', workspaceScope] }), queryClient.invalidateQueries({ queryKey: ['passport-versions', workspaceScope] }), queryClient.invalidateQueries({ queryKey: ['match', workspaceScope] })]); setPage('passport') },
   })
   const refreshMutation = useMutation({
     mutationFn: async (files: File[]) => {
@@ -62,9 +63,20 @@ export default function App() {
       const job = await api.refreshPassport(uploads.map(upload => upload.source_id))
       return waitForJob(job, { load: api.job, failureMessage: pageStateLabels.update_fail, timeoutMessage: pageStateLabels.timeout })
     },
-    onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['passport', workspaceScope] }), queryClient.invalidateQueries({ queryKey: ['candidates', workspaceScope] }), queryClient.invalidateQueries({ queryKey: ['match', workspaceScope] })]) },
+    onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['passport', workspaceScope] }), queryClient.invalidateQueries({ queryKey: ['candidates', workspaceScope] }), queryClient.invalidateQueries({ queryKey: ['passport-versions', workspaceScope] }), queryClient.invalidateQueries({ queryKey: ['match', workspaceScope] })]) },
   })
   const createWorkspaceMutation = useMutation({ mutationFn: api.createWorkspace, onSuccess: async workspace => { await queryClient.invalidateQueries({ queryKey: ['workspaces'] }); setApiWorkspaceId(workspace.id); setActiveWorkspaceId(workspace.id); setPage('overview') } })
+  const deleteWorkspaceMutation = useMutation({
+    mutationFn: api.deleteWorkspace,
+    onSuccess: (data, deletedId) => {
+      queryClient.setQueryData(['workspaces'], (previous: typeof workspacesQuery.data) => previous ? { ...previous, workspaces: data.workspaces } : previous)
+      if (workspaceScope === deletedId) {
+        const nextId = data.workspaces[0]?.id
+        setSelectedPolicy(undefined); setChecklist(undefined); setApplication(undefined); setWorkflowError(undefined)
+        setApiWorkspaceId(nextId); setActiveWorkspaceId(nextId); setPage('overview')
+      }
+    },
+  })
   const matchMutation = useMutation({ mutationFn: api.match, onSuccess: data => { queryClient.setQueryData(['match', workspaceScope], data) } })
   const enrichMutation = useMutation({ mutationFn: api.startEnrichment, onSuccess: setEnrichment })
   const checklistMutation = useMutation({ mutationFn: (policyId: string) => api.createChecklist(policyId), onSuccess: setChecklist })
@@ -76,14 +88,14 @@ export default function App() {
   if (workspacesQuery.error) return <ErrorState message={message(workspacesQuery.error, pageStateLabels.unknown_error)} onRetry={() => workspacesQuery.refetch()} />
   if (passportQuery.error) return <ErrorState message={message(passportQuery.error, pageStateLabels.unknown_error)} onRetry={() => passportQuery.refetch()} />
   const passport = passportQuery.data
-  const shellProps = { workspaces, activeWorkspaceId: selectedWorkspaceId, onWorkspaceChange: (workspaceId: string) => { setSelectedPolicy(undefined); setChecklist(undefined); setApplication(undefined); setWorkflowError(undefined); setApiWorkspaceId(workspaceId); setActiveWorkspaceId(workspaceId); setPage('overview') }, onCreateWorkspace: () => { createWorkspaceMutation.mutate(shellLabels.unnamed_workspace) } }
+  const shellProps = { workspaces, activeWorkspaceId: selectedWorkspaceId, onWorkspaceChange: (workspaceId: string) => { setSelectedPolicy(undefined); setChecklist(undefined); setApplication(undefined); setWorkflowError(undefined); setApiWorkspaceId(workspaceId); setActiveWorkspaceId(workspaceId); setPage('overview') }, onCreateWorkspace: () => { createWorkspaceMutation.mutate(shellLabels.unnamed_workspace) }, onDeleteWorkspace: async (workspaceId: string) => { await deleteWorkspaceMutation.mutateAsync(workspaceId) } }
   if (!passport || !passport.company_name) return <Shell page="overview" {...shellProps} onNavigate={setPage}><Onboarding onSubmit={input => buildMutation.mutate(input)} busy={buildMutation.isPending} error={buildMutation.error ? message(buildMutation.error, pageStateLabels.unknown_error) : undefined} /></Shell>
 
   const saveField = async (fieldKey: string, value: unknown) => {
     const current = queryClient.getQueryData<typeof passport>(['passport', workspaceScope]) ?? passportQuery.data!
     const updated = await api.confirmField(fieldKey, value, current.version)
     queryClient.setQueryData(['passport', workspaceScope], updated)
-    await queryClient.invalidateQueries({ queryKey: ['match', workspaceScope] })
+    await Promise.all([queryClient.invalidateQueries({ queryKey: ['match', workspaceScope] }), queryClient.invalidateQueries({ queryKey: ['passport-versions', workspaceScope] })])
   }
   const confirmCandidate = async (candidate: NonNullable<typeof candidatesQuery.data>['candidates'][number]) => {
     await saveField(candidate.field_key, candidate.value)
@@ -94,7 +106,7 @@ export default function App() {
     const updated = await api.acceptEnrichment(candidateId, current.version)
     queryClient.setQueryData(['passport', workspaceScope], updated)
     setEnrichment(currentRun => currentRun ? { ...currentRun, candidates: currentRun.candidates.map(candidate => candidate.id === candidateId ? { ...candidate, status: 'ACCEPTED' } : candidate) } : currentRun)
-    await queryClient.invalidateQueries({ queryKey: ['match', workspaceScope] })
+    await Promise.all([queryClient.invalidateQueries({ queryKey: ['match', workspaceScope] }), queryClient.invalidateQueries({ queryKey: ['passport-versions', workspaceScope] })])
   }
   const markAvailable = async (itemId: string) => { if (!checklist) return; const updated = await api.updateChecklist(checklist.id, itemId, checklist.version, 'AVAILABLE', 'Người dùng xác nhận tài liệu trong workspace'); setChecklist(updated) }
   const applicationAction = async (action: 'submit' | 'approve' | 'generate') => {
@@ -112,7 +124,7 @@ export default function App() {
 
   return <Shell page={page} {...shellProps} onNavigate={setPage} unreadAlerts={(alertsQuery.data?.alerts ?? []).filter(alert => !alert.read).length}>
     {page === 'overview' && <Dashboard passport={passport} matchRun={matchRun} selectedPolicy={activeSelectedPolicy} checklist={checklist} application={activeApplication} onNavigate={setPage} />}
-    {page === 'passport' && <PassportPage passport={passport} candidates={candidatesQuery.data?.candidates ?? []} onConfirm={confirmCandidate} onSaveField={saveField} onRefresh={async files => { await refreshMutation.mutateAsync(files) }} refreshBusy={refreshMutation.isPending} busy={candidatesQuery.isFetching || refreshMutation.isPending} />}
+    {page === 'passport' && <PassportPage passport={passport} candidates={candidatesQuery.data?.candidates ?? []} versions={passportVersionsQuery.data?.versions ?? []} onConfirm={confirmCandidate} onSaveField={saveField} onRefresh={async files => { await refreshMutation.mutateAsync(files) }} refreshBusy={refreshMutation.isPending} busy={candidatesQuery.isFetching || refreshMutation.isPending} />}
     {page === 'opportunities' && <OpportunitiesPage run={matchRun} onMatch={() => matchMutation.mutate()} matching={matchMutation.isPending} selected={selectedPolicy} onSelect={setSelectedPolicy} onPrepare={prepare} enrichment={enrichment} onEnrich={policyId => enrichMutation.mutate(policyId)} onAcceptEvidence={candidateId => void acceptEvidence(candidateId)} busy={enrichMutation.isPending} error={matchMutation.error ? message(matchMutation.error, pageStateLabels.unknown_error) : undefined} />}
     {page === 'application' && <ApplicationPage policy={activeSelectedPolicy} checklist={checklist} application={activeApplication} templates={templatesQuery.data?.templates ?? []} onCreateChecklist={() => activeSelectedPolicy && checklistMutation.mutate(activeSelectedPolicy.policy_id)} onMarkAvailable={itemId => void markAvailable(itemId)} onCreateApplication={templateId => checklist && applicationMutation.mutate({ checklistId: checklist.id, templateId })} onUploadTemplate={async file => { await templateUploadMutation.mutateAsync(file) }} onSave={async sections => { if (!activeApplication) return; const updated = await api.updateApplication(activeApplication.id, activeApplication.version, sections); setApplication(updated); queryClient.setQueryData(['application-draft', workspaceScope], { application: updated }); return updated }} onAction={action => void applicationAction(action)} onDownload={() => void download()} busy={checklistMutation.isPending || applicationMutation.isPending || templateUploadMutation.isPending} error={workflowError || (templateUploadMutation.error ? message(templateUploadMutation.error, pageStateLabels.unknown_error) : undefined)} />}
     {page === 'alerts' && (

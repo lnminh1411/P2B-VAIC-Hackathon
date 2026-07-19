@@ -30,7 +30,7 @@ describe('PassportPage', () => {
   it('shows missing scale, geography, and technology fields and lets the user enter a value', async () => {
     const onSaveField = vi.fn().mockResolvedValue(undefined)
 
-    render(<PassportPage passport={passport} candidates={[]} onConfirm={vi.fn()} onSaveField={onSaveField} busy={false} />)
+    render(<PassportPage passport={passport} candidates={[]} versions={[]} onConfirm={vi.fn()} onSaveField={onSaveField} busy={false} />)
 
     expect(screen.getByText('Số lao động')).toBeInTheDocument()
     expect(screen.getByText('Tỉnh/thành')).toBeInTheDocument()
@@ -45,7 +45,7 @@ describe('PassportPage', () => {
 
   it('rejects a fractional employee count instead of silently rounding it', async () => {
     const onSaveField = vi.fn().mockResolvedValue(undefined)
-    render(<PassportPage passport={passport} candidates={[]} onConfirm={vi.fn()} onSaveField={onSaveField} busy={false} />)
+    render(<PassportPage passport={passport} candidates={[]} versions={[]} onConfirm={vi.fn()} onSaveField={onSaveField} busy={false} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Chỉnh sửa Số lao động' }))
     fireEvent.change(screen.getByLabelText('Giá trị Số lao động'), { target: { value: '25.5' } })
@@ -81,7 +81,7 @@ describe('PassportPage', () => {
 
   it('lets the user upload additional PDF evidence', async () => {
     const onRefresh = vi.fn().mockResolvedValue(undefined)
-    render(<PassportPage passport={passport} candidates={[]} onConfirm={vi.fn()} onSaveField={vi.fn()} onRefresh={onRefresh} busy={false} />)
+    render(<PassportPage passport={passport} candidates={[]} versions={[]} onConfirm={vi.fn()} onSaveField={vi.fn()} onRefresh={onRefresh} busy={false} />)
 
     const file = new File(['%PDF-1.7'], 'bo-sung.pdf', { type: 'application/pdf' })
     fireEvent.change(screen.getByLabelText('Tài liệu cập nhật'), { target: { files: [file] } })

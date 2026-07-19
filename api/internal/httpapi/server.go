@@ -39,6 +39,7 @@ type WorkspaceManager interface {
 	Resolve(context.Context, authn.Principal, string) (string, error)
 	List(context.Context, authn.Principal) ([]Workspace, error)
 	Create(context.Context, authn.Principal, string) (Workspace, error)
+	Delete(context.Context, authn.Principal, string) error
 }
 
 type Config struct {
@@ -56,6 +57,7 @@ type Config struct {
 		EnqueueRefresh(context.Context, string, []string, string, string) (pipeline.Job, error)
 		Job(context.Context, string, string) (pipeline.Job, error)
 		Passport(context.Context, string) (domain.Passport, error)
+		PassportVersions(context.Context, string) ([]pipeline.PassportVersion, error)
 		Candidates(context.Context, string) ([]passportdomain.Candidate, error)
 		ConfirmField(context.Context, string, string, string, any, int) (domain.Passport, error)
 		SaveMatchRun(ctx context.Context, matchID string, workspaceID string, passportID string, passportVersion int, retrievalMode string, resultsJSON []byte) error
@@ -133,6 +135,7 @@ func NewServerWithConfig(service *platform.Service, config Config) http.Handler 
 		r.Get("/auth/me", server.authMe)
 		r.Get("/workspaces", server.listWorkspaces)
 		r.Post("/workspaces", server.createWorkspace)
+		r.Delete("/workspaces/{workspaceID}", server.deleteWorkspace)
 		r.Post("/uploads/presign", server.presignUpload)
 		r.Post("/uploads/{sourceID}/complete", server.completeUpload)
 		r.Post("/passports/build", server.buildPassport)
@@ -268,6 +271,50 @@ func (s *Server) createWorkspace(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, created)
 }
 
+func (s *Server) deleteWorkspace(w http.ResponseWriter, r *http.Request) {
+	targetID := chi.URLParam(r, "workspaceID")
+	currentPrincipal := principal(r)
+	if s.config.WorkspaceManager != nil && !s.config.DevAuth {
+		if targetID == currentPrincipal.Subject {
+			writeError(w, http.StatusUnprocessableEntity, "WORKSPACE_DELETE_FAILED", "The default workspace cannot be deleted")
+			return
+		}
+		if err := s.config.WorkspaceManager.Delete(r.Context(), currentPrincipal, targetID); err != nil {
+			writeError(w, http.StatusForbidden, "WORKSPACE_FORBIDDEN", "You do not have access to this business workspace")
+			return
+		}
+		workspaces, err := s.config.WorkspaceManager.List(r.Context(), currentPrincipal)
+		if err != nil {
+			writeError(w, http.StatusServiceUnavailable, "WORKSPACES_UNAVAILABLE", "Business workspaces are temporarily unavailable")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"workspaces": workspaces})
+		return
+	}
+	if targetID == currentPrincipal.Subject {
+		writeError(w, http.StatusUnprocessableEntity, "WORKSPACE_DELETE_FAILED", "The default workspace cannot be deleted")
+		return
+	}
+	s.devMu.Lock()
+	existing := s.devWorkspaces[currentPrincipal.Subject]
+	filtered := make([]Workspace, 0, len(existing))
+	found := false
+	for _, ws := range existing {
+		if ws.ID == targetID {
+			found = true
+			continue
+		}
+		filtered = append(filtered, ws)
+	}
+	s.devWorkspaces[currentPrincipal.Subject] = filtered
+	s.devMu.Unlock()
+	if !found {
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "Workspace not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"workspaces": s.devWorkspaceList(currentPrincipal.Subject, currentPrincipal.Subject)})
+}
+
 func (s *Server) devWorkspaceList(principalID, activeID string) []Workspace {
 	s.devMu.Lock()
 	defer s.devMu.Unlock()
@@ -322,7 +369,7 @@ func (s *Server) cors(next http.Handler) http.Handler {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Vary", "Origin")
 			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, Idempotency-Key, If-Match, X-Workspace-ID")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		}
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
@@ -513,7 +560,16 @@ func (s *Server) getPassport(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.service.Passport(workspace(r)))
 }
 func (s *Server) getPassportVersions(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, []any{s.service.Passport(workspace(r))})
+	if s.config.ExtractionStore != nil {
+		versions, err := s.config.ExtractionStore.PassportVersions(r.Context(), workspace(r))
+		if err != nil {
+			writeError(w, http.StatusServiceUnavailable, "PASSPORT_UNAVAILABLE", "Passport version history is temporarily unavailable")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"versions": versions})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"versions": s.service.PassportVersions(workspace(r))})
 }
 func (s *Server) getCandidates(w http.ResponseWriter, r *http.Request) {
 	if s.config.ExtractionStore != nil {

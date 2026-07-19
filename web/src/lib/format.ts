@@ -64,7 +64,7 @@ export function displayValue(value: unknown, dataType?: string) {
     return lang === 'en' ? 'No data' : 'Chưa có dữ liệu'
   }
   if (Array.isArray(value)) return value.join(', ')
-  if (dataType === 'number' && typeof value === 'number' && value >= 1_000_000) return formatMoney(value)
+  if (dataType === 'money' && typeof value === 'number') return formatMoney(value)
   if (typeof value === 'boolean') {
     if (lang === 'en') return value ? 'Yes' : 'No'
     return value ? 'Có' : 'Không'

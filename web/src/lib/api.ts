@@ -1,4 +1,4 @@
-import type { Alert, Application, ApplicationTemplate, Candidate, Checklist, EnrichmentRun, MatchRun, Passport, WatchlistSettings, Workspace } from './types'
+import type { Alert, Application, ApplicationTemplate, Candidate, Checklist, EnrichmentRun, MatchRun, Passport, PassportVersion, WatchlistSettings, Workspace } from './types'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080'
 const WORKSPACE = 'p2b-local-development'
@@ -46,8 +46,10 @@ export const api = {
   health: () => request<{ status: string; mode: string }>('/health/ready'),
   workspaces: () => request<{ workspaces: Workspace[]; active_workspace_id: string }>('/v1/workspaces'),
   createWorkspace: (displayName: string) => request<Workspace>('/v1/workspaces', { method: 'POST', body: JSON.stringify({ display_name: displayName }) }),
+  deleteWorkspace: (workspaceId: string) => request<{ workspaces: Workspace[] }>(`/v1/workspaces/${workspaceId}`, { method: 'DELETE' }),
   passport: () => request<Passport>('/v1/passport'),
   candidates: () => request<{ candidates: Candidate[] }>('/v1/passport/candidates'),
+  passportVersions: () => request<{ versions: PassportVersion[] }>('/v1/passport/versions'),
   uploadPDF: async (file: File) => {
     const signed = await request<{ source_id: string; object_key?: string; upload_url: string }>('/v1/uploads/presign', {
       method: 'POST',

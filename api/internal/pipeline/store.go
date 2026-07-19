@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
+	"sort"
 	"time"
 
 	"github.com/google/uuid"
@@ -257,9 +259,82 @@ func (s *Store) Passport(ctx context.Context, workspaceID string) (domain.Passpo
 	return passportdomain.EnsureCanonicalFields(result), nil
 }
 
+// PassportVersion summarizes one entry in a passport's version history.
+type PassportVersion struct {
+	Version       int       `json:"version"`
+	CreatedBy     string    `json:"created_by"`
+	CreatedAt     time.Time `json:"created_at"`
+	ChangedFields []string  `json:"changed_fields"`
+}
+
+func (s *Store) PassportVersions(ctx context.Context, workspaceID string) ([]PassportVersion, error) {
+	rows, err := s.database.Query(ctx, `
+		SELECT pv.version, pv.fields, pv.created_by, pv.created_at
+		FROM passport_versions pv
+		JOIN passports p ON p.id = pv.passport_id
+		WHERE p.workspace_id = $1::uuid
+		ORDER BY pv.version ASC`, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	type versionRow struct {
+		version   int
+		fields    map[string]domain.PassportField
+		createdBy uuid.UUID
+		createdAt time.Time
+	}
+	parsed := make([]versionRow, 0)
+	for rows.Next() {
+		var entry versionRow
+		var encodedFields []byte
+		if err = rows.Scan(&entry.version, &encodedFields, &entry.createdBy, &entry.createdAt); err != nil {
+			return nil, err
+		}
+		entry.fields = map[string]domain.PassportField{}
+		if len(encodedFields) > 0 {
+			if err = json.Unmarshal(encodedFields, &entry.fields); err != nil {
+				return nil, err
+			}
+		}
+		parsed = append(parsed, entry)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	result := make([]PassportVersion, 0, len(parsed))
+	var previous map[string]domain.PassportField
+	for _, entry := range parsed {
+		result = append(result, PassportVersion{
+			Version:       entry.version,
+			CreatedBy:     entry.createdBy.String(),
+			CreatedAt:     entry.createdAt,
+			ChangedFields: changedFieldLabels(previous, entry.fields),
+		})
+		previous = entry.fields
+	}
+	for left, right := 0, len(result)-1; left < right; left, right = left+1, right-1 {
+		result[left], result[right] = result[right], result[left]
+	}
+	return result, nil
+}
+
+func changedFieldLabels(previous, current map[string]domain.PassportField) []string {
+	labels := make([]string, 0)
+	for key, field := range current {
+		if prior, existed := previous[key]; !existed || !reflect.DeepEqual(prior.Value, field.Value) {
+			labels = append(labels, fieldLabel(key))
+		}
+	}
+	sort.Strings(labels)
+	return labels
+}
+
 func (s *Store) Candidates(ctx context.Context, workspaceID string) ([]passportdomain.Candidate, error) {
 	rows, err := s.database.Query(ctx, `
-		SELECT id, field_key, value, data_type, confidence, evidence
+		SELECT id, field_key, value, data_type, confidence, evidence, status
 		FROM field_candidates WHERE workspace_id = $1::uuid AND status IN ('EXTRACTED','NEEDS_REVIEW','CONFLICTED')
 		ORDER BY created_at DESC`, workspaceID)
 	if err != nil {
@@ -270,7 +345,7 @@ func (s *Store) Candidates(ctx context.Context, workspaceID string) ([]passportd
 	for rows.Next() {
 		var candidate passportdomain.Candidate
 		var encodedValue, encodedEvidence []byte
-		if err = rows.Scan(&candidate.ID, &candidate.FieldKey, &encodedValue, &candidate.DataType, &candidate.Confidence, &encodedEvidence); err != nil {
+		if err = rows.Scan(&candidate.ID, &candidate.FieldKey, &encodedValue, &candidate.DataType, &candidate.Confidence, &encodedEvidence, &candidate.Status); err != nil {
 			return nil, err
 		}
 		if err = json.Unmarshal(encodedValue, &candidate.Value); err != nil {
@@ -281,7 +356,6 @@ func (s *Store) Candidates(ctx context.Context, workspaceID string) ([]passportd
 			return nil, err
 		}
 		candidate.Evidence = evidence
-		candidate.Status = "NEEDS_REVIEW"
 		result = append(result, candidate)
 	}
 	return result, rows.Err()
@@ -348,10 +422,10 @@ func (s *Store) ConfirmField(ctx context.Context, workspaceID, actorSubject, fie
 		if err = json.Unmarshal(encodedEvidence, &candidateEvidence); err != nil {
 			return domain.Passport{}, err
 		}
-		evidence = append(evidence, candidateEvidence)
+		evidence = appendEvidenceIfNew(evidence, candidateEvidence)
 	}
-	evidence = append(evidence, domain.Evidence{
-		SourceID: "user-input", SourceName: "Người dùng xác nhận", Quote: fmt.Sprint(value),
+	evidence = appendEvidenceIfNew(evidence, domain.Evidence{
+		SourceID: "user-input", SourceName: "Người dùng xác nhận", Quote: passportdomain.FormatConfirmedValue(value),
 		ContentHash: fmt.Sprintf("user-confirmation:%s:v%d", actorSubject, currentVersion+1), ObservedAt: time.Now().UTC(),
 	})
 	fields[fieldKey] = domain.PassportField{Key: fieldKey, Label: definition.Label, Value: value, DataType: definition.DataType, Status: domain.FieldConfirmed, Confidence: 1, Evidence: evidence}
@@ -363,10 +437,11 @@ func (s *Store) ConfirmField(ctx context.Context, workspaceID, actorSubject, fie
 	if _, err = transaction.Exec(ctx, `UPDATE passports SET current_version = $2, updated_at = now() WHERE id = $1`, passportID, newVersion); err != nil {
 		return domain.Passport{}, err
 	}
-	if candidateID != uuid.Nil {
-		if _, err = transaction.Exec(ctx, `UPDATE field_candidates SET status = 'ACCEPTED' WHERE id = $1`, candidateID); err != nil {
-			return domain.Passport{}, err
-		}
+	if _, err = transaction.Exec(ctx, `
+		UPDATE field_candidates SET status = 'ACCEPTED'
+		WHERE workspace_id = $1::uuid AND field_key = $2 AND status IN ('EXTRACTED','NEEDS_REVIEW','CONFLICTED')`,
+		workspaceID, fieldKey); err != nil {
+		return domain.Passport{}, err
 	}
 	if fieldKey == "legal_name" {
 		if _, err = transaction.Exec(ctx, `
@@ -401,6 +476,15 @@ func initialFields(workspaceID, companyName, website string, now time.Time) map[
 		fields["website"] = domain.PassportField{Key: "website", Label: "Website", Value: website, DataType: "url", Status: domain.FieldConfirmed, Confidence: 1, Evidence: []domain.Evidence{{SourceID: "user-input", SourceName: "Website do người dùng cung cấp", URL: website, Quote: website, ContentHash: "user:" + workspaceID, ObservedAt: now}}}
 	}
 	return fields
+}
+
+func appendEvidenceIfNew(list []domain.Evidence, item domain.Evidence) []domain.Evidence {
+	for _, existing := range list {
+		if existing.ContentHash == item.ContentHash {
+			return list
+		}
+	}
+	return append(list, item)
 }
 
 func fieldLabel(key string) string {
@@ -490,7 +574,7 @@ func (s *Store) Alerts(ctx context.Context, workspaceID string) ([]domain.Alert,
 		SELECT id, type, severity, payload, read_at, created_at
 		FROM alerts
 		WHERE workspace_id = $1::uuid
-		ORDER BY created_at DESC`)
+		ORDER BY created_at DESC`, workspaceID)
 	if err != nil {
 		return nil, err
 	}

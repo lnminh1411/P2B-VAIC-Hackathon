@@ -94,10 +94,34 @@ func (s *Store) SaveCandidates(ctx context.Context, workspaceID, sourceID, sourc
 	}
 	defer transaction.Rollback(ctx)
 	var passportID uuid.UUID
-	if err = transaction.QueryRow(ctx, `SELECT id FROM passports WHERE workspace_id = $1::uuid`, workspaceID).Scan(&passportID); err != nil {
+	var encodedFields []byte
+	if err = transaction.QueryRow(ctx, `
+		SELECT p.id, pv.fields
+		FROM passports p JOIN passport_versions pv ON pv.passport_id = p.id AND pv.version = p.current_version
+		WHERE p.workspace_id = $1::uuid`, workspaceID).Scan(&passportID, &encodedFields); err != nil {
 		return err
 	}
+	confirmedFields := map[string]domain.PassportField{}
+	if len(encodedFields) > 0 {
+		if err = json.Unmarshal(encodedFields, &confirmedFields); err != nil {
+			return err
+		}
+	}
 	for _, candidate := range candidates {
+		if confirmed, ok := confirmedFields[candidate.FieldKey]; ok && confirmed.Status == domain.FieldConfirmed {
+			confirmedValue, marshalErr := json.Marshal(confirmed.Value)
+			if marshalErr != nil {
+				return marshalErr
+			}
+			candidateValue, marshalErr := json.Marshal(candidate.Value)
+			if marshalErr != nil {
+				return marshalErr
+			}
+			if string(confirmedValue) == string(candidateValue) {
+				// Already confirmed with the same value — nothing new to review.
+				continue
+			}
+		}
 		value, marshalErr := json.Marshal(candidate.Value)
 		if marshalErr != nil {
 			return marshalErr
@@ -106,10 +130,14 @@ func (s *Store) SaveCandidates(ctx context.Context, workspaceID, sourceID, sourc
 		if marshalErr != nil {
 			return marshalErr
 		}
+		status := "NEEDS_REVIEW"
+		if confirmed, ok := confirmedFields[candidate.FieldKey]; ok && confirmed.Status == domain.FieldConfirmed {
+			status = "CONFLICTED"
+		}
 		if _, err = transaction.Exec(ctx, `
 			INSERT INTO field_candidates (workspace_id, passport_id, source_id, field_key, value, data_type, status, confidence, evidence)
-			VALUES ($1::uuid, $2, $3::uuid, $4, $5, $6, 'NEEDS_REVIEW', $7, $8)
-			ON CONFLICT DO NOTHING`, workspaceID, passportID, sourceID, candidate.FieldKey, value, candidate.DataType, candidate.Confidence, evidence); err != nil {
+			VALUES ($1::uuid, $2, $3::uuid, $4, $5, $6, $7, $8, $9)
+			ON CONFLICT DO NOTHING`, workspaceID, passportID, sourceID, candidate.FieldKey, value, candidate.DataType, status, candidate.Confidence, evidence); err != nil {
 			return fmt.Errorf("save field candidate: %w", err)
 		}
 	}

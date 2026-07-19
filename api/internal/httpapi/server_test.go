@@ -43,6 +43,7 @@ func (stub *workspaceManagerStub) Create(context.Context, authn.Principal, strin
 	stub.created = true
 	return Workspace{ID: "business-2", DisplayName: "Công ty Hai", Role: "OWNER"}, nil
 }
+func (stub *workspaceManagerStub) Delete(context.Context, authn.Principal, string) error { return nil }
 
 type policyStoreStub struct {
 	policies []domain.Policy

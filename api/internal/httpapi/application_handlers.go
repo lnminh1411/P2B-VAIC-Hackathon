@@ -59,7 +59,14 @@ func (s *Server) createApplication(w http.ResponseWriter, r *http.Request) {
 	variables := applicationdomain.TemplateVariables(draftContext.Passport, draftContext.Policy)
 	sections := fallbackApplicationSections(templateText, variables)
 	generationWarning := ""
-	if s.config.ApplicationGenerator != nil {
+	missingKeys := applicationdomain.MissingVariables(templateText, variables)
+	if len(missingKeys) > 0 {
+		missingLabels := make([]string, len(missingKeys))
+		for index, key := range missingKeys {
+			missingLabels[index] = applicationdomain.LabelForVariable(key)
+		}
+		generationWarning = "Còn thiếu dữ liệu đã xác nhận: " + strings.Join(missingLabels, ", ") + ". Hệ thống đã điền mẫu bằng phần dữ liệu hiện có; hãy xác nhận các trường còn thiếu rồi tạo lại bản nháp để có nội dung đầy đủ."
+	} else if s.config.ApplicationGenerator != nil {
 		generationContext, cancelGeneration := context.WithTimeout(r.Context(), 25*time.Second)
 		generated, generationErr := s.config.ApplicationGenerator.GenerateApplication(generationContext, applicationdomain.GenerationRequest{TemplateText: templateText, Variables: variables})
 		cancelGeneration()

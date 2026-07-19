@@ -47,6 +47,13 @@ export interface Candidate {
   status: string
 }
 
+export interface PassportVersion {
+  version: number
+  created_by: string
+  created_at: string
+  changed_fields: string[]
+}
+
 export interface CriterionResult {
   rule_id: string
   field_key: string

@@ -10,6 +10,9 @@ export function getSupabase(): SupabaseClient | undefined {
       autoRefreshToken: true,
       detectSessionInUrl: true,
       persistSession: true,
+      // PKCE keeps access/refresh tokens out of the redirect URL (unlike the
+      // implicit flow, which puts them in a visible #hash after Google sign-in).
+      flowType: 'pkce',
     },
   })
   return client
