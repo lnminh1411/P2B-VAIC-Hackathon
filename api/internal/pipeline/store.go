@@ -348,6 +348,13 @@ func (s *Store) Candidates(ctx context.Context, workspaceID string) ([]passportd
 		if err = rows.Scan(&candidate.ID, &candidate.FieldKey, &encodedValue, &candidate.DataType, &candidate.Confidence, &encodedEvidence, &candidate.Status); err != nil {
 			return nil, err
 		}
+		// Skip candidates for field keys that are no longer part of the canonical
+		// catalog (e.g. legacy rows from an older extraction schema). They can
+		// never be confirmed and would otherwise surface an "unknown passport
+		// field" error to the user.
+		if _, known := passportdomain.LookupField(candidate.FieldKey); !known {
+			continue
+		}
 		if err = json.Unmarshal(encodedValue, &candidate.Value); err != nil {
 			return nil, err
 		}

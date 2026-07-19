@@ -84,24 +84,12 @@ func (g *GeminiExtractor) ExtractFields(ctx context.Context, markdown string, fi
 	if err != nil {
 		return nil, fmt.Errorf("encode Gemini request: %w", err)
 	}
-	request, err := g.newRequest(ctx, body)
+	statusCode, responseBody, err := g.sendWithRetry(ctx, body)
 	if err != nil {
-		return nil, fmt.Errorf("create Gemini request: %w", err)
+		return nil, err
 	}
-	response, err := g.client.Do(request)
-	if err != nil {
-		return nil, fmt.Errorf("Gemini request failed: %w", err)
-	}
-	defer response.Body.Close()
-	responseBody, err := io.ReadAll(io.LimitReader(response.Body, maxGeminiResponseBytes+1))
-	if err != nil {
-		return nil, fmt.Errorf("read Gemini response: %w", err)
-	}
-	if len(responseBody) > maxGeminiResponseBytes {
-		return nil, errors.New("Gemini response exceeds limit")
-	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return nil, fmt.Errorf("Gemini request returned status %d: %s", response.StatusCode, boundedError(string(responseBody)))
+	if statusCode < 200 || statusCode >= 300 {
+		return nil, fmt.Errorf("Gemini request returned status %d: %s", statusCode, boundedError(string(responseBody)))
 	}
 	structuredContent, ok := geminiResponseText(responseBody)
 	if !ok {
@@ -153,21 +141,12 @@ func (g *GeminiExtractor) GenerateApplication(ctx context.Context, input applica
 	if err != nil {
 		return nil, fmt.Errorf("encode Gemini application request: %w", err)
 	}
-	request, err := g.newRequest(ctx, body)
+	statusCode, responseBody, err := g.sendWithRetry(ctx, body)
 	if err != nil {
-		return nil, fmt.Errorf("create Gemini application request: %w", err)
+		return nil, err
 	}
-	response, err := g.client.Do(request)
-	if err != nil {
-		return nil, fmt.Errorf("Gemini application request failed: %w", err)
-	}
-	defer response.Body.Close()
-	responseBody, err := io.ReadAll(io.LimitReader(response.Body, maxGeminiResponseBytes+1))
-	if err != nil || len(responseBody) > maxGeminiResponseBytes {
-		return nil, errors.New("Gemini application response is invalid")
-	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return nil, fmt.Errorf("Gemini application request returned status %d: %s", response.StatusCode, boundedError(string(responseBody)))
+	if statusCode < 200 || statusCode >= 300 {
+		return nil, fmt.Errorf("Gemini application request returned status %d: %s", statusCode, boundedError(string(responseBody)))
 	}
 	structuredContent, ok := geminiResponseText(responseBody)
 	if !ok {
@@ -185,6 +164,59 @@ func (g *GeminiExtractor) GenerateApplication(ctx context.Context, input applica
 		}
 	}
 	return sections, nil
+}
+
+const geminiMaxAttempts = 3
+
+// sendWithRetry POSTs body to Gemini and retries on network errors and transient
+// HTTP statuses (429 / 5xx) with short exponential backoff. The request is a pure
+// text-in/text-out extraction, so retrying is safe. This keeps a single transient
+// Gemini hiccup from failing the whole passport-build job. Returns the final
+// status code and response body.
+func (g *GeminiExtractor) sendWithRetry(ctx context.Context, body []byte) (int, []byte, error) {
+	var lastErr error
+	for attempt := 0; attempt < geminiMaxAttempts; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return 0, nil, ctx.Err()
+			case <-time.After(time.Second * time.Duration(int64(1)<<(attempt-1))): // 1s, 2s
+			}
+		}
+		request, err := g.newRequest(ctx, body)
+		if err != nil {
+			return 0, nil, fmt.Errorf("create Gemini request: %w", err)
+		}
+		response, err := g.client.Do(request)
+		if err != nil {
+			lastErr = fmt.Errorf("Gemini request failed: %w", err)
+			continue
+		}
+		responseBody, readErr := io.ReadAll(io.LimitReader(response.Body, maxGeminiResponseBytes+1))
+		_ = response.Body.Close()
+		if readErr != nil {
+			lastErr = fmt.Errorf("read Gemini response: %w", readErr)
+			continue
+		}
+		if len(responseBody) > maxGeminiResponseBytes {
+			return response.StatusCode, nil, errors.New("Gemini response exceeds limit")
+		}
+		if isTransientGeminiStatus(response.StatusCode) {
+			lastErr = fmt.Errorf("Gemini transient status %d: %s", response.StatusCode, boundedError(string(responseBody)))
+			continue
+		}
+		return response.StatusCode, responseBody, nil
+	}
+	return 0, nil, fmt.Errorf("Gemini request failed after %d attempts: %w", geminiMaxAttempts, lastErr)
+}
+
+func isTransientGeminiStatus(code int) bool {
+	switch code {
+	case http.StatusTooManyRequests, http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return true
+	default:
+		return false
+	}
 }
 
 func (g *GeminiExtractor) newRequest(ctx context.Context, body []byte) (*http.Request, error) {

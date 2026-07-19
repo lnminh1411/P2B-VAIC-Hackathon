@@ -108,7 +108,17 @@ func (s *Service) Passport(workspaceID string) domain.Passport {
 func (s *Service) Candidates(workspaceID string) []passportservice.Candidate {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return slices.Clone(s.workspace(workspaceID).Candidates)
+	stored := s.workspace(workspaceID).Candidates
+	result := make([]passportservice.Candidate, 0, len(stored))
+	for _, candidate := range stored {
+		// Skip candidates whose field key is no longer canonical so they can
+		// never be surfaced as confirmable (mirrors pipeline.Store.Candidates).
+		if _, known := passportservice.LookupField(candidate.FieldKey); !known {
+			continue
+		}
+		result = append(result, candidate)
+	}
+	return result
 }
 
 func (s *Service) PassportVersions(workspaceID string) []PassportVersion {

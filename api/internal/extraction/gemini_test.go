@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	applicationdomain "github.com/p2b/p2b/internal/application"
@@ -125,6 +126,56 @@ func TestGeminiExtractorUsesStableModelAndParsesStructuredCandidates(t *testing.
 	}
 	if len(result) != 1 || result[0].FieldKey != "tax_code" {
 		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestGeminiExtractorRetriesTransientStatus(t *testing.T) {
+	var calls int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if atomic.AddInt32(&calls, 1) < 3 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte(`{"error":"temporarily unavailable"}`))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"{\"candidates\":[{\"field_key\":\"tax_code\",\"value\":\"0123456789\",\"data_type\":\"string\",\"confidence\":0.97,\"quote\":\"Mã số doanh nghiệp: 0123456789\"}]}"}]}}]}`))
+	}))
+	defer server.Close()
+
+	extractor, err := NewGeminiExtractor("test-key", GeminiStableModel, server.URL, server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := extractor.Extract(context.Background(), "Mã số doanh nghiệp: 0123456789")
+	if err != nil {
+		t.Fatalf("expected success after transient 503s, got %v", err)
+	}
+	if got := atomic.LoadInt32(&calls); got != 3 {
+		t.Fatalf("expected 3 attempts (2 transient + 1 success), got %d", got)
+	}
+	if len(result) != 1 || result[0].FieldKey != "tax_code" {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestGeminiExtractorGivesUpAfterPersistentTransientFailures(t *testing.T) {
+	var calls int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt32(&calls, 1)
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":"rate limited"}`))
+	}))
+	defer server.Close()
+
+	extractor, err := NewGeminiExtractor("test-key", GeminiStableModel, server.URL, server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := extractor.Extract(context.Background(), "Mã số doanh nghiệp: 0123456789"); err == nil {
+		t.Fatal("expected error after exhausting retries")
+	}
+	if got := atomic.LoadInt32(&calls); got != geminiMaxAttempts {
+		t.Fatalf("expected %d attempts, got %d", geminiMaxAttempts, got)
 	}
 }
 
