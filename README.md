@@ -175,6 +175,11 @@ Chi tiết các biến môi trường cấu hình tại file `.env`:
 *   `GEMINI_API_KEY`: API Key kết nối dịch vụ Google Gemini.
 *   `P2B_MODEL_CACHE_DIR`: Thư mục lưu trữ cache model ONNX (mặc định sẽ lưu tại `~/.cache/p2b-embeddings`).
 
+### 📝 Ghi công & Nguồn dữ liệu
+Dự án sử dụng cơ sở dữ liệu pháp luật Việt Nam từ các nguồn dữ liệu công khai:
+*   Dữ liệu chính thức từ cổng thông tin: [vbpl.vn](https://vbpl.vn) (Cổng thông tin Pháp điển / Bộ Tư pháp).
+*   Bộ dữ liệu Hugging Face: [tmquan/vbpl-vn](https://huggingface.co/datasets/tmquan/vbpl-vn) của tác giả `tmquan`.
+
 ---
 ---
 
@@ -331,3 +336,10 @@ Key environment configurations inside `.env`:
 *   `SUPABASE_URL` / `SUPABASE_SECRET_KEY`: Used for authentication and bucket signing operations.
 *   `GEMINI_API_KEY`: API Key for Google Gemini services.
 *   `P2B_MODEL_CACHE_DIR`: Local persistent cache folder path for model files (defaults to `~/.cache/p2b-embeddings`).
+
+---
+
+### 📝 Credits & Data Sources
+This project uses Vietnamese legal documents from open public sources:
+*   Official data from: [vbpl.vn](https://vbpl.vn) (Ministry of Justice of Vietnam).
+*   Hugging Face dataset: [tmquan/vbpl-vn](https://huggingface.co/datasets/tmquan/vbpl-vn) by `tmquan`.
